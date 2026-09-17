@@ -34,4 +34,16 @@ public class GlobalExceptionHandler {
                 errors
         );
     }
+
+    @ExceptionHandler(PlaceNotFoundException.class)
+    public ErrorResponse handlePlaceNotFoundException(
+            PlaceNotFoundException exception
+    ) {
+
+        return new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                exception.getMessage(),
+                Map.of()
+        );
+    }
 }
