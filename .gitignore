@@ -1,0 +1,26 @@
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Java / Maven
+**/target/
+**/build/
+
+# Node
+**/node_modules/
+**/dist/
+
+# Environment / secrets
+.env
+**/.env
+
+# Spring secrets
+application.properties
+**/application.properties
+
+# OS
+.DS_Store
+Thumbs.db
