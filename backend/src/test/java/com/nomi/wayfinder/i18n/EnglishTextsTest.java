@@ -2,6 +2,7 @@ package com.nomi.wayfinder.i18n;
 
 import com.nomi.wayfinder.assistant.ResponseComposer;
 import com.nomi.wayfinder.config.WebConfig;
+import com.nomi.wayfinder.dto.NearbyPlaceResponse;
 import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.dto.RouteDtos.StopPlace;
 import com.nomi.wayfinder.dto.RouteDtos.StopResponse;
@@ -9,6 +10,7 @@ import com.nomi.wayfinder.dto.RouteDtos.WeatherSnapshot;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.service.Interests;
 import com.nomi.wayfinder.service.PlaceMapper;
+import com.nomi.wayfinder.service.RecommendationService.Recommendation;
 import com.nomi.wayfinder.service.RouteService;
 import com.nomi.wayfinder.weather.WeatherCondition;
 import com.nomi.wayfinder.weather.WeatherForecast.DaySummary;
@@ -189,5 +191,53 @@ class EnglishTextsTest {
                 LocalTime.of(9, 0), LocalTime.of(22, 0), 2, 700, 400, 800, 12, WalkingTolerance.MEDIUM, List.of(),
                 new WeatherSnapshot("CLEAR", 24.0, "The weather is clear, up to 24°C. Good for exploring."),
                 List.of(), stops, null, null);
+    }
+
+    @Test
+    void unknownPriceStopLineAndTotalInBothLanguages() {
+        assertThat(composer.planCreated(osmRoute()))
+                .contains("15:00 → Kahve: Kahve Durağı (fiyat bilgisi yok)")
+                .contains("Toplam tahmini harcama (fiyatı bilinen duraklar): ~0 TL");
+
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        assertThat(composer.planCreated(osmRoute()))
+                .contains("15:00 → Coffee: Kahve Durağı (no price info)")
+                .contains("Estimated total spend (stops with known prices): ~0 TL");
+    }
+
+    // A one-stop route whose place has no known price (e.g. from OpenStreetMap)
+    private static RouteResponse osmRoute() {
+        StopResponse osmStop = new StopResponse(3L, 0, StopType.COFFEE, StopType.COFFEE.getLabel(),
+                LocalTime.of(15, 0), LocalTime.of(15, 45), 300, 5, List.of(), StopStatus.PLANNED,
+                new StopPlace(12L, "Kahve Durağı", PlaceCategory.CAFE, null, null, 40.99, 29.02, null, null, true));
+        return new RouteResponse(1L, "R", LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02,
+                LocalTime.of(15, 0), LocalTime.of(22, 0), 1, null, 0, 300, 5, WalkingTolerance.MEDIUM, List.of(),
+                null, List.of(), List.of(osmStop), null, null);
+    }
+
+    @Test
+    void fartherRecommendationsGetTheirOwnSection() {
+        Recommendation near = recommendation("Yakın Kafe", List.of("Başlangıç noktana 300 m (~6 dk yürüme)"), null);
+        Recommendation far = recommendation("Uzak Kafe",
+                List.of("1,8 km uzakta (yürüyerek ~32 dk)", "Puanı 4.7"), "Puanı daha yüksek (4.7)");
+
+        assertThat(composer.recommendations(List.of(near), List.of(far), StopType.COFFEE.getLabel()))
+                .isEqualTo("""
+                        Kahve için önerilerim:
+                        1. Yakın Kafe — Başlangıç noktana 300 m (~6 dk yürüme)
+
+                        Daha uygun ama sana yakın değil:
+                        • Uzak Kafe — 1,8 km uzakta (yürüyerek ~32 dk) · Puanı daha yüksek (4.7)""");
+
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        assertThat(composer.recommendations(List.of(), List.of(far), StopType.COFFEE.getLabel()))
+                .startsWith("I could not find a suitable coffee place open near you right now.")
+                .contains("\n\nA better fit, but not close to you:\n• Uzak Kafe — ");
+    }
+
+    private static Recommendation recommendation(String name, List<String> reasons, String whyBetter) {
+        NearbyPlaceResponse place = new NearbyPlaceResponse();
+        place.setName(name);
+        return new Recommendation(place, StopType.COFFEE, 80, reasons, whyBetter);
     }
 }

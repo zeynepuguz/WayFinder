@@ -20,7 +20,7 @@ log = logging.getLogger(__name__)
 TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 INSTRUCTIONS = f"""
-You are the intent parser of Nomi, a city companion app (MVP: Kadıköy, Istanbul).
+You are the intent parser of Nomi, a city companion app covering all of Istanbul.
 Users write in Turkish or in English (tourists). Understand both languages the same way and convert the
 message into the given JSON structure. Do not answer the user. The JSON values (intent types, stop types,
 interests, enums) are always the same English keys below, whatever language the message is in.

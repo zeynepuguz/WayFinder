@@ -1,4 +1,4 @@
-import { formatCost, formatDistance, formatTime, haversineMeters } from './format'
+import { formatCost, formatDistance, formatTime, haversineMeters, withinBudget } from './format'
 
 describe('format helpers', () => {
   it('formats times, distances and costs for Turkish users', () => {
@@ -6,8 +6,17 @@ describe('format helpers', () => {
     expect(formatDistance(320.4)).toBe('320 m')
     expect(formatDistance(1250)).toBe('1,3 km')
     expect(formatCost(0)).toBe('Ücretsiz')
-    expect(formatCost(null)).toBe('Ücretsiz')
+    expect(formatCost(null)).toBe('Fiyat bilgisi yok')
+    expect(formatCost(undefined)).toBe('Fiyat bilgisi yok')
     expect(formatCost(1500)).toBe('~1.500 TL')
+  })
+
+  it('never treats an unknown price as free in the budget filter', () => {
+    expect(withinBudget(null, 200)).toBe(false)
+    expect(withinBudget(undefined, 0)).toBe(false)
+    expect(withinBudget(0, 0)).toBe(true)
+    expect(withinBudget(150, 200)).toBe(true)
+    expect(withinBudget(250, 200)).toBe(false)
   })
 
   it('computes distances between coordinates', () => {

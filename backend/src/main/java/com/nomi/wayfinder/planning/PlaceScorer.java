@@ -18,6 +18,8 @@ import java.util.Locale;
 public class PlaceScorer {
 
     static final double DEFAULT_RATING = 3.8;
+    // With a budget, a place of unknown price is slightly less attractive than one known to fit
+    static final double UNKNOWN_PRICE_PENALTY = 4;
 
     public ScoredPlace score(Candidate c) {
         Place place = c.place();
@@ -28,8 +30,9 @@ public class PlaceScorer {
         double rating = place.getRating() == null ? DEFAULT_RATING : place.getRating();
         score += rating * 20;
 
-        // 2) Distance: closer is better, relative to how far the user is willing to walk
-        score -= (c.distanceMeters() / c.maxLegMeters()) * 25;
+        // 2) Distance: closer is better, relative to how far the user is willing to walk.
+        // Kept separate so "fit" (everything but distance) can be compared across distances.
+        double distancePenalty = (c.distanceMeters() / c.maxLegMeters()) * 25;
         if (Texts.english()) {
             reasons.add(String.format(Locale.ROOT, "%d m from %s (~%d min walk)",
                     Math.round(c.distanceMeters()),
@@ -72,10 +75,14 @@ public class PlaceScorer {
             reasons.add(Texts.t("İlgi alanına uygun: ", "Matches your interests: ") + String.join(", ", matches.stream().map(Interests::label).toList()));
         }
 
-        // 5) Budget: reward places that leave room for the rest of the day
-        int cost = c.totalCost();
+        // 5) Budget: reward places that leave room for the rest of the day.
+        // Unknown price (null, e.g. OpenStreetMap places) is not free: with a budget it gets a small
+        // penalty instead of a bonus, because we cannot tell whether it fits.
+        Integer cost = c.totalCost();
         if (c.budgetAllowance() != null) {
-            if (c.budgetAllowance() <= 0) {
+            if (cost == null) {
+                score -= UNKNOWN_PRICE_PENALTY;
+            } else if (c.budgetAllowance() <= 0) {
                 // Budget already used up: anything that costs money gets the full penalty
                 score -= cost > 0 ? 20 : 0;
             } else {
@@ -83,7 +90,8 @@ public class PlaceScorer {
                 score += Math.max(-20, Math.min(10, 10 * (1 - ratio)));
             }
         }
-        reasons.add(cost == 0 ? Texts.t("Ücretsiz", "Free") :
+        reasons.add(cost == null ? Texts.t("Fiyat bilgisi yok", "No price info")
+                : cost == 0 ? Texts.t("Ücretsiz", "Free") :
                 String.format(Locale.ROOT, Texts.t("Kişi başı ~%d TL", "~%d TL per person"), place.getEstimatedCost()));
 
         // 6) Unknown opening hours are a small risk
@@ -93,7 +101,7 @@ public class PlaceScorer {
             reasons.add(Texts.t("Bu saatte açık", "Open at this time"));
         }
 
-        return new ScoredPlace(place, score, reasons);
+        return new ScoredPlace(place, score - distancePenalty, score, reasons);
     }
 
     private static boolean isEvening(LocalTime time) {
@@ -101,6 +109,7 @@ public class PlaceScorer {
     }
 
     /**
+     * @param totalCost       TL for the whole party; null = price unknown (0 = free)
      * @param budgetAllowance TL this stop may use for the whole party (null = no budget)
      * @param openStatus      true = open, null = unknown (false is filtered out before scoring)
      */
@@ -113,12 +122,16 @@ public class PlaceScorer {
             LocalTime arrival,
             WeatherContext weather,
             List<String> interests,
-            int totalCost,
+            Integer totalCost,
             Double budgetAllowance,
             Boolean openStatus
     ) {
     }
 
-    public record ScoredPlace(Place place, double score, List<String> reasons) {
+    /**
+     * @param score    everything, including distance; the route planner picks by this
+     * @param fitScore the same without the distance term: how well the place itself suits the request
+     */
+    public record ScoredPlace(Place place, double score, double fitScore, List<String> reasons) {
     }
 }

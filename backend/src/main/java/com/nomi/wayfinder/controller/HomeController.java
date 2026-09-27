@@ -6,6 +6,7 @@ import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.security.CurrentUser;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
+import com.nomi.wayfinder.service.RecommendationService.TieredRecommendations;
 import com.nomi.wayfinder.service.RouteService;
 import com.nomi.wayfinder.weather.HourlyWeather;
 import com.nomi.wayfinder.weather.WeatherForecast;
@@ -72,12 +73,14 @@ public class HomeController {
                 .orElse(null);
 
         StopType suggestedType = RecommendationService.suggestedTypeAt(now);
-        List<Recommendation> suggestions = recommendationService.recommend(lat, lon, suggestedType, userId, 3);
+        // 3 nearby suggestions as before, plus up to 2 that fit better but are farther away
+        TieredRecommendations tiered = recommendationService.recommendTiered(lat, lon, suggestedType, userId, 3, 2);
 
         RouteSummary currentRoute = userId == null ? null
                 : routeService.findCurrentRouteSummary(userId).orElse(null);
 
-        return new HomeResponse(weather, suggestedType, suggestions, currentRoute, Texts.english() ? PROMPTS_EN : PROMPTS);
+        return new HomeResponse(weather, suggestedType, tiered.nearby(), tiered.farther(), currentRoute,
+                Texts.english() ? PROMPTS_EN : PROMPTS);
     }
 
     private WeatherNow toWeatherNow(WeatherForecast forecast, LocalTime now) {
@@ -106,6 +109,8 @@ public class HomeController {
             WeatherNow weather,
             StopType suggestedStopType,
             List<Recommendation> suggestions,
+            // "Daha uygun ama sana yakın değil": each starts its reasons with a distance line and has whyBetter
+            List<Recommendation> fartherSuggestions,
             RouteSummary currentRoute,
             List<String> prompts
     ) {

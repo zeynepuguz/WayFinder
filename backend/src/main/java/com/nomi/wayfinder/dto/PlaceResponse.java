@@ -24,6 +24,9 @@ public class PlaceResponse {
     // null = opening hours unknown
     private Boolean openNow;
     private String source;
+    // true = hand-verified data; false = imported from OpenStreetMap (no price / rating / description)
+    private boolean verified;
+    private String sourceUrl;
     private Instant lastVerifiedAt;
 
     public Long getId() {
@@ -152,6 +155,22 @@ public class PlaceResponse {
 
     public void setSource(String source) {
         this.source = source;
+    }
+
+    public boolean isVerified() {
+        return verified;
+    }
+
+    public void setVerified(boolean verified) {
+        this.verified = verified;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
     }
 
     public Instant getLastVerifiedAt() {

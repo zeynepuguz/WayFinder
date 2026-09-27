@@ -51,7 +51,7 @@ public class RouteMapper {
         );
     }
 
-    // Skipped stops cost nothing
+    // Skipped stops cost nothing; stops with unknown price (null) are left out, not counted as free
     public int totalCost(Route route) {
         return route.getStops().stream()
                 .filter(s -> s.getStatus() != StopStatus.SKIPPED)

@@ -1,8 +1,8 @@
-import { Clock, Heart, Info, MapPin, Navigation, Timer, Umbrella, Wallet } from 'lucide-react'
+import { Clock, ExternalLink, Heart, Info, MapPin, Navigation, Timer, Umbrella, Wallet } from 'lucide-react'
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
-import { OpenBadge } from '../components/PlaceViews'
+import { OpenBadge, VerifiedBadge } from '../components/PlaceViews'
 import { RouteMap } from '../components/RouteMap'
 import { BackButton, ErrorState, Skeleton } from '../components/ui'
 import { CATEGORY_ICON, Rating } from '../components/visuals'
@@ -59,6 +59,7 @@ export function PlaceDetailPage() {
           <div className="row wrap" style={{ gap: 8 }}>
             <Rating value={place.rating} />
             <OpenBadge openNow={place.openNow} />
+            {place.verified && <VerifiedBadge />}
             {place.indoor ? <span className="badge badge-sea"><Umbrella size={12} /> {t('Kapalı alan', 'Indoor')}</span>
               : <span className="badge">{t('Açık alan', 'Outdoor')}</span>}
           </div>
@@ -70,12 +71,12 @@ export function PlaceDetailPage() {
           {place.address && <div className="info-row"><MapPin size={18} />{place.address}</div>}
           <div className="info-row">
             <Clock size={18} />
-            {place.openingHours.length === 0 ? t('Saat bilgisi yok', 'No opening hours')
+            {place.openingHours.length === 0 ? t('Çalışma saati bilgisi yok', 'Opening hours unknown')
               : todayHours.length ? `${t('Bugün', 'Today')} ${todayHours.map(h => `${formatTime(h.opensAt)}–${formatTime(h.closesAt)}`).join(', ')}`
                 : t('Bugün kapalı', 'Closed today')}
           </div>
-          <div className="info-row"><Wallet size={18} />{formatCost(place.estimatedCost)}{place.estimatedCost ? t(' kişi başı, tahmini', ' per person, estimated') : ''}</div>
-          {place.avgVisitMinutes && <div className="info-row"><Timer size={18} />{t(`Ortalama ${place.avgVisitMinutes} dakika`, `About ${place.avgVisitMinutes} minutes`)}</div>}
+          <div className="info-row"><Wallet size={18} />{formatCost(place.estimatedCost)}{place.estimatedCost != null && place.estimatedCost > 0 ? t(' kişi başı, tahmini', ' per person, estimated') : ''}</div>
+          {place.avgVisitMinutes != null && place.avgVisitMinutes > 0 && <div className="info-row"><Timer size={18} />{t(`Ortalama ${place.avgVisitMinutes} dakika`, `About ${place.avgVisitMinutes} minutes`)}</div>}
         </div>
 
         {place.tags.length > 0 && (
@@ -107,7 +108,19 @@ export function PlaceDetailPage() {
 
         <p className="t-caption row" style={{ alignItems: 'flex-start' }}>
           <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-          {place.lastVerifiedAt
+          {!place.verified ? (
+            <span>
+              {t('Bu mekanın bilgileri OpenStreetMap katkıcılarından geliyor ve güncel olmayabilir.', 'This place’s details come from OpenStreetMap contributors and may be out of date.')}
+              {place.sourceUrl && /^https?:\/\//.test(place.sourceUrl) && (
+                <>
+                  {' '}
+                  <a href={place.sourceUrl} target="_blank" rel="noopener noreferrer" className="section-link" style={{ fontSize: 13 }}>
+                    {t('OpenStreetMap’te gör', 'View on OpenStreetMap')} <ExternalLink size={12} />
+                  </a>
+                </>
+              )}
+            </span>
+          ) : place.lastVerifiedAt
             ? t(
               `Konum ve saatler ${new Date(place.lastVerifiedAt).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })} tarihinde kontrol edildi. Fiyatlar tahminidir; saatler değişebilir.`,
               `Location and hours checked on ${new Date(place.lastVerifiedAt).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}. Prices are estimates; hours may change.`,

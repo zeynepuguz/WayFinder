@@ -14,8 +14,29 @@ public record NomiProperties(
         Ai ai,
         RateLimit rateLimit,
         Billing billing,
-        Mail mail
+        Mail mail,
+        Osm osm
 ) {
+
+    /**
+     * OpenStreetMap place import (all of Istanbul) through the Overpass API.
+     *
+     * @param importOnStartup    import once in the background when the database has no OSM places yet
+     * @param refreshCron        Spring cron for the periodic refresh ("-" disables it)
+     * @param overpassEndpoints  tried in order; the main server is often busy
+     * @param maxAttempts        rounds over all endpoints before giving up
+     * @param retryDelay         wait between rounds (grows with each round)
+     */
+    public record Osm(
+            boolean importOnStartup,
+            String refreshCron,
+            List<String> overpassEndpoints,
+            Duration connectTimeout,
+            Duration readTimeout,
+            int maxAttempts,
+            Duration retryDelay
+    ) {
+    }
 
     /**
      * @param from        sender address of outgoing e-mails

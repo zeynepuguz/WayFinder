@@ -35,11 +35,12 @@ public class PlaceController {
             @RequestParam(required = false) @PositiveOrZero Integer maxCost,
             @RequestParam(required = false) Boolean indoor,
             @RequestParam(required = false) String q,
+            @RequestParam(required = false) Boolean verified,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Positive @Max(100) int size
     ) {
         return placeService.searchPlaces(
-                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q), page, size);
+                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q, verified), page, size);
     }
 
     // lat/lon = user's current location (from device GPS), not a place's
@@ -51,6 +52,24 @@ public class PlaceController {
             @RequestParam(defaultValue = "20") @Positive @Max(50) int limit
     ) {
         return placeService.getNearbyPlaces(lat, lon, radius, limit);
+    }
+
+    /**
+     * Live map: places inside the visible box (max 0.6° per side, else 400).
+     * lat/lon (optional) = the user's location; distances and ordering use it, else the box center.
+     */
+    @GetMapping("/in-area")
+    public List<NearbyPlaceResponse> getPlacesInArea(
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double south,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double west,
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double north,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double east,
+            @RequestParam(required = false) @DecimalMin("-90.0") @DecimalMax("90.0") Double lat,
+            @RequestParam(required = false) @DecimalMin("-180.0") @DecimalMax("180.0") Double lon,
+            @RequestParam(required = false) PlaceCategory category,
+            @RequestParam(defaultValue = "200") @Positive @Max(300) int limit
+    ) {
+        return placeService.getPlacesInArea(south, west, north, east, lat, lon, category, limit);
     }
 
     @GetMapping("/{id}")

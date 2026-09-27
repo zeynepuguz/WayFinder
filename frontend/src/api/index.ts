@@ -1,8 +1,8 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, PlansResponse,
-  AssistantReply, AuthResponse, ChatMessage, HomeResponse, Page, Place, PlaceCategory, Preferences,
-  Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
+  AssistantReply, AuthResponse, ChatMessage, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory, Preferences,
+  Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
 
 // One function per backend endpoint, so pages never build URLs themselves
@@ -28,11 +28,20 @@ export const api = {
   searchPlaces: (filter: {
     category?: PlaceCategory; q?: string; maxCost?: number; indoor?: boolean; page?: number; size?: number
   }) => http.get<Page<Place>>('/places', filter),
-  nearbyPlaces: (lat: number, lon: number, radius = 1500) =>
-    http.get<Place[]>('/places/nearby', { lat, lon, radius, limit: 50 }),
+  nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50) =>
+    http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit }),
+  // Places inside the visible map box (max 0.6° per side, max 300 items); distance from lat/lon when given
+  placesInArea: (box: MapBox, options: { lat?: number; lon?: number; category?: PlaceCategory; limit?: number } = {},
+    signal?: AbortSignal) =>
+    http.get<NearbyPlace[]>('/places/in-area', {
+      ...box, lat: options.lat, lon: options.lon, category: options.category, limit: options.limit ?? 300,
+    }, signal),
   place: (id: number) => http.get<Place>(`/places/${id}`),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
+  // Close-by picks plus better fits that are farther away
+  tieredRecommendations: (lat: number, lon: number, type?: StopType) =>
+    http.get<TieredRecommendations>('/recommendations/tiered', { lat, lon, type }),
 
   routes: (saved = false) => http.get<RouteSummary[]>('/routes', { saved }),
   route: (id: number) => http.get<Route>(`/routes/${id}`),

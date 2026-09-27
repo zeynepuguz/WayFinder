@@ -96,4 +96,37 @@ class PlaceScorerTest {
                 place, distance, 1200, RoutePlanner.walkingMinutes(distance), false, arrival, weather,
                 List.of("history"), cost, allowance, true));
     }
+
+    @Test
+    void unknownPriceIsNotFreeAndIsSlightlyPenalizedOnlyWithABudget() {
+        Place unknown = place(1, "OSM Cafe", PlaceCategory.CAFE, true, 4.5, 0);
+        unknown.setEstimatedCost(null);
+        Place known = place(2, "Cafe", PlaceCategory.CAFE, true, 4.5, 100);
+
+        PlaceScorer.ScoredPlace noBudget = scoreWithCost(unknown, null, null);
+        PlaceScorer.ScoredPlace withBudget = scoreWithCost(unknown, null, 500.0);
+
+        assertThat(noBudget.reasons()).contains("Fiyat bilgisi yok").doesNotContain("Ücretsiz");
+        assertThat(withBudget.score()).isEqualTo(noBudget.score() - PlaceScorer.UNKNOWN_PRICE_PENALTY);
+        // A known price that fits the budget beats an unknown one
+        assertThat(scoreWithCost(known, 100, 500.0).score()).isGreaterThan(withBudget.score());
+    }
+
+    @Test
+    void fitScoreIsTheScoreWithoutDistance() {
+        Place cafe = place(1, "Cafe", PlaceCategory.CAFE, true, 4.5, 100);
+
+        PlaceScorer.ScoredPlace near = score(cafe, NICE, LocalTime.of(15, 0), 100, null);
+        PlaceScorer.ScoredPlace far = score(cafe, NICE, LocalTime.of(15, 0), 1000, null);
+
+        assertThat(near.fitScore()).isEqualTo(far.fitScore());
+        assertThat(near.fitScore()).isGreaterThan(near.score());
+        assertThat(near.fitScore() - near.score()).isCloseTo(100.0 / 1200 * 25, org.assertj.core.data.Offset.offset(1e-9));
+    }
+
+    private PlaceScorer.ScoredPlace scoreWithCost(Place place, Integer cost, Double allowance) {
+        return scorer.score(new PlaceScorer.Candidate(
+                place, 300, 1200, RoutePlanner.walkingMinutes(300), false, LocalTime.of(15, 0), NICE,
+                List.of(), cost, allowance, true));
+    }
 }

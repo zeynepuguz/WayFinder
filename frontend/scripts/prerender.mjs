@@ -66,10 +66,12 @@ async function waitForApi() {
   }
 }
 
+// Only hand-verified places get pages: thousands of OpenStreetMap entries without descriptions
+// would be thin content for search engines. The app itself still shows all of them.
 async function fetchAllPlaces(lang) {
   const places = []
   for (let page = 0; ; page++) {
-    const result = await fetchJson(`/places?size=100&page=${page}`, lang)
+    const result = await fetchJson(`/places?size=100&page=${page}&verified=true`, lang)
     places.push(...result.content)
     if (page + 1 >= result.totalPages) return places
   }

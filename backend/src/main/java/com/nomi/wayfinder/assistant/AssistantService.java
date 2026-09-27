@@ -14,6 +14,7 @@ import com.nomi.wayfinder.planning.ReplanType;
 import com.nomi.wayfinder.repository.AssistantMessageRepository;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
+import com.nomi.wayfinder.service.RecommendationService.TieredRecommendations;
 import com.nomi.wayfinder.service.RouteService;
 import com.nomi.wayfinder.weather.WeatherService;
 import org.springframework.data.domain.PageRequest;
@@ -142,11 +143,12 @@ public class AssistantService {
         StopType type = intent.recommendType() != null ? intent.recommendType()
                 : RecommendationService.suggestedTypeAt(LocalTime.now(clock));
 
-        List<Recommendation> recommendations = recommendationService.recommend(
-                request.latitude(), request.longitude(), type, userId, 3);
+        // Nearby first; places that fit better but are farther go in their own sub-section of the text
+        TieredRecommendations tiered = recommendationService.recommendTiered(
+                request.latitude(), request.longitude(), type, userId, 3, 2);
 
-        return new AssistantReply(composer.recommendations(recommendations, type.getLabel()),
-                intent, null, recommendations, List.of());
+        return new AssistantReply(composer.recommendations(tiered.nearby(), tiered.farther(), type.getLabel()),
+                intent, null, tiered.nearby(), List.of());
     }
 
     private AssistantReply weather(AssistantRequest request, AssistantIntent intent) {

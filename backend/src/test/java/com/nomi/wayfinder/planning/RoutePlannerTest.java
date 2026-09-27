@@ -201,6 +201,36 @@ class RoutePlannerTest {
 
     // ---------- helpers ----------
 
+
+    @Test
+    void unknownPricesAreLeftOutOfTheTotalWithANote() {
+        Place unknown = place(1, "OSM Cafe", PlaceCategory.CAFE, true, 4.5, 0);
+        unknown.setEstimatedCost(null);
+        add(unknown, 100);
+
+        PlanResult result = planner.plan(request(List.of(PlanningSlot.at(StopType.COFFEE, LocalTime.of(10, 0))),
+                500, false));
+
+        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("OSM Cafe");
+        assertThat(result.stops().getFirst().reasons()).contains("Fiyat bilgisi yok");
+        assertThat(result.notes()).contains("1 durağın fiyat bilgisi yok; toplam tahmine dahil edilmedi.");
+        assertThat(result.notes()).noneMatch(n -> n.contains("bütçeyi"));
+    }
+
+    @Test
+    void withABudgetAKnownPriceIsPreferredOverAnUnknownOneOfEqualQuality() {
+        Place unknown = place(1, "Unknown", PlaceCategory.CAFE, true, 4.5, 0);
+        unknown.setEstimatedCost(null);
+        add(unknown, 200);
+        add(place(2, "Known", PlaceCategory.CAFE, true, 4.5, 80), 200);
+
+        PlanResult result = planner.plan(request(List.of(PlanningSlot.at(StopType.COFFEE, LocalTime.of(10, 0))),
+                500, false));
+
+        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Known");
+        assertThat(result.notes()).noneMatch(n -> n.contains("fiyat bilgisi yok"));
+    }
+
     private void add(Place place, double distance) {
         places.put(place.getId(), place);
         candidates.computeIfAbsent(place.getCategory(), c -> new ArrayList<>())

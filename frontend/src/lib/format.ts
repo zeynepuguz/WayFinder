@@ -84,9 +84,16 @@ export function formatDistance(meters: number): string {
   return `${(meters / 1000).toLocaleString(locale(), { maximumFractionDigits: 1 })} km`
 }
 
+// null = price unknown (most OpenStreetMap places), 0 = free
 export function formatCost(cost: number | null | undefined): string {
-  if (!cost) return tr('Ücretsiz', 'Free')
+  if (cost == null) return tr('Fiyat bilgisi yok', 'No price info')
+  if (cost === 0) return tr('Ücretsiz', 'Free')
   return `~${cost.toLocaleString(locale())} TL`
+}
+
+// Price filter: a place with an unknown price never counts as "within budget"
+export function withinBudget(cost: number | null | undefined, max: number): boolean {
+  return cost != null && cost <= max
 }
 
 export function formatDate(date: string): string {
@@ -103,7 +110,7 @@ export function todayIso(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }
 
-// Great-circle distance, only used on the client to decide if the user is inside the MVP area
+// Great-circle distance on the client (live map: distance to a pin, when to refresh suggestions)
 export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180
   const dLat = toRad(lat2 - lat1)

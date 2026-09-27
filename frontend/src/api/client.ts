@@ -53,7 +53,7 @@ export function buildQuery(query?: Query): string {
   return text ? `?${text}` : ''
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, query?: Query, signal?: AbortSignal): Promise<T> {
   // Accept-Language: the backend answers (assistant, route notes, place texts) in the app's language
   const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': currentLang() }
   const token = tokenStore.get()
@@ -66,8 +66,11 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
+      signal,
     })
-  } catch {
+  } catch (e) {
+    // Cancelled by the caller (e.g. the map moved again): not a connection problem
+    if (signal?.aborted) throw e
     throw new ApiRequestError({ status: 0, message: tr('Sunucuya ulaşılamıyor', 'Can’t reach the server'), errors: {} })
   }
 
@@ -97,7 +100,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
 }
 
 export const http = {
-  get: <T>(path: string, query?: Query) => request<T>('GET', path, undefined, query),
+  get: <T>(path: string, query?: Query, signal?: AbortSignal) => request<T>('GET', path, undefined, query, signal),
   post: <T>(path: string, body?: unknown) => request<T>('POST', path, body ?? {}),
   put: <T>(path: string, body?: unknown) => request<T>('PUT', path, body),
   patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body),

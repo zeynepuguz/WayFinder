@@ -88,10 +88,25 @@ export interface Place {
   avgVisitMinutes: number | null
   tags: string[]
   openingHours: OpeningHours[]
+  // openingHours empty = hours unknown, then openNow is null
   openNow: boolean | null
   source: string
   lastVerifiedAt: string | null
+  // false for places imported from OpenStreetMap (details may be out of date)
+  verified: boolean
+  // link to the OpenStreetMap object for imported places
+  sourceUrl: string | null
   distanceMeters?: number
+}
+
+// /places/nearby and /places/in-area items (distanceMeters is set when a position was sent)
+export type NearbyPlace = Place
+
+export interface MapBox {
+  south: number
+  west: number
+  north: number
+  east: number
 }
 
 export interface Page<T> {
@@ -106,7 +121,15 @@ export interface Recommendation {
   place: Place
   type: StopType
   score: number
+  // farther items: reasons[0] is a localized distance line ("1,8 km uzakta (yürüyerek ~23 dk)")
   reasons: string[]
+  // null for nearby items; a short localized sentence for farther ones
+  whyBetter: string | null
+}
+
+export interface TieredRecommendations {
+  nearby: Recommendation[]
+  farther: Recommendation[]
 }
 
 // ---------- weather / home ----------
@@ -134,6 +157,8 @@ export interface HomeResponse {
   weather: WeatherNow | null
   suggestedStopType: StopType
   suggestions: Recommendation[]
+  // 0–2 better fits that are not close to the user
+  fartherSuggestions: Recommendation[]
   currentRoute: RouteSummary | null
   prompts: string[]
 }

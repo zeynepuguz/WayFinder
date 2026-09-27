@@ -56,6 +56,59 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("limit") int limit
     );
 
+    /**
+     * Like findCandidates, but only places between minRadius and maxRadius ("better but farther").
+     * There can be hundreds in 5 km, so the most promising come first: real rating, then interest
+     * matches (interests = comma separated tags, "" for none), then distance.
+     */
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :maxRadius)
+              AND NOT ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :minRadius)
+              AND (p.category IN (:categories)
+                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            ORDER BY p.rating DESC NULLS LAST,
+                     (p.tags && string_to_array(CAST(:interests AS text), ',')) DESC,
+                     "distanceMeters"
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PlaceDistance> findCandidatesInRing(
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("minRadius") double minRadiusMeters,
+            @Param("maxRadius") double maxRadiusMeters,
+            @Param("categories") Collection<String> categories,
+            @Param("tag") String tag,
+            @Param("interests") String interests,
+            @Param("limit") int limit
+    );
+
+    /**
+     * Places inside a map viewport (south/west/north/east in degrees). The && bounding box test uses
+     * the GiST index. Verified places first, then by distance from (lat, lon).
+     */
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE p.location && CAST(ST_MakeEnvelope(:west, :south, :east, :north, 4326) AS geography)
+              AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
+            ORDER BY CASE WHEN p.source = 'OSM' THEN 1 ELSE 0 END, "distanceMeters"
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PlaceDistance> findInArea(
+            @Param("south") double south,
+            @Param("west") double west,
+            @Param("north") double north,
+            @Param("east") double east,
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("category") String category,
+            @Param("limit") int limit
+    );
+
     @Query(value = """
             SELECT ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography))
             FROM places p

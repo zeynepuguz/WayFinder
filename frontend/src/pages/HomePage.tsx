@@ -1,11 +1,11 @@
 import {
-  ArrowUp, ChevronRight, Crown, Landmark, MapPin, Navigation, Sparkles, UserRound, Waves, Wallet, Coffee, type LucideIcon,
+  ArrowUp, ChevronRight, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Sparkles, UserRound, Waves, Wallet, Coffee, type LucideIcon,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import type { PlaceCategory } from '../api/types'
 import { useGate } from '../components/gate'
-import { PlaceCard } from '../components/PlaceViews'
+import { FartherPlaceRow, PlaceCard } from '../components/PlaceViews'
 import { ErrorState, Skeleton } from '../components/ui'
 import { BrandMark, CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
@@ -91,10 +91,10 @@ export function HomePage() {
         <div className="stack" style={{ gap: 8 }}>
           <button className="location-chip" onClick={location.refresh} style={{ alignSelf: 'flex-start' }}>
             <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
-            <Navigation size={13} /> {location.source === 'gps' ? t('Kadıköy, İstanbul', 'Kadıköy, Istanbul') : locationLabel(location.source)}
+            <Navigation size={13} /> {location.source === 'gps' ? t('Konumun · İstanbul', 'Your location · Istanbul') : locationLabel(location.source)}
           </button>
           <h1 className="t-display">
-            {user ? `${greeting}, ${user.displayName.split(' ')[0]}` : t('Kadıköy’de bugün ne yapsak?', 'What shall we do in Kadıköy today?')}
+            {user ? `${greeting}, ${user.displayName.split(' ')[0]}` : t('İstanbul’da bugün ne yapsak?', 'What shall we do in Istanbul today?')}
           </h1>
         </div>
 
@@ -160,6 +160,17 @@ export function HomePage() {
         {data && data.suggestions.length === 0 && (
           <p className="t-caption">{t('Yakınında şu an açık bir öneri bulamadım.', 'I couldn’t find anything open near you right now.')}</p>
         )}
+        {data && (data.fartherSuggestions ?? []).length > 0 && (
+          <div className="stack-sm">
+            <h3 className="t-overline">{t('Daha uygun ama sana yakın değil', 'A better fit, but not close to you')}</h3>
+            <div className="farther-list">
+              {data.fartherSuggestions.map(s => <FartherPlaceRow key={s.place.id} recommendation={s} />)}
+            </div>
+          </div>
+        )}
+        <Link to="/explore?view=map" className="section-link" style={{ alignSelf: 'flex-start' }}>
+          <MapIcon size={16} style={{ marginRight: 4 }} /> {t('Haritada gör', 'See on map')} <ChevronRight size={16} />
+        </Link>
       </section>
 
       <section className="section">
@@ -197,7 +208,7 @@ export function HomePage() {
 
       {data && (
         <p className="t-caption" style={{ textAlign: 'center' }}>
-          <MapPin size={12} style={{ verticalAlign: -1 }} /> {t('Nomi şu an Kadıköy’de hizmet veriyor.', 'Nomi currently covers Kadıköy.')}
+          <MapPin size={12} style={{ verticalAlign: -1 }} /> {t('Nomi İstanbul genelinde hizmet veriyor.', 'Nomi covers all of Istanbul.')}
         </p>
       )}
 

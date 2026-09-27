@@ -25,7 +25,7 @@ interface Message {
 // Functions, not constants: the texts follow the language chosen at runtime
 const starters = () => [
   tr('2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz', 'We’re 2 people with 700 TL, we’d like breakfast and coffee'),
-  tr('Kadıköy’e ilk defa geliyorum, bir günlük rota planla', 'It’s my first time in Kadıköy, plan a day for me'),
+  tr('İstanbul’a ilk defa geliyorum, bir günlük rota planla', 'It’s my first time in Istanbul, plan a day for me'),
   tr('Yakında iyi bir kahveci öner', 'Suggest a good coffee place nearby'),
 ]
 const duringTrip = () => [

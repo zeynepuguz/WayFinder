@@ -83,6 +83,8 @@ public class PlaceMapper {
                 .toList());
         response.setOpenNow(place.isOpenDuring(now.toLocalDate(), now.toLocalTime(), 0));
         response.setSource(place.getSource());
+        response.setVerified(place.isVerified());
+        response.setSourceUrl(place.getSourceUrl());
         response.setLastVerifiedAt(place.getLastVerifiedAt());
 
         return response;

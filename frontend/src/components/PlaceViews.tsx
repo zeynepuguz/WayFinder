@@ -1,6 +1,6 @@
-import { Check, Heart, MapPin } from 'lucide-react'
+import { BadgeCheck, Check, Heart, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
-import type { Place } from '../api/types'
+import type { Place, Recommendation } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
 import { CATEGORY_LABELS, formatCost, formatDistance } from '../lib/format'
 import { useT } from '../lib/i18n'
@@ -33,6 +33,12 @@ export function OpenBadge({ openNow }: { openNow: boolean | null }) {
   const t = useT()
   if (openNow == null) return null
   return <span className={`badge ${openNow ? 'badge-success' : 'badge-danger'}`}>{openNow ? t('Açık', 'Open') : t('Kapalı', 'Closed')}</span>
+}
+
+// Places checked by the Nomi team (OpenStreetMap imports are not)
+export function VerifiedBadge() {
+  const t = useT()
+  return <span className="badge badge-success"><BadgeCheck size={12} /> {t('Doğrulandı', 'Verified')}</span>
 }
 
 // Compact row for lists
@@ -84,5 +90,20 @@ export function PlaceCard({ place, reason }: { place: Place; reason?: string }) 
       </Link>
       <SaveButton place={place} glass />
     </div>
+  )
+}
+
+// Smaller row for a "better fit, but farther away" suggestion: distance line + why it is worth it
+export function FartherPlaceRow({ recommendation }: { recommendation: Recommendation }) {
+  const { place, reasons, whyBetter } = recommendation
+  return (
+    <Link to={`/places/${place.id}`} className="card farther-row card-press">
+      <CategoryTile category={place.category} size={22} />
+      <div className="grow stack-sm" style={{ gap: 2 }}>
+        <span className="place-name" style={{ fontSize: 15 }}>{place.name}</span>
+        {reasons[0] && <span className="t-caption">{reasons[0]}</span>}
+        {whyBetter && <span className="t-caption rec-why">{whyBetter}</span>}
+      </div>
+    </Link>
   )
 }

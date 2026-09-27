@@ -16,6 +16,7 @@ public record PlannedStop(
         List<String> reasons
 ) {
 
+    // Unknown price (null) adds nothing to totals; the plan gets a note about it instead
     public int totalCost(int partySize) {
         Integer cost = place.getEstimatedCost();
         return cost == null ? 0 : cost * partySize;

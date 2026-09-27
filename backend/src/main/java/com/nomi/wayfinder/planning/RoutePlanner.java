@@ -128,6 +128,12 @@ public class RoutePlanner {
                     "Estimated spending is about " + (-remainingBudget) + " TL over the budget."));
         }
 
+        // Unknown prices are left out of the totals (not counted as free); say so
+        long unknownPrice = stops.stream().filter(s -> s.place().getEstimatedCost() == null).count();
+        if (unknownPrice > 0) {
+            notes.add(unknownPriceNote(unknownPrice));
+        }
+
         return new PlanResult(stops, notes, forecast, advice);
     }
 
@@ -198,7 +204,9 @@ public class RoutePlanner {
 
         for (PlaceDistance candidate : found) {
             Place place = places.get(candidate.getId());
-            if (place == null || used.contains(place.getId())) {
+            if (place == null || used.contains(place.getId())
+                    // Route legs are walked: stay on the same side of the Bosphorus
+                    || !BosphorusSides.sameSide(leg.latitude(), leg.longitude(), place.getLatitude(), place.getLongitude())) {
                 continue;
             }
 
@@ -209,7 +217,8 @@ public class RoutePlanner {
                 continue;
             }
 
-            int cost = place.getEstimatedCost() == null ? 0 : place.getEstimatedCost() * request.partySize();
+            // null = price unknown (e.g. OpenStreetMap places); the scorer handles it
+            Integer cost = place.getEstimatedCost() == null ? null : place.getEstimatedCost() * request.partySize();
 
             PlaceScorer.ScoredPlace scored = scorer.score(new PlaceScorer.Candidate(
                     place,
@@ -226,13 +235,15 @@ public class RoutePlanner {
             ));
 
             timings.put(place.getId(), timing);
-            boolean fits = leg.allowance() == null || cost <= leg.allowance() * 1.4;
+            // An unknown price cannot be shown to be over budget; the scorer already prefers known prices
+            boolean fits = leg.allowance() == null || cost == null || cost <= leg.allowance() * 1.4;
             if (fits) {
                 affordable.add(scored);
             } else {
                 // Over budget: every 10 TL over the allowance costs one point, so the fallback stays cheap
                 double overspend = cost - Math.max(0, leg.allowance());
-                overBudget.add(new PlaceScorer.ScoredPlace(place, scored.score() - overspend / 10, scored.reasons()));
+                overBudget.add(new PlaceScorer.ScoredPlace(place, scored.score() - overspend / 10,
+                        scored.fitScore() - overspend / 10, scored.reasons()));
             }
         }
 
@@ -341,6 +352,12 @@ public class RoutePlanner {
         }
         return placeRepository.findByIdIn(found.stream().map(PlaceDistance::getId).toList()).stream()
                 .collect(Collectors.toMap(Place::getId, Function.identity()));
+    }
+
+    static String unknownPriceNote(long count) {
+        return Texts.t(count + " durağın fiyat bilgisi yok; toplam tahmine dahil edilmedi.",
+                count == 1 ? "1 stop has no price info; it is not included in the estimated total."
+                        : count + " stops have no price info; they are not included in the estimated total.");
     }
 
     public static int walkingMinutes(double distanceMeters) {

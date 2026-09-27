@@ -16,6 +16,8 @@ import java.util.List;
 @Table(name = "places")
 public class Place {
 
+    public static final String OSM_SOURCE = "OSM";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -56,7 +58,8 @@ public class Place {
     @Column(columnDefinition = "text[]", nullable = false)
     private List<String> tags = new ArrayList<>();
 
-    // Where the data came from (SEED_UNVERIFIED, ADMIN, OSM, ...) and when it was last checked
+    // Where the data came from (WEB_CHECK, MANUAL, ADMIN, OSM, ...) and when it was last checked.
+    // OSM rows are written by OsmPlaceImporter (JDBC); their osm_id column is not mapped here.
     @Column(nullable = false)
     private String source = "MANUAL";
 
@@ -100,8 +103,10 @@ public class Place {
         LocalDateTime visitStart = date.atTime(arrival);
         LocalDateTime visitEnd = visitStart.plusMinutes(minutes);
 
-        // The previous day's row matters when it closes after midnight
-        for (LocalDate day : List.of(date.minusDays(1), date)) {
+        // The previous day's row matters when it closes after midnight; the next day's when the
+        // visit runs past midnight into an opening that starts at 00:00 (e.g. 24/7 places)
+        List<LocalDateTime[]> intervals = new ArrayList<>();
+        for (LocalDate day : List.of(date.minusDays(1), date, date.plusDays(1))) {
             int dayOfWeek = day.getDayOfWeek().getValue();
 
             for (PlaceOpeningHours hours : openingHours) {
@@ -113,14 +118,36 @@ public class Place {
                 LocalDateTime closes = hours.closesAfterMidnight()
                         ? day.plusDays(1).atTime(hours.getClosesAt())
                         : day.atTime(hours.getClosesAt());
-
-                if (!visitStart.isBefore(opens) && !visitEnd.isAfter(closes)) {
-                    return true;
-                }
+                intervals.add(new LocalDateTime[]{opens, closes});
             }
         }
 
-        return false;
+        // Openings that touch or overlap count as one (Mon 00:00-24:00 + Tue 00:00-24:00 = open through midnight)
+        intervals.sort(java.util.Comparator.comparing(i -> i[0]));
+        LocalDateTime[] current = null;
+        for (LocalDateTime[] interval : intervals) {
+            if (current != null && !interval[0].isAfter(current[1])) {
+                if (interval[1].isAfter(current[1])) {
+                    current[1] = interval[1];
+                }
+                continue;
+            }
+            if (current != null && covers(current, visitStart, visitEnd)) {
+                return true;
+            }
+            current = new LocalDateTime[]{interval[0], interval[1]};
+        }
+
+        return current != null && covers(current, visitStart, visitEnd);
+    }
+
+    private static boolean covers(LocalDateTime[] interval, LocalDateTime start, LocalDateTime end) {
+        return !start.isBefore(interval[0]) && !end.isAfter(interval[1]);
+    }
+
+    // Hand-verified (web check, admin) as opposed to imported from OpenStreetMap
+    public boolean isVerified() {
+        return !OSM_SOURCE.equals(source);
     }
 
     public boolean hasTag(String tag) {

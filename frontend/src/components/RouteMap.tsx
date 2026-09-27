@@ -3,6 +3,7 @@ import L from 'leaflet'
 import { useEffect } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
 import { useT } from '../lib/i18n'
+import { TILE_ATTRIBUTION, TILE_URL } from './mapTiles'
 
 export interface MapPoint {
   latitude: number
@@ -18,12 +19,6 @@ interface Props {
   height?: number
   hero?: boolean
 }
-
-// Map tiles: a commercial app needs its own tile provider/key (VITE_MAP_TILE_URL). The default is
-// the public OpenStreetMap server, which is only fine for development.
-const TILE_URL = import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const TILE_ATTRIBUTION = import.meta.env.VITE_MAP_ATTRIBUTION
-  || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 // Pins are drawn with CSS, so no marker image files need to be bundled
 function pinIcon(label: string, muted?: boolean) {

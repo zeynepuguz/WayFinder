@@ -1,10 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { haversineMeters } from '../lib/format'
 import { tr } from '../lib/i18n'
+import { isInIstanbul } from '../lib/geo'
 
-// MVP data only covers Kadıköy. Outside of it we use a demo location so the app still works.
+// Nomi covers Istanbul. Outside of it (or without a fix) we use a demo location in Kadıköy so the app still works.
 export const KADIKOY = { latitude: 40.991, longitude: 29.023 }
-const MVP_RADIUS_METERS = 15000
 
 // demo-denied: the user refused location; demo-unavailable: allowed but no fix (indoors, GPS off, timeout)
 export type LocationSource = 'gps' | 'demo-outside' | 'demo-denied' | 'demo-unavailable' | 'loading'
@@ -27,9 +26,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       return
     }
     const onPosition = ({ coords }: GeolocationPosition) => {
-      const inside = haversineMeters(coords.latitude, coords.longitude, KADIKOY.latitude, KADIKOY.longitude)
-        <= MVP_RADIUS_METERS
-      setPosition(inside
+      setPosition(isInIstanbul(coords.latitude, coords.longitude)
         ? { latitude: coords.latitude, longitude: coords.longitude, source: 'gps' }
         : { ...KADIKOY, source: 'demo-outside' })
     }
@@ -68,7 +65,7 @@ export function locationLabel(source: LocationSource): string {
     case 'gps':
       return tr('Konumun kullanılıyor', 'Using your location')
     case 'demo-outside':
-      return tr('Nomi şimdilik sadece Kadıköy’de: demo konum kullanılıyor', 'Nomi only covers Kadıköy for now: using a demo location')
+      return tr('Nomi İstanbul’da hizmet veriyor: demo konum kullanılıyor', 'Nomi covers Istanbul: using a demo location')
     case 'demo-denied':
       return tr('Konum izni yok: Kadıköy iskelesi kullanılıyor', 'No location permission: using Kadıköy pier')
     case 'demo-unavailable':
@@ -76,4 +73,54 @@ export function locationLabel(source: LocationSource): string {
     default:
       return tr('Konum alınıyor…', 'Getting your location…')
   }
+}
+
+// ---------- live tracking (map) ----------
+
+export type LiveStatus = 'off' | 'locating' | 'live' | 'denied' | 'unavailable'
+
+export interface LiveLocation {
+  latitude: number | null
+  longitude: number | null
+  // metres (68% confidence radius from the browser)
+  accuracy: number | null
+  status: LiveStatus
+}
+
+const NO_FIX: LiveLocation = { latitude: null, longitude: null, accuracy: null, status: 'off' }
+
+/**
+ * Follows the device position while `enabled` (the live map). The rest of the app uses the
+ * one-shot useUserLocation(); this keeps GPS running only while a map is on screen.
+ */
+export function useLiveLocation(enabled: boolean): LiveLocation {
+  const [live, setLive] = useState<LiveLocation>(NO_FIX)
+
+  useEffect(() => {
+    if (!enabled) {
+      setLive(NO_FIX)
+      return
+    }
+    if (!('geolocation' in navigator)) {
+      setLive({ ...NO_FIX, status: 'unavailable' })
+      return
+    }
+    setLive(current => ({ ...current, status: current.latitude == null ? 'locating' : current.status }))
+    const id = navigator.geolocation.watchPosition(
+      ({ coords }) => setLive({ latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy, status: 'live' }),
+      error => {
+        if (error.code === error.PERMISSION_DENIED) {
+          setLive({ ...NO_FIX, status: 'denied' })
+          navigator.geolocation.clearWatch(id)
+        } else {
+          // Timeout / no fix: keep the last known position (if any) and keep watching
+          setLive(current => ({ ...current, status: current.latitude == null ? 'unavailable' : current.status }))
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
+    )
+    return () => navigator.geolocation.clearWatch(id)
+  }, [enabled])
+
+  return live
 }

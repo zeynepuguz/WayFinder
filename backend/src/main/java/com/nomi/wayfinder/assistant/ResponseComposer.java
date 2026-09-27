@@ -35,12 +35,16 @@ public class ResponseComposer {
 
         route.stops().forEach(stop -> sb.append(stopLine(stop)).append('\n'));
 
+        // Unknown prices are not in the total, so the total must not look like the full cost
+        boolean someUnknown = route.stops().stream().anyMatch(s -> s.place().estimatedCost() == null);
         if (Texts.english()) {
-            sb.append(String.format(Locale.ROOT, "\nEstimated total spend: ~%d TL (%d %s) · Total walking: ~%d min.",
+            sb.append(String.format(Locale.ROOT, "\nEstimated total spend%s: ~%d TL (%d %s) · Total walking: ~%d min.",
+                    someUnknown ? " (stops with known prices)" : "",
                     route.totalEstimatedCost(), route.partySize(), route.partySize() == 1 ? "person" : "people",
                     route.totalWalkingMinutes()));
         } else {
-            sb.append(String.format(Locale.ROOT, "\nToplam tahmini harcama: ~%d TL (%d kişi) · Toplam yürüme: ~%d dk.",
+            sb.append(String.format(Locale.ROOT, "\nToplam tahmini harcama%s: ~%d TL (%d kişi) · Toplam yürüme: ~%d dk.",
+                    someUnknown ? " (fiyatı bilinen duraklar)" : "",
                     route.totalEstimatedCost(), route.partySize(), route.totalWalkingMinutes()));
         }
 
@@ -75,20 +79,44 @@ public class ResponseComposer {
     }
 
     public String recommendations(List<Recommendation> recommendations, String typeLabel) {
+        return recommendations(recommendations, List.of(), typeLabel);
+    }
+
+    /**
+     * Nearby suggestions, then (if any) places that suit the request better but are farther away.
+     * A farther item's first reason is its distance line; whyBetter says what makes it the better fit.
+     */
+    public String recommendations(List<Recommendation> recommendations, List<Recommendation> farther, String typeLabel) {
+        StringBuilder sb = new StringBuilder();
         if (recommendations.isEmpty()) {
-            return Texts.english()
+            sb.append(Texts.english()
                     ? "I could not find a suitable " + typeLabel.toLowerCase(Locale.ROOT) + " place open near you right now."
                     : "Yakınında şu an açık ve uygun bir " + typeLabel.toLowerCase(Locale.forLanguageTag("tr-TR"))
-                    + " mekanı bulamadım.";
+                    + " mekanı bulamadım.");
+        } else {
+            sb.append(Texts.english()
+                    ? "My suggestions for " + typeLabel.toLowerCase(Locale.ROOT) + ":\n"
+                    : typeLabel + " için önerilerim:\n");
+            for (int i = 0; i < recommendations.size(); i++) {
+                Recommendation r = recommendations.get(i);
+                sb.append(i + 1).append(". ").append(r.place().getName())
+                        .append(" — ").append(String.join(" · ", r.reasons())).append('\n');
+            }
         }
 
-        StringBuilder sb = new StringBuilder(Texts.english()
-                ? "My suggestions for " + typeLabel.toLowerCase(Locale.ROOT) + ":\n"
-                : typeLabel + " için önerilerim:\n");
-        for (int i = 0; i < recommendations.size(); i++) {
-            Recommendation r = recommendations.get(i);
-            sb.append(i + 1).append(". ").append(r.place().getName())
-                    .append(" — ").append(String.join(" · ", r.reasons())).append('\n');
+        if (!farther.isEmpty()) {
+            sb.append(sb.charAt(sb.length() - 1) == '\n' ? "\n" : "\n\n")
+                    .append(Texts.t("Daha uygun ama sana yakın değil:\n", "A better fit, but not close to you:\n"));
+            for (Recommendation r : farther) {
+                sb.append("• ").append(r.place().getName());
+                if (!r.reasons().isEmpty()) {
+                    sb.append(" — ").append(r.reasons().getFirst());
+                }
+                if (r.whyBetter() != null) {
+                    sb.append(" · ").append(r.whyBetter());
+                }
+                sb.append('\n');
+            }
         }
         return sb.toString().trim();
     }
@@ -115,7 +143,10 @@ public class ResponseComposer {
 
     // "HH:MM → Type: Place (cost)" in both languages
     private static String stopLine(StopResponse stop) {
-        String cost = stop.place().estimatedCost() == null || stop.place().estimatedCost() == 0
+        // null = unknown price (not free), 0 = free
+        String cost = stop.place().estimatedCost() == null
+                ? Texts.t("fiyat bilgisi yok", "no price info")
+                : stop.place().estimatedCost() == 0
                 ? Texts.t("ücretsiz", "free")
                 : Texts.english()
                 ? "~" + stop.place().estimatedCost() + " TL per person"

@@ -57,7 +57,7 @@ class BillingServiceTest {
 
     private BillingService service(boolean devMode) {
         NomiProperties properties = new NomiProperties("Europe/Istanbul", null, null, null, null,
-                new NomiProperties.Billing(devMode, "com.nomi.app", "", PRICES, List.of(" Owner@Example.com ")), null);
+                new NomiProperties.Billing(devMode, "com.nomi.app", "", PRICES, List.of(" Owner@Example.com ")), null, null);
         return new BillingService(repository, googlePlay, users, properties, Clock.fixed(NOW, ISTANBUL));
     }
 
