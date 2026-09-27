@@ -1,0 +1,74 @@
+spring:
+  application:
+    name: wayfinder
+  config:
+    # Reads the project-root .env whether the app is started from backend/ or the repo root
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
+
+  datasource:
+    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5433}/${POSTGRES_DB:wayfinder}
+    username: ${POSTGRES_USER:wayfinder}
+    password: ${POSTGRES_PASSWORD:wayfinder}
+
+  jpa:
+    # Schema is owned by Flyway; Hibernate only checks that entities match it
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
+    properties:
+      # Loads lazy collections (e.g. opening hours of a page of places) in batches instead of one query each
+      hibernate.default_batch_fetch_size: 50
+
+  flyway:
+    locations: classpath:db/migration
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2s
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 15m
+
+server:
+  error:
+    include-message: never
+
+logging:
+  pattern:
+    # Adds the request id (set by RequestIdFilter) to every log line
+    level: "%5p [%X{requestId:-}]"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+nomi:
+  timezone: Europe/Istanbul
+  security:
+    jwt-secret: ${JWT_SECRET:}
+    jwt-expiration-minutes: ${JWT_EXPIRATION_MINUTES:1440}
+    admin-email: ${ADMIN_EMAIL:}
+    admin-password: ${ADMIN_PASSWORD:}
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  weather:
+    base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}
+    connect-timeout: 3s
+    read-timeout: 5s
+  ai:
+    base-url: ${AI_SERVICE_URL:}
+    api-key: ${AI_SERVICE_API_KEY:}
+    connect-timeout: 2s
+    read-timeout: 10s
+  rate-limit:
+    # Requests per minute per user for expensive endpoints (route planning, assistant)
+    requests-per-minute: 30

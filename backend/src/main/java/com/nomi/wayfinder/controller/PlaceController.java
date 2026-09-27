@@ -1,10 +1,21 @@
 package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.dto.NearbyPlaceResponse;
+import com.nomi.wayfinder.dto.PageResponse;
 import com.nomi.wayfinder.dto.PlaceCreateRequest;
 import com.nomi.wayfinder.dto.PlaceResponse;
+import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.service.PlaceService;
+import com.nomi.wayfinder.service.PlaceService.PlaceSearchFilter;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import java.util.List;
 
 @RestController
@@ -18,8 +29,28 @@ public class PlaceController {
     }
 
     @GetMapping
-    public List<PlaceResponse> getAllPlaces() {
-        return placeService.getAllPlaces();
+    public PageResponse<PlaceResponse> searchPlaces(
+            @RequestParam(required = false) PlaceCategory category,
+            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) @PositiveOrZero Integer maxCost,
+            @RequestParam(required = false) Boolean indoor,
+            @RequestParam(required = false) String q,
+            @RequestParam(defaultValue = "0") @Min(0) int page,
+            @RequestParam(defaultValue = "20") @Positive @Max(100) int size
+    ) {
+        return placeService.searchPlaces(
+                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q), page, size);
+    }
+
+    // lat/lon = user's current location (from device GPS), not a place's
+    @GetMapping("/nearby")
+    public List<NearbyPlaceResponse> getNearbyPlaces(
+            @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
+            @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon,
+            @RequestParam(defaultValue = "1000") @Positive @Max(5000) double radius,
+            @RequestParam(defaultValue = "20") @Positive @Max(50) int limit
+    ) {
+        return placeService.getNearbyPlaces(lat, lon, radius, limit);
     }
 
     @GetMapping("/{id}")
@@ -28,6 +59,7 @@ public class PlaceController {
     }
 
     @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
     public PlaceResponse createPlace(
             @Valid @RequestBody PlaceCreateRequest request)
     {
@@ -43,6 +75,7 @@ public class PlaceController {
     }
 
     @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletePlace(@PathVariable Long id) {
         placeService.deletePlace(id);
     }

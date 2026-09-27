@@ -1,0 +1,68 @@
+package com.nomi.wayfinder.entity;
+
+import jakarta.persistence.*;
+
+import java.time.Instant;
+
+@Entity
+@Table(name = "assistant_messages")
+public class AssistantMessage {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false)
+    private Long userId;
+
+    private Long routeId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private MessageRole role;
+
+    @Column(nullable = false)
+    private String content;
+
+    @Column(nullable = false, updatable = false)
+    private Instant createdAt;
+
+    public AssistantMessage() {
+    }
+
+    public AssistantMessage(Long userId, Long routeId, MessageRole role, String content) {
+        this.userId = userId;
+        this.routeId = routeId;
+        this.role = role;
+        this.content = content;
+    }
+
+    @PrePersist
+    void onCreate() {
+        createdAt = Instant.now();
+    }
+
+    public Long getId() {
+        return id;
+    }
+
+    public Long getUserId() {
+        return userId;
+    }
+
+    public Long getRouteId() {
+        return routeId;
+    }
+
+    public MessageRole getRole() {
+        return role;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+}
