@@ -114,7 +114,9 @@ public final class RouteDtos {
             double longitude,
             Integer estimatedCost,
             Double rating,
-            boolean indoor
+            boolean indoor,
+            // Wikimedia Commons photo with attribution; null = no image
+            PlaceImage image
     ) {
     }
 

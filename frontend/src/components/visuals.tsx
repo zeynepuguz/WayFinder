@@ -2,7 +2,9 @@ import {
   CakeSlice, Camera, CloudFog, CloudLightning, CloudRain, CloudSun, Coffee, Croissant, Drama, Landmark, Moon,
   Snowflake, Star, Sun, Trees, UtensilsCrossed, type LucideIcon,
 } from 'lucide-react'
-import type { PlaceCategory, StopType } from '../api/types'
+import { useState } from 'react'
+import type { PlaceCategory, PlaceImage, StopType } from '../api/types'
+import { httpUrl } from '../lib/format'
 
 export const CATEGORY_ICON: Record<PlaceCategory, LucideIcon> = {
   BREAKFAST: Croissant,
@@ -33,16 +35,33 @@ export const WEATHER_ICON: Record<string, LucideIcon> = {
   STORM: CloudLightning,
 }
 
-// Gradient tile with the category icon: a consistent stand-in until places have photos
-export function CategoryTile({ category, size = 28, className = '' }: {
+// The photo to show, or null when there is none, it is not http(s) or it failed to load
+export function usePlacePhoto(image: PlaceImage | null | undefined) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null)
+  const url = httpUrl(image?.url)
+  return {
+    url: url && url !== failedUrl ? url : null,
+    onError: () => setFailedUrl(url),
+  }
+}
+
+// Gradient tile with the category icon; covered by the place photo when there is one.
+// The tile keeps its fixed size, so a late or failed photo never shifts the layout.
+export function CategoryTile({ category, size = 28, className = '', image, alt }: {
   category: PlaceCategory
   size?: number
   className?: string
+  image?: PlaceImage | null
+  alt?: string
 }) {
   const Icon = CATEGORY_ICON[category]
+  const photo = usePlacePhoto(image)
   return (
-    <div className={`tile tile-${category} ${className}`} aria-hidden>
+    <div className={`tile tile-${category} ${className}`} aria-hidden={photo.url ? undefined : true}>
       <Icon size={size} strokeWidth={1.8} style={{ position: 'relative', zIndex: 1 }} />
+      {photo.url && (
+        <img className="tile-photo" src={photo.url} alt={alt ?? ''} loading="lazy" decoding="async" onError={photo.onError} />
+      )}
     </div>
   )
 }

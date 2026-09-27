@@ -5,7 +5,7 @@ import { api } from '../api'
 import { ApiRequestError } from '../api/client'
 import type { Recommendation, Route } from '../api/types'
 import { Locked } from '../components/gate'
-import { PlaceRow } from '../components/PlaceViews'
+import { FartherPlaceRow, PlaceRow } from '../components/PlaceViews'
 import { Alert } from '../components/ui'
 import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
@@ -20,6 +20,8 @@ interface Message {
   routeId?: number | null
   route?: Route | null
   recommendations?: Recommendation[]
+  // lower-ranked extras: a better fit, but not close by
+  fartherRecommendations?: Recommendation[]
 }
 
 // Functions, not constants: the texts follow the language chosen at runtime
@@ -98,6 +100,7 @@ function Chat({ canSend }: { canSend: boolean }) {
       setMessages(current => [...current, {
         key: `a${Date.now()}`, role: 'ASSISTANT', content: reply.reply,
         route: reply.route, routeId: reply.route?.id, recommendations: reply.recommendations,
+        fartherRecommendations: reply.fartherRecommendations ?? [],
       }])
     } catch (e) {
       if (!(e instanceof ApiRequestError && e.status === 402)) {
@@ -152,13 +155,22 @@ function Chat({ canSend }: { canSend: boolean }) {
               <span className="bot-avatar"><Sparkles size={15} /></span>
               <div className="bubble bubble-bot">{m.route ? withoutStopLines(m.content) : m.content}</div>
             </div>
-            {(m.route || m.routeId || (m.recommendations && m.recommendations.length > 0)) && (
+            {(m.route || m.routeId || (m.recommendations && m.recommendations.length > 0)
+              || (m.fartherRecommendations && m.fartherRecommendations.length > 0)) && (
               <div className="chat-attachment">
                 {m.route && <RoutePreview route={m.route} />}
                 {!m.route && m.routeId && (
                   <Link to={`/routes/${m.routeId}`} className="section-link">{t('Rotayı aç', 'Open route')} <ChevronRight size={16} /></Link>
                 )}
                 {m.recommendations?.map(r => <PlaceRow key={r.place.id} place={r.place} />)}
+                {m.fartherRecommendations && m.fartherRecommendations.length > 0 && (
+                  <div className="stack-sm">
+                    <h3 className="t-overline">{t('Daha uygun ama sana yakın değil', 'A better fit, but not close to you')}</h3>
+                    <div className="farther-list">
+                      {m.fartherRecommendations.map(r => <FartherPlaceRow key={r.place.id} recommendation={r} />)}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

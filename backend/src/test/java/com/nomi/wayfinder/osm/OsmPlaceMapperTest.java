@@ -122,6 +122,62 @@ class OsmPlaceMapperTest {
     }
 
     @Test
+    void storesWikidataAndCommonsFileForPhotos() {
+        OsmPlace museum = OsmPlaceMapper.map(new OverpassResponse.Element("way", 20, null, null,
+                new OverpassResponse.Center(41.0086, 28.9802),
+                Map.of("tourism", "museum", "name", "Ayasofya", "wikidata", " Q12506 ",
+                        "wikimedia_commons", "File:Hagia_Sophia Mars_2013.jpg",
+                        "image", "https://upload.wikimedia.org/wikipedia/commons/a/ab/Other.jpg")));
+        assertThat(museum.wikidata()).isEqualTo("Q12506");
+        // wikimedia_commons wins over image; underscores are spaces in wiki titles
+        assertThat(museum.commonsFile()).isEqualTo("Hagia Sophia Mars 2013.jpg");
+        assertThat(museum.hasMedia()).isTrue();
+
+        OsmPlace cafe = OsmPlaceMapper.map(new OverpassResponse.Element("node", 21, 40.99, 29.02, null,
+                Map.of("amenity", "cafe", "name", "Kafe", "wikidata", "Q1;Q2",
+                        "image", "https://example.com/photo.jpg")));
+        assertThat(cafe.wikidata()).isNull();
+        assertThat(cafe.commonsFile()).isNull();
+        assertThat(cafe.hasMedia()).isFalse();
+    }
+
+    @Test
+    void commonsFileComesOnlyFromCommonsReferences() {
+        assertThat(OsmPlaceMapper.commonsFile("File:Galata Kulesi.jpg", null)).isEqualTo("Galata Kulesi.jpg");
+        assertThat(OsmPlaceMapper.commonsFile("file:galata.jpg", null)).isEqualTo("Galata.jpg");
+        // A category is many photos, not one: fall back to image
+        assertThat(OsmPlaceMapper.commonsFile("Category:Galata Tower",
+                "https://commons.wikimedia.org/wiki/File:Galata_Tower_%C3%87ok_G%C3%BCzel+1.jpg"))
+                .isEqualTo("Galata Tower Çok Güzel+1.jpg");
+        assertThat(OsmPlaceMapper.commonsFile(null,
+                "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Moda_Sahili.jpg/800px-Moda_Sahili.jpg"))
+                .isEqualTo("Moda Sahili.jpg");
+        assertThat(OsmPlaceMapper.commonsFile(null,
+                "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Galata.jpg/960px-Galata.jpg?utm_source=x"))
+                .isEqualTo("Galata.jpg");
+        assertThat(OsmPlaceMapper.commonsFile(null,
+                "http://upload.wikimedia.org/wikipedia/commons/4/4a/Moda.JPG")).isEqualTo("Moda.JPG");
+
+        // Unknown license: other hosts, other wikis' local files (may be fair use), Commons categories
+        assertThat(OsmPlaceMapper.commonsFile(null, "https://example.com/Moda.jpg")).isNull();
+        assertThat(OsmPlaceMapper.commonsFile(null, "https://upload.wikimedia.org/wikipedia/en/4/4a/Logo.jpg")).isNull();
+        assertThat(OsmPlaceMapper.commonsFile(null, "https://commons.wikimedia.org/wiki/Category:Moda")).isNull();
+        assertThat(OsmPlaceMapper.commonsFile(null, "https://www.flickr.com/photos/x/123")).isNull();
+        assertThat(OsmPlaceMapper.commonsFile("File:", null)).isNull();
+        assertThat(OsmPlaceMapper.commonsFile("File:A|B.jpg", null)).isNull();
+    }
+
+    @Test
+    void wikidataMustBeASingleItemId() {
+        assertThat(OsmPlaceMapper.wikidata("Q42")).isEqualTo("Q42");
+        assertThat(OsmPlaceMapper.wikidata("q42")).isNull();
+        assertThat(OsmPlaceMapper.wikidata("Q42;Q43")).isNull();
+        assertThat(OsmPlaceMapper.wikidata("P18")).isNull();
+        assertThat(OsmPlaceMapper.wikidata("")).isNull();
+        assertThat(OsmPlaceMapper.wikidata(null)).isNull();
+    }
+
+    @Test
     void foldIgnoresCaseTurkishLettersAndPunctuation() {
         assertThat(OsmPlaceMapper.fold("Çiya Sofrası")).isEqualTo("ciyasofrasi");
         assertThat(OsmPlaceMapper.fold("KAHVALTI")).isEqualTo("kahvalti");

@@ -3,11 +3,15 @@ package com.nomi.wayfinder.osm;
 import com.nomi.wayfinder.dto.OpeningHoursDto;
 import com.nomi.wayfinder.entity.PlaceCategory;
 
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * One Overpass element -> one place row, using only what OSM says. OSM has no prices, ratings or
@@ -20,6 +24,17 @@ public final class OsmPlaceMapper {
     static final int MAX_NAME = 255;
     static final int MAX_ADDRESS = 255;
     static final int MAX_NEIGHBORHOOD = 100;
+    static final int MAX_COMMONS_FILE = 255;
+
+    private static final Pattern WIKIDATA_ID = Pattern.compile("Q\\d{1,15}");
+    private static final Pattern COMMONS_TAG = Pattern.compile("(?i)(?:file|image):(.+)");
+    private static final Pattern COMMONS_PAGE_URL =
+            Pattern.compile("(?i)https?://commons\\.(?:m\\.)?wikimedia\\.org/wiki/(?:file|image):([^?#]+)");
+    // Only the Commons repository: /wikipedia/en/... files are local to one wiki and may be fair use
+    private static final Pattern COMMONS_UPLOAD_URL = Pattern.compile(
+            "(?i)https?://(?:upload|thumb)\\.wikimedia\\.org/wikipedia/commons/(?:thumb/)?[0-9a-f]/[0-9a-f]{2}/([^/?#]+)(?:/[^/?#]*)?(?:\\?.*)?");
+    // Characters MediaWiki titles cannot contain ("|" would also break the API's title lists)
+    private static final Pattern INVALID_TITLE_CHARS = Pattern.compile("[|#<>\\[\\]{}\\x00-\\x1f]");
 
     private OsmPlaceMapper() {
     }
@@ -97,8 +112,66 @@ public final class OsmPlaceMapper {
                 tags.stream().distinct().toList(),
                 truncate(address(element), MAX_ADDRESS),
                 truncate(neighborhood(element), MAX_NEIGHBORHOOD),
-                hours
+                hours,
+                wikidata(element.tag("wikidata")),
+                commonsFile(element.tag("wikimedia_commons"), element.tag("image"))
         );
+    }
+
+    // "Q12506"; anything else (lists like "Q1;Q2", typos) -> null
+    static String wikidata(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed != null && WIKIDATA_ID.matcher(trimmed).matches() ? trimmed : null;
+    }
+
+    /**
+     * The Commons file title (without "File:") from wikimedia_commons ("File:X.jpg"), else from image when
+     * it is a Commons file page or an upload.wikimedia.org/wikipedia/commons URL. Other image URLs are
+     * ignored: their license is unknown. Categories ("Category:...") are not a single photo and are ignored too.
+     */
+    static String commonsFile(String wikimediaCommons, String image) {
+        String commons = trimToNull(wikimediaCommons);
+        if (commons != null) {
+            Matcher m = COMMONS_TAG.matcher(commons);
+            if (m.matches()) {
+                String title = cleanFileTitle(m.group(1), false);
+                if (title != null) {
+                    return title;
+                }
+            }
+        }
+
+        String url = trimToNull(image);
+        if (url == null) {
+            return null;
+        }
+        for (Pattern pattern : List.of(COMMONS_PAGE_URL, COMMONS_UPLOAD_URL)) {
+            Matcher m = pattern.matcher(url);
+            if (m.matches()) {
+                return cleanFileTitle(m.group(1), true);
+            }
+        }
+        return null;
+    }
+
+    // Underscores are spaces in wiki titles; null when the title cannot be a valid file name
+    private static String cleanFileTitle(String raw, boolean urlEncoded) {
+        String title = raw;
+        if (urlEncoded) {
+            try {
+                // A literal "+" in a URL path is a plus sign, not a space
+                title = URLDecoder.decode(title.replace("+", "%2B"), StandardCharsets.UTF_8);
+            } catch (IllegalArgumentException e) {
+                return null;
+            }
+        }
+        title = title.replace('_', ' ').trim().replaceAll("\\s+", " ");
+        if (title.isEmpty() || title.length() > MAX_COMMONS_FILE || INVALID_TITLE_CHARS.matcher(title).find()
+                || title.lastIndexOf('.') <= 0) {
+            return null;
+        }
+        // Wiki titles start with a capital letter (Character.toUpperCase ignores the JVM's Turkish locale)
+        return Character.toUpperCase(title.charAt(0)) + title.substring(1);
     }
 
     // amenity first: a cafe that is also tagged tourism=attraction is still a cafe
@@ -202,7 +275,15 @@ public final class OsmPlaceMapper {
             List<String> tags,
             String address,
             String neighborhood,
-            List<OpeningHoursDto> openingHours
+            List<OpeningHoursDto> openingHours,
+            // Wikidata item id ("Q123") or null
+            String wikidata,
+            // Commons file title without "File:" or null
+            String commonsFile
     ) {
+
+        public boolean hasMedia() {
+            return wikidata != null || commonsFile != null;
+        }
     }
 }

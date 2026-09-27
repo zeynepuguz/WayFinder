@@ -34,6 +34,7 @@ import java.util.*;
 public class AssistantService {
 
     private static final Locale TR = Locale.forLanguageTag("tr-TR");
+    static final int MAX_FARTHER = 2;
 
     private final IntentParser intentParser;
     private final RouteService routeService;
@@ -143,12 +144,13 @@ public class AssistantService {
         StopType type = intent.recommendType() != null ? intent.recommendType()
                 : RecommendationService.suggestedTypeAt(LocalTime.now(clock));
 
-        // Nearby first; places that fit better but are farther go in their own sub-section of the text
+        // Nearby first; up to MAX_FARTHER places that fit better but are farther come after them as lower-ranked
+        // extra options (own sub-section of the text and their own list for the app's cards)
         TieredRecommendations tiered = recommendationService.recommendTiered(
-                request.latitude(), request.longitude(), type, userId, 3, 2);
+                request.latitude(), request.longitude(), type, userId, 3, MAX_FARTHER);
 
         return new AssistantReply(composer.recommendations(tiered.nearby(), tiered.farther(), type.getLabel()),
-                intent, null, tiered.nearby(), List.of());
+                intent, null, tiered.nearby(), tiered.farther(), List.of());
     }
 
     private AssistantReply weather(AssistantRequest request, AssistantIntent intent) {
@@ -208,11 +210,11 @@ public class AssistantService {
     }
 
     private static AssistantReply text(AssistantIntent intent, String reply) {
-        return new AssistantReply(reply, intent, null, List.of(), List.of());
+        return new AssistantReply(reply, intent, null, List.of(), List.of(), List.of());
     }
 
     private static AssistantReply withRoute(AssistantIntent intent, String reply, RouteResponse route, List<String> changes) {
-        return new AssistantReply(reply, intent, route, List.of(), changes);
+        return new AssistantReply(reply, intent, route, List.of(), List.of(), changes);
     }
 
     // ============ DTOs ============
@@ -225,6 +227,9 @@ public class AssistantService {
             AssistantIntent intent,
             RouteResponse route,
             List<Recommendation> recommendations,
+            // "Daha uygun ama sana yakın değil": RECOMMEND only (max 2, otherwise empty), ranked below
+            // recommendations. Each starts its reasons with a distance line and has whyBetter
+            List<Recommendation> fartherRecommendations,
             List<String> changes
     ) {
     }

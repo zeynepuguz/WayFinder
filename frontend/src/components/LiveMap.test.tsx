@@ -8,14 +8,14 @@ const place = (id: number, name: string, extra: Partial<Place> = {}): Place => (
   id, name, description: null, address: null, neighborhood: null, latitude: 40.99, longitude: 29.02,
   category: 'CAFE', estimatedCost: null, rating: null, indoor: false, avgVisitMinutes: null, tags: [],
   openingHours: [], openNow: null, source: 'OSM', lastVerifiedAt: null, verified: false,
-  sourceUrl: 'https://www.openstreetmap.org/node/1', distanceMeters: 120, ...extra,
+  sourceUrl: 'https://www.openstreetmap.org/node/1', image: null, distanceMeters: 120, ...extra,
 })
-const rec = (p: Place, reasons: string[], whyBetter: string | null): Recommendation =>
-  ({ place: p, type: 'COFFEE', score: 1, reasons, whyBetter })
+const rec = (p: Place, reasons: string[]): Recommendation =>
+  ({ place: p, type: 'COFFEE', score: 1, reasons, whyBetter: null })
 
 const placesInArea = vi.fn()
-const tieredRecommendations = vi.fn()
-vi.mock('../api', () => ({ api: { placesInArea: (...args: unknown[]) => placesInArea(...args), tieredRecommendations: (...args: unknown[]) => tieredRecommendations(...args) } }))
+const recommendations = vi.fn()
+vi.mock('../api', () => ({ api: { placesInArea: (...args: unknown[]) => placesInArea(...args), recommendations: (...args: unknown[]) => recommendations(...args) } }))
 vi.mock('../context/LocationContext', () => ({
   useUserLocation: () => ({ latitude: 40.991, longitude: 29.023, source: 'gps', refresh: () => {} }),
   useLiveLocation: () => ({ latitude: null, longitude: null, accuracy: null, status: 'denied' }),
@@ -23,12 +23,9 @@ vi.mock('../context/LocationContext', () => ({
 }))
 
 describe('LiveMap', () => {
-  it('loads places for the visible area and shows both recommendation tiers', async () => {
+  it('loads places for the visible area and shows only close-by suggestions', async () => {
     placesInArea.mockResolvedValue([place(1, 'Köşe Kahve')])
-    tieredRecommendations.mockResolvedValue({
-      nearby: [rec(place(2, 'Yakın Kafe', { estimatedCost: 0 }), ['Şu an açık'], null)],
-      farther: [rec(place(3, 'Uzak Müze', { category: 'MUSEUM' }), ['1,8 km uzakta (yürüyerek ~23 dk)'], 'Yağmurda kapalı alan')],
-    })
+    recommendations.mockResolvedValue([rec(place(2, 'Yakın Kafe', { estimatedCost: 0 }), ['Şu an açık'])])
 
     render(<MemoryRouter><LiveMap category="CAFE" /></MemoryRouter>)
 
@@ -38,15 +35,14 @@ describe('LiveMap', () => {
     expect(options).toMatchObject({ lat: 40.991, lon: 29.023, category: 'CAFE', limit: 300 })
 
     expect(await screen.findByText('Yakın Kafe')).toBeInTheDocument()
-    expect(screen.getByText('Daha uygun ama sana yakın değil')).toBeInTheDocument()
-    expect(screen.getByText('1,8 km uzakta (yürüyerek ~23 dk)')).toBeInTheDocument()
-    expect(screen.getByText('Yağmurda kapalı alan')).toBeInTheDocument()
+    expect(recommendations).toHaveBeenCalledWith(40.991, 29.023)
+    expect(screen.queryByText('Daha uygun ama sana yakın değil')).not.toBeInTheDocument()
 
     // choosing a suggestion opens its card with honest unknowns
-    await userEvent.click(screen.getByText('Uzak Müze'))
-    const card = await screen.findByRole('dialog', { name: 'Uzak Müze' })
-    expect(card).toHaveTextContent('Fiyat bilgisi yok')
+    await userEvent.click(screen.getByText('Yakın Kafe'))
+    const card = await screen.findByRole('dialog', { name: 'Yakın Kafe' })
+    expect(card).toHaveTextContent('Ücretsiz')
     expect(card).toHaveTextContent('Saat bilgisi yok')
-    expect(screen.getByRole('link', { name: 'Mekanı gör' })).toHaveAttribute('href', '/places/3')
+    expect(screen.getByRole('link', { name: 'Mekanı gör' })).toHaveAttribute('href', '/places/2')
   })
 })

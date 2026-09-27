@@ -104,9 +104,11 @@ public class PlaceService {
             double latitude,
             double longitude,
             double radiusMeters,
+            PlaceCategory category,
             int limit
     ) {
-        List<PlaceDistance> nearby = placeRepository.findNearby(latitude, longitude, radiusMeters, limit);
+        List<PlaceDistance> nearby = placeRepository.findNearby(latitude, longitude, radiusMeters,
+                category == null ? null : category.name(), limit);
 
         Map<Long, Place> places = loadPlaces(nearby);
 

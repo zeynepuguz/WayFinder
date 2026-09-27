@@ -79,7 +79,7 @@ async function fetchAllPlaces(lang) {
 
 // ---------- shared head ----------
 
-function head({ path, title, description, lang, alternates, jsonLd }) {
+function head({ path, title, description, lang, alternates, jsonLd, image }) {
   const url = SITE + path
   return [
     `<title>${escape(title)}</title>`,
@@ -93,7 +93,8 @@ function head({ path, title, description, lang, alternates, jsonLd }) {
     `<meta property="og:title" content="${escape(title)}" />`,
     `<meta property="og:description" content="${escape(description)}" />`,
     `<meta property="og:url" content="${escape(url)}" />`,
-    `<meta property="og:image" content="${escape(SITE)}/og-image.png" />`,
+    // A place page shares its own (free-licensed) photo; everything else the Nomi card
+    `<meta property="og:image" content="${escape(image ?? `${SITE}/og-image.png`)}" />`,
     `<meta name="twitter:card" content="summary_large_image" />`,
     ...(jsonLd ? [`<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`] : []),
   ].join('\n    ')
@@ -162,6 +163,7 @@ function placeJsonLd(place, lang) {
       addressCountry: 'TR',
     },
     geo: { '@type': 'GeoCoordinates', latitude: place.latitude, longitude: place.longitude },
+    ...(place.image?.url ? { image: place.image.url } : {}),
   }
   // Only hours backed by a source are stored; never invent them here
   if (place.openingHours?.length) {
@@ -277,6 +279,7 @@ async function main() {
       title: `${place.name} · ${category?.label ?? 'Mekan'}, Kadıköy · Nomi`,
       description: description.slice(0, 300),
       jsonLd: placeJsonLd(place, 'tr'),
+      image: place.image?.url,
       body: `<h1>${escape(place.name)}</h1>
 <p>${escape(category?.label ?? '')}${place.neighborhood ? ` · ${escape(place.neighborhood)}` : ''} · Kadıköy</p>
 ${place.description ? `<p>${escape(place.description)}</p>` : ''}
@@ -362,6 +365,7 @@ ${category ? `<p><a href="/kadikoy/${category.slug}">${escape(category.title)}</
       description: [place.descriptionEn, place.address && `Address: ${place.address}, Kadıköy, Istanbul.`]
         .filter(Boolean).join(' ').slice(0, 300) || `${place.name}, Kadıköy, Istanbul`,
       jsonLd: placeJsonLd(place, 'en'),
+      image: place.image?.url,
       body: `<p class="meta">${escape(category?.label ?? '')}${place.neighborhood ? ` · ${escape(place.neighborhood)}` : ''} · Kadıköy, Istanbul</p>
 ${place.descriptionEn ? `<p>${escape(place.descriptionEn)}</p>` : ''}
 ${place.address ? `<p>Address: ${escape(place.address)}</p>` : ''}

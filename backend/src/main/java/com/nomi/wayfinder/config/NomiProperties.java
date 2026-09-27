@@ -15,8 +15,43 @@ public record NomiProperties(
         RateLimit rateLimit,
         Billing billing,
         Mail mail,
-        Osm osm
+        Osm osm,
+        Images images
 ) {
+
+    /**
+     * Place photos from Wikimedia Commons (free licenses only), found through the wikidata / Commons
+     * references the OSM import stores. See media/WikimediaImageResolver.
+     *
+     * @param resolveAfterImport look up photos right after every OSM import (in the background)
+     * @param resolveCron        Spring cron for the periodic pass ("-" disables it)
+     * @param recheckAfter       places checked longer ago than this are looked up again
+     * @param maxPlacesPerRun    upper bound per pass, so one pass never runs for hours
+     * @param thumbWidth         width of the thumbnail used as image_url
+     * @param batchDelay         pause between API requests (be gentle with Wikimedia)
+     * @param maxAttempts        tries per API request (maxlag / network errors)
+     * @param retryDelay         wait before the next try
+     * @param wikidataMaxlag     maxlag sent to Wikidata (0 = not sent). Wikidata also reports its query
+     *                           service lag here, often above 5 s for hours, which would block plain reads
+     * @param commonsMaxlag      maxlag sent to Commons (0 = not sent)
+     */
+    public record Images(
+            boolean resolveAfterImport,
+            String resolveCron,
+            Duration recheckAfter,
+            int maxPlacesPerRun,
+            String wikidataApiUrl,
+            String commonsApiUrl,
+            int thumbWidth,
+            Duration connectTimeout,
+            Duration readTimeout,
+            Duration batchDelay,
+            int maxAttempts,
+            Duration retryDelay,
+            int wikidataMaxlag,
+            int commonsMaxlag
+    ) {
+    }
 
     /**
      * OpenStreetMap place import (all of Istanbul) through the Overpass API.

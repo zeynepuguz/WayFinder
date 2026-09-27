@@ -28,6 +28,8 @@ public class PlaceResponse {
     private boolean verified;
     private String sourceUrl;
     private Instant lastVerifiedAt;
+    // Wikimedia Commons photo with attribution; null = no image
+    private PlaceImage image;
 
     public Long getId() {
         return id;
@@ -179,5 +181,13 @@ public class PlaceResponse {
 
     public void setLastVerifiedAt(Instant lastVerifiedAt) {
         this.lastVerifiedAt = lastVerifiedAt;
+    }
+
+    public PlaceImage getImage() {
+        return image;
+    }
+
+    public void setImage(PlaceImage image) {
+        this.image = image;
     }
 }

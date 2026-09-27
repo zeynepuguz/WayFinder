@@ -34,7 +34,7 @@ class AiUsageLimiterTest {
     private AiUsageLimiter limiter(int dailyLimit, LocalDateTime istanbulTime) {
         Clock clock = Clock.fixed(istanbulTime.atZone(ISTANBUL).toInstant(), ISTANBUL);
         NomiProperties properties = new NomiProperties("Europe/Istanbul", null,
-                null, new NomiProperties.Ai("http://ai", "key", null, null, dailyLimit), null, null, null, null);
+                null, new NomiProperties.Ai("http://ai", "key", null, null, dailyLimit), null, null, null, null, null);
         return new AiUsageLimiter(redis, clock, properties);
     }
 

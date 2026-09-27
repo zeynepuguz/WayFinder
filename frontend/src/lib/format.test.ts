@@ -1,4 +1,4 @@
-import { formatCost, formatDistance, formatTime, haversineMeters, withinBudget } from './format'
+import { formatCost, formatDistance, formatTime, haversineMeters, httpUrl, withinBudget } from './format'
 
 describe('format helpers', () => {
   it('formats times, distances and costs for Turkish users', () => {
@@ -24,5 +24,14 @@ describe('format helpers', () => {
     const meters = haversineMeters(40.991, 29.023, 40.9798, 29.026)
     expect(meters).toBeGreaterThan(1100)
     expect(meters).toBeLessThan(1400)
+  })
+})
+
+describe('httpUrl', () => {
+  it('keeps only http(s) links', () => {
+    expect(httpUrl('https://upload.wikimedia.org/a.jpg')).toBe('https://upload.wikimedia.org/a.jpg')
+    expect(httpUrl('javascript:alert(1)')).toBeNull()
+    expect(httpUrl(null)).toBeNull()
+    expect(httpUrl(undefined)).toBeNull()
   })
 })

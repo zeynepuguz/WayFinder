@@ -28,8 +28,8 @@ export const api = {
   searchPlaces: (filter: {
     category?: PlaceCategory; q?: string; maxCost?: number; indoor?: boolean; page?: number; size?: number
   }) => http.get<Page<Place>>('/places', filter),
-  nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50) =>
-    http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit }),
+  nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50, category?: PlaceCategory) =>
+    http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit, category }),
   // Places inside the visible map box (max 0.6° per side, max 300 items); distance from lat/lon when given
   placesInArea: (box: MapBox, options: { lat?: number; lon?: number; category?: PlaceCategory; limit?: number } = {},
     signal?: AbortSignal) =>

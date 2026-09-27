@@ -116,3 +116,22 @@ nomi:
     read-timeout: 5m
     max-attempts: 3
     retry-delay: 30s
+  images:
+    # One free-licensed Wikimedia Commons photo per place (from OSM's wikidata / wikimedia_commons / image tags)
+    resolve-after-import: ${IMAGES_RESOLVE_AFTER_IMPORT:true}
+    # Daily pass at 05:15 (Istanbul time) for places not checked yet or checked > recheck-after ago. "-" disables it
+    resolve-cron: ${IMAGES_RESOLVE_CRON:0 15 5 * * *}
+    recheck-after: 30d
+    max-places-per-run: 5000
+    wikidata-api-url: https://www.wikidata.org/w/api.php
+    commons-api-url: https://commons.wikimedia.org/w/api.php
+    thumb-width: 800
+    connect-timeout: 10s
+    read-timeout: 30s
+    batch-delay: 1s
+    max-attempts: 3
+    retry-delay: 10s
+    # Back off when Wikimedia's servers lag (seconds; 0 = not sent). Wikidata's maxlag also counts its
+    # query service lag (often > 5 s for hours), which would block these read-only requests, so it is not sent there
+    wikidata-maxlag: 0
+    commons-maxlag: 5

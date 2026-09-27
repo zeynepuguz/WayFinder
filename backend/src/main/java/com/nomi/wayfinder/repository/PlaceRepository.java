@@ -26,6 +26,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+              AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
             ORDER BY "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -33,6 +34,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("lat") double latitude,
             @Param("lon") double longitude,
             @Param("radius") double radiusMeters,
+            @Param("category") String category,
             @Param("limit") int limit
     );
 

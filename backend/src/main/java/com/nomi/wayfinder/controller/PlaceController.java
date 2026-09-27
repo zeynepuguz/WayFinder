@@ -49,9 +49,11 @@ public class PlaceController {
             @RequestParam @DecimalMin("-90.0") @DecimalMax("90.0") double lat,
             @RequestParam @DecimalMin("-180.0") @DecimalMax("180.0") double lon,
             @RequestParam(defaultValue = "1000") @Positive @Max(5000) double radius,
+            // Filter before the limit: otherwise 50 nearby cafes could hide every museum
+            @RequestParam(required = false) PlaceCategory category,
             @RequestParam(defaultValue = "20") @Positive @Max(50) int limit
     ) {
-        return placeService.getNearbyPlaces(lat, lon, radius, limit);
+        return placeService.getNearbyPlaces(lat, lon, radius, category, limit);
     }
 
     /**

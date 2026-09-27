@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.service;
 
+import com.nomi.wayfinder.dto.PlaceImage;
 import com.nomi.wayfinder.dto.RouteDtos.*;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.Route;
@@ -84,7 +85,8 @@ public class RouteMapper {
                         place.getLongitude(),
                         place.getEstimatedCost(),
                         place.getRating(),
-                        place.isIndoor()
+                        place.isIndoor(),
+                        PlaceImage.of(place)
                 )
         );
     }

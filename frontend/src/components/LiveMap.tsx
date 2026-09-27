@@ -16,9 +16,6 @@ import { OpenBadge, VerifiedBadge } from './PlaceViews'
 import { Skeleton, Spinner } from './ui'
 import { CategoryTile } from './visuals'
 
-type PinKind = 'place' | 'far'
-interface Pin { place: Place; kind: PinKind }
-
 // Accuracy circles bigger than this say more about the phone than about where the user is
 const MAX_ACCURACY_CIRCLE = 300
 // Moving more than this (live GPS) asks for new recommendations
@@ -27,12 +24,12 @@ const FETCH_DEBOUNCE_MS = 300
 
 // Pins are drawn with CSS; icons are cached because Leaflet re-creates the DOM on every icon change
 const iconCache = new Map<string, L.DivIcon>()
-function placeIcon(category: PlaceCategory, verified: boolean, kind: PinKind, selected: boolean): L.DivIcon {
-  const key = `${category}-${verified}-${kind}-${selected}`
+function placeIcon(category: PlaceCategory, verified: boolean, selected: boolean): L.DivIcon {
+  const key = `${category}-${verified}-${selected}`
   let icon = iconCache.get(key)
   if (!icon) {
     const { color, symbol } = CATEGORY_PIN[category]
-    const classes = ['map-pin', 'map-pin-cat', verified ? '' : 'map-pin-osm', kind === 'far' ? 'map-pin-far' : '',
+    const classes = ['map-pin', 'map-pin-cat', verified ? '' : 'map-pin-osm',
       selected ? 'map-pin-selected' : ''].filter(Boolean).join(' ')
     icon = L.divIcon({
       className: '',
@@ -171,7 +168,8 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
       setAnchor(origin)
     }
   }, [origin.latitude, origin.longitude])
-  const recs = useAsync(() => api.tieredRecommendations(anchor.latitude, anchor.longitude), [anchor.latitude, anchor.longitude])
+  // Only close-by picks here; "better but farther" places are offered by the assistant
+  const recs = useAsync(() => api.recommendations(anchor.latitude, anchor.longitude), [anchor.latitude, anchor.longitude])
 
   function focus(place: Place) {
     setSelected(place)
@@ -181,18 +179,10 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
   }
 
   // ---------- pins ----------
-  const pins = useMemo<Pin[]>(() => {
-    const result: Pin[] = places.map(place => ({ place, kind: 'place' }))
-    const seen = new Set(places.map(p => p.id))
-    for (const r of recs.data?.farther ?? []) {
-      if (!seen.has(r.place.id)) {
-        seen.add(r.place.id)
-        result.push({ place: r.place, kind: 'far' })
-      }
-    }
-    if (selected && !seen.has(selected.id)) result.push({ place: selected, kind: 'place' })
-    return result
-  }, [places, recs.data, selected])
+  const pins = useMemo<Place[]>(() => {
+    if (!selected || places.some(p => p.id === selected.id)) return places
+    return [...places, selected]
+  }, [places, selected])
 
   const selectedDistance = selected
     ? userPos ? haversineMeters(userPos.latitude, userPos.longitude, selected.latitude, selected.longitude) : selected.distanceMeters
@@ -218,12 +208,12 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
         {userPos && (
           <Marker position={[userPos.latitude, userPos.longitude]} icon={liveIcon} interactive={false} zIndexOffset={1000} />
         )}
-        {pins.map(({ place, kind }) => {
+        {pins.map(place => {
           const isSelected = selected?.id === place.id
           return (
             <Marker key={place.id} position={[place.latitude, place.longitude]}
-                    icon={placeIcon(place.category, place.verified, kind, isSelected)}
-                    zIndexOffset={isSelected ? 900 : kind === 'far' ? 500 : 0}
+                    icon={placeIcon(place.category, place.verified, isSelected)}
+                    zIndexOffset={isSelected ? 900 : 0}
                     title={place.name} alt={place.name}
                     eventHandlers={{ click: () => setSelected(place) }} />
           )
@@ -252,6 +242,7 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
         {selected && (
           <div className="card map-card" role="dialog" aria-label={selected.name}>
             <div className="row" style={{ alignItems: 'flex-start' }}>
+              {selected.image && <CategoryTile category={selected.category} size={22} image={selected.image} alt={selected.name} className="map-card-photo" />}
               <div className="grow stack-sm">
                 <span className="place-name">{selected.name}</span>
                 <div className="meta">
@@ -290,16 +281,10 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
                   <button className="section-link" onClick={() => void recs.reload()}>{t('Tekrar dene', 'Try again')}</button>
                 </p>
               )}
-              {recs.data && recs.data.nearby.length === 0 && (
+              {recs.data && recs.data.length === 0 && (
                 <p className="t-caption">{t('Yakınında şu an açık bir öneri bulamadım.', 'I couldn’t find anything open near you right now.')}</p>
               )}
-              {recs.data?.nearby.map(r => <RecItem key={r.place.id} rec={r} onSelect={focus} />)}
-              {recs.data && recs.data.farther.length > 0 && (
-                <>
-                  <h3 className="t-overline" style={{ marginTop: 6 }}>{t('Daha uygun ama sana yakın değil', 'A better fit, but not close to you')}</h3>
-                  {recs.data.farther.map(r => <RecItem key={r.place.id} rec={r} far onSelect={focus} />)}
-                </>
-              )}
+              {recs.data?.map(r => <RecItem key={r.place.id} rec={r} onSelect={focus} />)}
             </div>
           )}
         </section>
@@ -308,25 +293,18 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
   )
 }
 
-function RecItem({ rec, far, onSelect }: { rec: Recommendation; far?: boolean; onSelect: (place: Place) => void }) {
+function RecItem({ rec, onSelect }: { rec: Recommendation; onSelect: (place: Place) => void }) {
   const { place } = rec
   return (
-    <button className={`rec-item ${far ? 'rec-item-far' : ''}`} onClick={() => onSelect(place)}>
-      <CategoryTile category={place.category} size={20} />
+    <button className="rec-item" onClick={() => onSelect(place)}>
+      <CategoryTile category={place.category} size={20} image={place.image} alt={place.name} />
       <span className="grow stack-sm" style={{ gap: 2 }}>
         <span className="place-name" style={{ fontSize: 15 }}>{place.name}</span>
-        {far ? (
-          <>
-            {rec.reasons[0] && <span className="t-caption">{rec.reasons[0]}</span>}
-            {rec.whyBetter && <span className="t-caption rec-why">{rec.whyBetter}</span>}
-          </>
-        ) : (
-          <span className="meta">
-            <span>{CATEGORY_LABELS[place.category]}</span>
-            {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
-            <span>{formatCost(place.estimatedCost)}</span>
-          </span>
-        )}
+        <span className="meta">
+          <span>{CATEGORY_LABELS[place.category]}</span>
+          {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
+          <span>{formatCost(place.estimatedCost)}</span>
+        </span>
       </span>
     </button>
   )

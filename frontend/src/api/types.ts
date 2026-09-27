@@ -96,7 +96,18 @@ export interface Place {
   verified: boolean
   // link to the OpenStreetMap object for imported places
   sourceUrl: string | null
+  // one free-licensed photo when available (most cafes and restaurants have none)
+  image: PlaceImage | null
   distanceMeters?: number
+}
+
+// Wikimedia Commons photo; url is an 800px thumbnail hot-linked from upload.wikimedia.org
+export interface PlaceImage {
+  url: string
+  author: string | null
+  license: string | null
+  // the Commons file page, used for the credit link
+  sourceUrl: string | null
 }
 
 // /places/nearby and /places/in-area items (distanceMeters is set when a position was sent)
@@ -157,8 +168,6 @@ export interface HomeResponse {
   weather: WeatherNow | null
   suggestedStopType: StopType
   suggestions: Recommendation[]
-  // 0–2 better fits that are not close to the user
-  fartherSuggestions: Recommendation[]
   currentRoute: RouteSummary | null
   prompts: string[]
 }
@@ -176,6 +185,8 @@ export interface StopPlace {
   estimatedCost: number | null
   rating: number | null
   indoor: boolean
+  // same photo as the place (optional so older route payloads still type-check)
+  image?: PlaceImage | null
 }
 
 export interface RouteStop {
@@ -251,6 +262,8 @@ export interface AssistantReply {
   intent: { type: string; source: string | null }
   route: Route | null
   recommendations: Recommendation[]
+  // 0–2 better fits that are not close to the user, shown below the main picks (empty for other intents)
+  fartherRecommendations?: Recommendation[]
   changes: string[]
 }
 

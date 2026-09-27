@@ -44,6 +44,30 @@ class OsmDeduplicatorTest {
         assertThat(prepared.skippedUnusable()).isEqualTo(1);
     }
 
+    @Test
+    void duplicateGivesItsPhotoReferenceOnlyToVerifiedPlacesWithoutOne() {
+        OsmDeduplicator withIds = new OsmDeduplicator(List.of(
+                new ExistingPlace(10L, "Çiya Sofrası", 40.98970, 29.02660, false),
+                new ExistingPlace(11L, "Moda Sahili", 40.98100, 29.02500, true)));
+        List<OverpassResponse.Element> elements = List.of(
+                new OverpassResponse.Element("node", 1, 40.98980, 29.02665, null, Map.of(
+                        "amenity", "restaurant", "name", "Çiya Sofrası", "wikidata", "Q111",
+                        "wikimedia_commons", "File:Çiya.jpg")),
+                // A second duplicate of the same place: the first reference is kept
+                new OverpassResponse.Element("node", 2, 40.98975, 29.02660, null, Map.of(
+                        "amenity", "restaurant", "name", "Çiya", "wikidata", "Q222")),
+                // Moda Sahili already has one: untouched
+                new OverpassResponse.Element("way", 3, 40.98105, 29.02505, null, Map.of(
+                        "leisure", "park", "name", "Moda Sahili", "wikidata", "Q333")));
+
+        OsmPlaceImporter.Prepared prepared = OsmPlaceImporter.prepare(elements, withIds);
+
+        assertThat(prepared.places()).isEmpty();
+        assertThat(prepared.skippedDuplicates()).isEqualTo(3);
+        assertThat(prepared.verifiedMedia()).containsExactly(
+                new OsmPlaceImporter.VerifiedMedia(10L, "Q111", "Çiya.jpg"));
+    }
+
     private static OsmPlaceMapper.OsmPlace osm(String id, String name, double lat, double lon) {
         return OsmPlaceMapper.map(element(id.split("/")[0], Long.parseLong(id.split("/")[1]), name, lat, lon));
     }

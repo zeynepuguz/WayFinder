@@ -83,7 +83,7 @@ export function ExplorePage() {
     try {
       if (mode === 'nearby') {
         // Nearby list is sorted by PostGIS distance; filters are applied on that small result
-        const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500, 50)
+        const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500, 50, category || undefined)
         const q = fold(query)
         setPlaces(nearby.filter(p =>
           (!category || p.category === category)

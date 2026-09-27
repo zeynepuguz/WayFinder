@@ -67,6 +67,29 @@ public class Place {
 
     private Instant lastVerifiedAt;
 
+    // Photo from Wikimedia Commons. Written only by the OSM import (wikidata, commonsFile) and
+    // WikimediaImageResolver (the rest) through JDBC, so JPA saves (admin edits) never overwrite them.
+    @Column(insertable = false, updatable = false)
+    private String wikidata;
+
+    @Column(insertable = false, updatable = false)
+    private String commonsFile;
+
+    @Column(insertable = false, updatable = false)
+    private String imageUrl;
+
+    @Column(insertable = false, updatable = false)
+    private String imageAuthor;
+
+    @Column(insertable = false, updatable = false)
+    private String imageLicense;
+
+    @Column(insertable = false, updatable = false)
+    private String imageSourceUrl;
+
+    @Column(insertable = false, updatable = false)
+    private Instant imageCheckedAt;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -284,6 +307,34 @@ public class Place {
 
     public void setLastVerifiedAt(Instant lastVerifiedAt) {
         this.lastVerifiedAt = lastVerifiedAt;
+    }
+
+    public String getWikidata() {
+        return wikidata;
+    }
+
+    public String getCommonsFile() {
+        return commonsFile;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public String getImageAuthor() {
+        return imageAuthor;
+    }
+
+    public String getImageLicense() {
+        return imageLicense;
+    }
+
+    public String getImageSourceUrl() {
+        return imageSourceUrl;
+    }
+
+    public Instant getImageCheckedAt() {
+        return imageCheckedAt;
     }
 
     public Instant getCreatedAt() {

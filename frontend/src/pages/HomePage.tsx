@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import type { PlaceCategory } from '../api/types'
 import { useGate } from '../components/gate'
-import { FartherPlaceRow, PlaceCard } from '../components/PlaceViews'
+import { PlaceCard } from '../components/PlaceViews'
 import { ErrorState, Skeleton } from '../components/ui'
 import { BrandMark, CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
@@ -159,14 +159,6 @@ export function HomePage() {
         </div>
         {data && data.suggestions.length === 0 && (
           <p className="t-caption">{t('Yakınında şu an açık bir öneri bulamadım.', 'I couldn’t find anything open near you right now.')}</p>
-        )}
-        {data && (data.fartherSuggestions ?? []).length > 0 && (
-          <div className="stack-sm">
-            <h3 className="t-overline">{t('Daha uygun ama sana yakın değil', 'A better fit, but not close to you')}</h3>
-            <div className="farther-list">
-              {data.fartherSuggestions.map(s => <FartherPlaceRow key={s.place.id} recommendation={s} />)}
-            </div>
-          </div>
         )}
         <Link to="/explore?view=map" className="section-link" style={{ alignSelf: 'flex-start' }}>
           <MapIcon size={16} style={{ marginRight: 4 }} /> {t('Haritada gör', 'See on map')} <ChevronRight size={16} />

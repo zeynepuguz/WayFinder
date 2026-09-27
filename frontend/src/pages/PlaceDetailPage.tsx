@@ -2,10 +2,10 @@ import { Clock, ExternalLink, Heart, Info, MapPin, Navigation, Timer, Umbrella, 
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
-import { OpenBadge, VerifiedBadge } from '../components/PlaceViews'
+import { OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { RouteMap } from '../components/RouteMap'
 import { BackButton, ErrorState, Skeleton } from '../components/ui'
-import { CATEGORY_ICON, Rating } from '../components/visuals'
+import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
 import { CATEGORY_LABELS, dayNames, formatCost, formatTime, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -17,6 +17,7 @@ export function PlaceDetailPage() {
   const gate = useGate()
   const t = useT()
   const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id])
+  const photo = usePlacePhoto(place?.image)
 
   if (loading) {
     return (
@@ -39,9 +40,10 @@ export function PlaceDetailPage() {
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
-      <div className="place-hero">
+      <div className={`place-hero ${photo.url ? 'place-hero-photo' : ''}`}>
         <div className={`tile tile-${place.category}`}>
           <span className="hero-icon"><Icon size={44} strokeWidth={1.6} /></span>
+          {photo.url && <img className="tile-photo" src={photo.url} alt={place.name} decoding="async" onError={photo.onError} />}
         </div>
         <div className="place-hero-bar">
           <BackButton glass />
@@ -105,6 +107,8 @@ export function PlaceDetailPage() {
             </table>
           </section>
         )}
+
+        {photo.url && place.image && <PhotoCredit image={place.image} />}
 
         <p className="t-caption row" style={{ alignItems: 'flex-start' }}>
           <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />

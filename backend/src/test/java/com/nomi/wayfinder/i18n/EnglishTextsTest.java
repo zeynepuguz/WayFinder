@@ -181,10 +181,10 @@ class EnglishTextsTest {
     private static RouteResponse route(String title, StopStatus firstStatus) {
         StopResponse breakfast = new StopResponse(1L, 0, StopType.BREAKFAST, StopType.BREAKFAST.getLabel(),
                 LocalTime.of(9, 30), LocalTime.of(10, 30), 300, 5, List.of(), firstStatus,
-                new StopPlace(10L, "Çiya", PlaceCategory.BREAKFAST, null, null, 40.99, 29.02, 200, 4.5, true));
+                new StopPlace(10L, "Çiya", PlaceCategory.BREAKFAST, null, null, 40.99, 29.02, 200, 4.5, true, null));
         StopResponse sights = new StopResponse(2L, 1, StopType.SIGHTSEEING, StopType.SIGHTSEEING.getLabel(),
                 LocalTime.of(11, 0), LocalTime.of(12, 0), 500, 7, List.of(), StopStatus.PLANNED,
-                new StopPlace(11L, "Moda Sahili", PlaceCategory.PARK, null, null, 40.98, 29.02, 0, 4.7, false));
+                new StopPlace(11L, "Moda Sahili", PlaceCategory.PARK, null, null, 40.98, 29.02, 0, 4.7, false, null));
         List<StopResponse> stops = firstStatus == StopStatus.PLANNED ? List.of(breakfast, sights) : List.of(breakfast);
 
         return new RouteResponse(1L, title, LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02,
@@ -209,7 +209,7 @@ class EnglishTextsTest {
     private static RouteResponse osmRoute() {
         StopResponse osmStop = new StopResponse(3L, 0, StopType.COFFEE, StopType.COFFEE.getLabel(),
                 LocalTime.of(15, 0), LocalTime.of(15, 45), 300, 5, List.of(), StopStatus.PLANNED,
-                new StopPlace(12L, "Kahve Durağı", PlaceCategory.CAFE, null, null, 40.99, 29.02, null, null, true));
+                new StopPlace(12L, "Kahve Durağı", PlaceCategory.CAFE, null, null, 40.99, 29.02, null, null, true, null));
         return new RouteResponse(1L, "R", LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02,
                 LocalTime.of(15, 0), LocalTime.of(22, 0), 1, null, 0, 300, 5, WalkingTolerance.MEDIUM, List.of(),
                 null, List.of(), List.of(osmStop), null, null);

@@ -3,6 +3,7 @@ package com.nomi.wayfinder.service;
 import com.nomi.wayfinder.dto.NearbyPlaceResponse;
 import com.nomi.wayfinder.dto.OpeningHoursDto;
 import com.nomi.wayfinder.dto.PlaceCreateRequest;
+import com.nomi.wayfinder.dto.PlaceImage;
 import com.nomi.wayfinder.dto.PlaceResponse;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceOpeningHours;
@@ -86,6 +87,7 @@ public class PlaceMapper {
         response.setVerified(place.isVerified());
         response.setSourceUrl(place.getSourceUrl());
         response.setLastVerifiedAt(place.getLastVerifiedAt());
+        response.setImage(PlaceImage.of(place));
 
         return response;
     }

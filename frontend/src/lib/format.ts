@@ -134,3 +134,8 @@ export const CATEGORY_SLUGS: Record<PlaceCategory, string> = {
 export const CATEGORY_BY_SLUG: Record<string, PlaceCategory> = Object.fromEntries(
   Object.entries(CATEGORY_SLUGS).map(([category, slug]) => [slug, category as PlaceCategory]),
 )
+
+// Only http(s) links from the API are rendered as links or images
+export function httpUrl(url: string | null | undefined): string | null {
+  return url && /^https?:\/\//i.test(url) ? url : null
+}
