@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nomi</string>
+    <string name="title_activity_main">Nomi</string>
+    <string name="package_name">com.nomi.app</string>
+    <string name="custom_url_scheme">com.nomi.app</string>
+</resources>

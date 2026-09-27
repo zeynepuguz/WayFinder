@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.dto;
 
+import com.nomi.wayfinder.billing.BillingService;
 import com.nomi.wayfinder.entity.UserRole;
 import com.nomi.wayfinder.entity.WalkingTolerance;
 import jakarta.validation.constraints.*;
@@ -34,7 +35,8 @@ public final class AuthDtos {
             String email,
             String displayName,
             UserRole role,
-            PreferencesResponse preferences
+            PreferencesResponse preferences,
+            BillingService.AccessStatus access
     ) {
     }
 

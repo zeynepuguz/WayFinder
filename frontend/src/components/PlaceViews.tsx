@@ -1,0 +1,84 @@
+import { Check, Heart, MapPin } from 'lucide-react'
+import { Link } from 'react-router'
+import type { Place } from '../api/types'
+import { useSavedPlaces } from '../context/SavedPlacesContext'
+import { CATEGORY_LABELS, formatCost, formatDistance } from '../lib/format'
+import { useGate } from './gate'
+import { CategoryTile, Rating } from './visuals'
+
+function SaveButton({ place, glass }: { place: Place; glass?: boolean }) {
+  const saved = useSavedPlaces()
+  const gate = useGate()
+  const isSaved = saved.isSaved(place.id)
+
+  return (
+    <button
+      className={`icon-btn save ${glass ? 'icon-btn-glass' : 'icon-btn-plain'}`}
+      style={{ width: 38, height: 38 }}
+      aria-pressed={isSaved}
+      aria-label={isSaved ? 'Kaydedilenlerden çıkar' : 'Kaydet'}
+      onClick={e => {
+        e.preventDefault()
+        if (gate()) void saved.toggle(place)
+      }}
+    >
+      <Heart size={19} fill={isSaved ? 'currentColor' : 'none'} />
+    </button>
+  )
+}
+
+export function OpenBadge({ openNow }: { openNow: boolean | null }) {
+  if (openNow == null) return null
+  return <span className={`badge ${openNow ? 'badge-success' : 'badge-danger'}`}>{openNow ? 'Açık' : 'Kapalı'}</span>
+}
+
+// Compact row for lists
+export function PlaceRow({ place, reasons }: { place: Place; reasons?: string[] }) {
+  return (
+    <div className="card" style={{ padding: 0 }}>
+      <Link to={`/places/${place.id}`} className="place-row card-press">
+        <CategoryTile category={place.category} />
+        <div className="place-row-body">
+          <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
+          <div className="meta">
+            <Rating value={place.rating} />
+            <span>{CATEGORY_LABELS[place.category]}</span>
+            {place.distanceMeters != null && <span><MapPin size={12} />{formatDistance(place.distanceMeters)}</span>}
+          </div>
+          <div className="row" style={{ gap: 6 }}>
+            <OpenBadge openNow={place.openNow} />
+            <span className="badge">{formatCost(place.estimatedCost)}</span>
+            {place.indoor && <span className="badge badge-sea">Kapalı alan</span>}
+          </div>
+        </div>
+        <SaveButton place={place} />
+      </Link>
+      {reasons && reasons.length > 0 && (
+        <ul className="reasons" style={{ padding: '0 16px 14px' }}>
+          {reasons.map(r => <li key={r}><Check size={14} />{r}</li>)}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+// Large card for horizontal carousels
+export function PlaceCard({ place, reason }: { place: Place; reason?: string }) {
+  return (
+    <div className="place-card-wrap">
+      <Link to={`/places/${place.id}`} className="card place-card card-press">
+        <CategoryTile category={place.category} size={40} />
+        <div className="place-card-body">
+          <span className="place-name">{place.name}</span>
+          <div className="meta">
+            <Rating value={place.rating} />
+            <span>{formatCost(place.estimatedCost)}</span>
+            {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
+          </div>
+          {reason && <span className="t-caption" style={{ color: 'var(--success)', fontWeight: 650 }}>{reason}</span>}
+        </div>
+      </Link>
+      <SaveButton place={place} glass />
+    </div>
+  )
+}

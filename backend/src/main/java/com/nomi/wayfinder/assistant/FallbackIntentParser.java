@@ -3,9 +3,11 @@ package com.nomi.wayfinder.assistant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-// Uses the AI service when configured and healthy, otherwise the rule-based parser
+// Uses the AI service when configured, healthy and within the user's daily quota, otherwise the rule-based parser
 @Component
 @Primary
 public class FallbackIntentParser implements IntentParser {
@@ -14,15 +16,18 @@ public class FallbackIntentParser implements IntentParser {
 
     private final AiServiceIntentParser aiParser;
     private final RuleBasedIntentParser ruleParser;
+    private final AiUsageLimiter usageLimiter;
 
-    public FallbackIntentParser(AiServiceIntentParser aiParser, RuleBasedIntentParser ruleParser) {
+    public FallbackIntentParser(AiServiceIntentParser aiParser, RuleBasedIntentParser ruleParser,
+                                AiUsageLimiter usageLimiter) {
         this.aiParser = aiParser;
         this.ruleParser = ruleParser;
+        this.usageLimiter = usageLimiter;
     }
 
     @Override
     public AssistantIntent parse(String message, IntentContext context) {
-        if (aiParser.isEnabled()) {
+        if (aiParser.isEnabled() && usageLimiter.tryAcquire(currentUser())) {
             try {
                 return aiParser.parse(message, context);
             } catch (Exception e) {
@@ -30,5 +35,10 @@ public class FallbackIntentParser implements IntentParser {
             }
         }
         return ruleParser.parse(message, context);
+    }
+
+    private static String currentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? "user:" + auth.getName() : "anonymous";
     }
 }

@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.service;
 
+import com.nomi.wayfinder.billing.BillingService;
 import com.nomi.wayfinder.dto.AuthDtos.*;
 import com.nomi.wayfinder.entity.User;
 import com.nomi.wayfinder.entity.UserPreferences;
@@ -23,17 +24,20 @@ public class UserService {
     private final UserPreferencesRepository preferencesRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final BillingService billingService;
 
     public UserService(
             UserRepository userRepository,
             UserPreferencesRepository preferencesRepository,
             PasswordEncoder passwordEncoder,
-            JwtService jwtService
+            JwtService jwtService,
+            BillingService billingService
     ) {
         this.userRepository = userRepository;
         this.preferencesRepository = preferencesRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.billingService = billingService;
     }
 
     @Transactional
@@ -88,6 +92,12 @@ public class UserService {
         return toPreferencesResponse(preferencesRepository.save(preferences));
     }
 
+    // Google Play requires in-app account deletion. Routes, messages, saved places and passes cascade.
+    @Transactional
+    public void deleteAccount(Long userId) {
+        userRepository.delete(getUser(userId));
+    }
+
     @Transactional
     public UserPreferences getPreferences(Long userId) {
         return preferencesRepository.findById(userId)
@@ -110,7 +120,8 @@ public class UserService {
                 user.getEmail(),
                 user.getDisplayName(),
                 user.getRole(),
-                toPreferencesResponse(getPreferences(user.getId()))
+                toPreferencesResponse(getPreferences(user.getId())),
+                billingService.status(user.getId())
         );
     }
 

@@ -6,6 +6,7 @@ import com.nomi.wayfinder.dto.AuthDtos.UserResponse;
 import com.nomi.wayfinder.security.CurrentUser;
 import com.nomi.wayfinder.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,12 @@ public class UserController {
     @GetMapping
     public UserResponse me(@AuthenticationPrincipal Jwt jwt) {
         return userService.getProfile(CurrentUser.id(jwt));
+    }
+
+    @DeleteMapping
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteAccount(@AuthenticationPrincipal Jwt jwt) {
+        userService.deleteAccount(CurrentUser.id(jwt));
     }
 
     @PutMapping("/preferences")

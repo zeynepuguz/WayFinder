@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.assistant;
 
 import com.nomi.wayfinder.config.NomiProperties;
+import org.slf4j.MDC;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
@@ -27,7 +28,16 @@ public class AiServiceIntentParser implements IntentParser {
         requestFactory.setConnectTimeout(properties.connectTimeout());
         requestFactory.setReadTimeout(properties.readTimeout());
 
-        RestClient.Builder builder = RestClient.builder().requestFactory(requestFactory);
+        RestClient.Builder builder = RestClient.builder()
+                .requestFactory(requestFactory)
+                // Forward our request id so one user request can be followed in both services' logs
+                .requestInterceptor((request, body, execution) -> {
+                    String requestId = MDC.get("requestId");
+                    if (requestId != null) {
+                        request.getHeaders().add("X-Request-Id", requestId);
+                    }
+                    return execution.execute(request, body);
+                });
         if (properties.enabled()) {
             builder.baseUrl(properties.baseUrl());
         }

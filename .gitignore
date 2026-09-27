@@ -24,3 +24,8 @@ application.properties
 # OS
 .DS_Store
 Thumbs.db
+# Python
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.env.production

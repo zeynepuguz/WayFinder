@@ -79,9 +79,12 @@ public class RoutePlanner {
             remainingWeight -= slot.type().getBudgetWeight();
 
             LegContext leg = new LegContext(latitude, longitude, clock, stops.isEmpty(), allowance);
-            Optional<PlannedStop> planned = planSlot(slot, leg, request, forecast.orElse(null), used, notes);
+            // Notes about this stop only count if the stop ends up in the plan
+            List<String> slotNotes = new ArrayList<>();
+            Optional<PlannedStop> planned = planSlot(slot, leg, request, forecast.orElse(null), used, slotNotes);
 
             if (planned.isEmpty()) {
+                notes.addAll(slotNotes);
                 continue;
             }
 
@@ -92,6 +95,7 @@ public class RoutePlanner {
                 continue;
             }
 
+            notes.addAll(slotNotes);
             stops.add(stop);
             used.add(stop.place().getId());
             latitude = stop.place().getLatitude();
@@ -248,6 +252,13 @@ public class RoutePlanner {
             return Optional.empty();
         }
 
+        // Too far for how much the user wants to walk now (e.g. after "çok yorulduk")
+        double maxPinnedLeg = request.walkingTolerance().getMaxLegMeters() * 2.0;
+        if (distance != null && distance > maxPinnedLeg) {
+            notes.add(place.getName() + " artık uzak kaldığı için daha yakın bir yerle değiştirildi.");
+            return Optional.empty();
+        }
+
         WeatherContext weather = WeatherContext.at(forecast, time(timing.arrival()), request.assumeWet());
         if (weather.wet() && !place.isIndoor()) {
             notes.add(place.getName() + " açık alan olduğu ve yağış beklendiği için değiştirildi.");
@@ -268,9 +279,9 @@ public class RoutePlanner {
         int earliest = clock + walkingMinutes;
 
         int arrival = earliest;
-        if (slot.targetTime() != null) {
+        Integer target = upcomingTarget(slot.targetTime(), clock);
+        if (target != null) {
             int flex = slot.exactTime() ? 0 : slot.type().isMeal() ? MEAL_FLEX_MINUTES : OTHER_FLEX_MINUTES;
-            int target = toDayMinutes(slot.targetTime(), clock - 180);
             arrival = Math.max(earliest, target - flex);
         }
         // Round to 5 minutes so times look like a human made the plan
@@ -320,6 +331,23 @@ public class RoutePlanner {
     private static int endMinutes(LocalTime start, LocalTime end) {
         int e = minutes(end);
         return e <= minutes(start) ? e + 1440 : e;
+    }
+
+    /**
+     * The slot's target on the plan's timeline, or null if it already passed.
+     * A breakfast asked for at 12:45 is planned now, not tomorrow at 09:30.
+     * Only targets up to 3 hours after midnight wrap to the next day (late plans).
+     */
+    static Integer upcomingTarget(LocalTime targetTime, int clock) {
+        if (targetTime == null) {
+            return null;
+        }
+        int target = minutes(targetTime) + (clock / 1440) * 1440;
+        if (target >= clock - 180) {
+            return target;
+        }
+        int nextDay = target + 1440;
+        return nextDay - clock <= 180 ? nextDay : null;
     }
 
     // Places a time of day on the plan's timeline, at or after the reference minute

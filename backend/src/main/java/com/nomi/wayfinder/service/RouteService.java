@@ -206,8 +206,7 @@ public class RouteService {
                 tolerance = WalkingTolerance.LOW;
                 // Drop outdoor sightseeing, keep meals/coffee/dessert
                 slots.removeIf(slot -> slot.type() == StopType.SIGHTSEEING && isOutdoor(remaining, slot));
-                // Unpin the rest so far away stops can be swapped for closer ones
-                slots.replaceAll(slot -> slot.type().isMeal() ? slot : slot.unpinned());
+                // Remaining stops stay pinned; the planner swaps pinned places that are now too far (LOW tolerance)
                 boolean restNext = !slots.isEmpty()
                         && (slots.getFirst().type() == StopType.COFFEE || slots.getFirst().type() == StopType.DESSERT);
                 if (!restNext) {

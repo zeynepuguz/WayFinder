@@ -1,0 +1,66 @@
+import logging
+import secrets
+import time
+import uuid
+
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+
+from .config import Settings, get_settings
+from .intent import IntentExtractor, OpenAIIntentExtractor
+from .schemas import AssistantIntent, IntentRequest
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+log = logging.getLogger("nomi.ai")
+
+app = FastAPI(title="Nomi AI Service", version="0.1.0")
+
+
+@app.middleware("http")
+async def request_logging(request: Request, call_next):
+    # Same X-Request-Id as the Spring backend, so one request can be followed across both services
+    request_id = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:8]
+    start = time.perf_counter()
+    response = await call_next(request)
+    millis = (time.perf_counter() - start) * 1000
+    response.headers["X-Request-Id"] = request_id
+    log.info("[%s] %s %s -> %s (%.0f ms)", request_id, request.method, request.url.path, response.status_code, millis)
+    return response
+
+
+def require_api_key(
+    x_api_key: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> None:
+    if not settings.ai_service_api_key:
+        return
+    if x_api_key is None or not secrets.compare_digest(x_api_key, settings.ai_service_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+_extractor: IntentExtractor | None = None
+
+
+def get_extractor(settings: Settings = Depends(get_settings)) -> IntentExtractor:
+    global _extractor
+    if not settings.openai_api_key:
+        # The backend treats any error as "use the rule-based parser"
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+    if _extractor is None:
+        _extractor = OpenAIIntentExtractor(settings)
+    return _extractor
+
+
+@app.get("/health")
+def health(settings: Settings = Depends(get_settings)) -> dict:
+    return {"status": "UP", "llmConfigured": bool(settings.openai_api_key), "model": settings.openai_model}
+
+
+@app.post("/v1/intent", response_model=AssistantIntent, dependencies=[Depends(require_api_key)])
+def parse_intent(request: IntentRequest, extractor: IntentExtractor = Depends(get_extractor)) -> AssistantIntent:
+    try:
+        return extractor.extract(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # LLM timeout, rate limit, invalid output...
+        log.warning("Intent extraction failed: %s", e)
+        raise HTTPException(status_code=502, detail="Intent extraction failed") from e

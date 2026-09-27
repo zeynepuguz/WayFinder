@@ -59,16 +59,30 @@ nomi:
     jwt-expiration-minutes: ${JWT_EXPIRATION_MINUTES:1440}
     admin-email: ${ADMIN_EMAIL:}
     admin-password: ${ADMIN_PASSWORD:}
-    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    # https://localhost and capacitor://localhost are the Android / iOS app's WebView origins
+    cors-allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,https://localhost,capacitor://localhost}
   weather:
     base-url: ${WEATHER_BASE_URL:https://api.open-meteo.com}
     connect-timeout: 3s
     read-timeout: 5s
   ai:
     base-url: ${AI_SERVICE_URL:}
+    # OpenAI-backed messages per user per day (Istanbul date); after that the rule-based parser answers
+    daily-limit-per-user: ${AI_DAILY_LIMIT_PER_USER:150}
     api-key: ${AI_SERVICE_API_KEY:}
     connect-timeout: 2s
     read-timeout: 10s
+  billing:
+    dev-mode: ${BILLING_DEV_MODE:false}
+    google-play-package-name: ${GOOGLE_PLAY_PACKAGE_NAME:com.nomi.app}
+    google-play-service-account-file: ${GOOGLE_PLAY_SERVICE_ACCOUNT_FILE:}
+    prices:
+      DAILY: ${PRICE_DAILY_TRY:25}
+      WEEKLY: ${PRICE_WEEKLY_TRY:79}
+      MONTHLY: ${PRICE_MONTHLY_TRY:199}
+      YEARLY: ${PRICE_YEARLY_TRY:1499}
+    # Comma separated accounts with unlimited free access (e.g. the owner). Keep it only in .env
+    free-access-emails: ${FREE_ACCESS_EMAILS:}
   rate-limit:
     # Requests per minute per user for expensive endpoints (route planning, assistant)
     requests-per-minute: 30

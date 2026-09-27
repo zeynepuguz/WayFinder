@@ -52,8 +52,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/health", "/actuator/health").permitAll()
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Guests can look around the app before signing in / paying
                         .requestMatchers(HttpMethod.GET, "/api/v1/places/**", "/api/v1/weather/**",
-                                "/api/v1/recommendations/**", "/api/v1/home/**").permitAll()
+                                "/api/v1/recommendations/**", "/api/v1/home/**", "/api/v1/billing/plans").permitAll()
                         // Place data comes from admins / data pipeline, not from users
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/places/**").hasRole("ADMIN")

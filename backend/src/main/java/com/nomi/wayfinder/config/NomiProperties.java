@@ -12,8 +12,28 @@ public record NomiProperties(
         Security security,
         Weather weather,
         Ai ai,
-        RateLimit rateLimit
+        RateLimit rateLimit,
+        Billing billing
 ) {
+
+    /**
+     * @param devMode allows free "purchases" through /billing/dev/purchase; must stay false in production
+     * @param prices  TL price per plan; must match the prices set in Google Play Console
+     * @param freeAccessEmails accounts (e.g. the owner's) that get unlimited access without paying
+     */
+    public record Billing(
+            boolean devMode,
+            String googlePlayPackageName,
+            String googlePlayServiceAccountFile,
+            java.util.Map<com.nomi.wayfinder.entity.AccessPlan, Integer> prices,
+            List<String> freeAccessEmails
+    ) {
+
+        public boolean isFreeAccess(String email) {
+            return email != null && freeAccessEmails != null
+                    && freeAccessEmails.stream().anyMatch(free -> free.trim().equalsIgnoreCase(email.trim()));
+        }
+    }
 
     public record Security(
             String jwtSecret,
@@ -27,7 +47,12 @@ public record NomiProperties(
     public record Weather(String baseUrl, Duration connectTimeout, Duration readTimeout) {
     }
 
-    public record Ai(String baseUrl, String apiKey, Duration connectTimeout, Duration readTimeout) {
+    /**
+     * @param dailyLimitPerUser messages per user per day sent to the AI service (bot/abuse protection);
+     *                          beyond it the rule-based parser answers
+     */
+    public record Ai(String baseUrl, String apiKey, Duration connectTimeout, Duration readTimeout,
+                     int dailyLimitPerUser) {
 
         public boolean enabled() {
             return baseUrl != null && !baseUrl.isBlank();
