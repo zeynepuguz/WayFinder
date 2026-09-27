@@ -11,6 +11,8 @@ interface AuthState {
   hasAccess: boolean
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, displayName: string) => Promise<void>
+  // Sets a new password with the e-mailed code and signs in
+  resetPassword: (email: string, code: string, newPassword: string) => Promise<void>
   logout: () => void
   deleteAccount: () => Promise<void>
   refreshUser: () => Promise<void>
@@ -67,6 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasAccess,
     login: async (email, password) => accept(await api.login(email, password)),
     register: async (email, password, displayName) => accept(await api.register(email, password, displayName)),
+    resetPassword: async (email, code, newPassword) => accept(await api.resetPassword(email, code, newPassword)),
     logout,
     deleteAccount: async () => {
       await api.deleteAccount()

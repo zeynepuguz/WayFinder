@@ -69,6 +69,26 @@ public class GooglePlayClient {
                 .toBodilessEntity();
     }
 
+    /**
+     * Purchases that were refunded, charged back or canceled after they were granted.
+     * Google keeps the last 30 days; pageToken continues a previous page.
+     */
+    public VoidedPurchasesPage getVoidedPurchases(long startTimeMillis, String pageToken) {
+        return restClient.get()
+                .uri(uri -> {
+                    uri.path("/applications/{package}/purchases/voidedpurchases")
+                            .queryParam("startTime", startTimeMillis)
+                            .queryParam("maxResults", 1000);
+                    if (pageToken != null) {
+                        uri.queryParam("token", pageToken);
+                    }
+                    return uri.build(packageName);
+                })
+                .header("Authorization", "Bearer " + accessToken())
+                .retrieve()
+                .body(VoidedPurchasesPage.class);
+    }
+
     private String accessToken() {
         try {
             credentials.refreshIfExpired();
@@ -105,5 +125,16 @@ public class GooglePlayClient {
             String obfuscatedExternalAccountId,
             String regionCode
     ) {
+    }
+
+    // https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.voidedpurchases/list
+    public record VoidedPurchasesPage(List<VoidedPurchase> voidedPurchases, TokenPagination tokenPagination) {
+    }
+
+    /** @param voidedReason 0 other, 1 remorse, 2 not received, 3 defective, 4 accidental, 5 fraud, 6 friendly fraud, 7 chargeback */
+    public record VoidedPurchase(String purchaseToken, String orderId, String voidedTimeMillis, Integer voidedReason) {
+    }
+
+    public record TokenPagination(String nextPageToken) {
     }
 }

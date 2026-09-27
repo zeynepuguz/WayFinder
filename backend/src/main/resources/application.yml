@@ -6,7 +6,7 @@ spring:
     import: optional:file:.env[.properties],optional:file:../.env[.properties]
 
   datasource:
-    url: jdbc:postgresql://localhost:${POSTGRES_PORT:5433}/${POSTGRES_DB:wayfinder}
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5433}/${POSTGRES_DB:wayfinder}
     username: ${POSTGRES_USER:wayfinder}
     password: ${POSTGRES_PASSWORD:wayfinder}
 
@@ -34,6 +34,18 @@ spring:
     redis:
       time-to-live: 15m
 
+  # SMTP for password reset e-mails. Empty MAIL_HOST = e-mails are not sent (see nomi.mail.dev-log-codes)
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 10000
+
 server:
   error:
     include-message: never
@@ -51,6 +63,10 @@ management:
   endpoint:
     health:
       show-details: never
+  health:
+    # An SMTP outage must not mark the whole app as down
+    mail:
+      enabled: false
 
 nomi:
   timezone: Europe/Istanbul
@@ -83,6 +99,9 @@ nomi:
       YEARLY: ${PRICE_YEARLY_TRY:1499}
     # Comma separated accounts with unlimited free access (e.g. the owner). Keep it only in .env
     free-access-emails: ${FREE_ACCESS_EMAILS:}
+  mail:
+    from: ${MAIL_FROM:Nomi <no-reply@nomi.app>}
+    dev-log-codes: ${MAIL_DEV_LOG_CODES:false}
   rate-limit:
     # Requests per minute per user for expensive endpoints (route planning, assistant)
     requests-per-minute: 30

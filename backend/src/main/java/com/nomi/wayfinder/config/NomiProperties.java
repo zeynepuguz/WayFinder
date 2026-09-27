@@ -13,8 +13,17 @@ public record NomiProperties(
         Weather weather,
         Ai ai,
         RateLimit rateLimit,
-        Billing billing
+        Billing billing,
+        Mail mail
 ) {
+
+    /**
+     * @param from        sender address of outgoing e-mails
+     * @param devLogCodes write password reset codes to the log instead of failing silently when
+     *                    no SMTP server is configured; local development only
+     */
+    public record Mail(String from, boolean devLogCodes) {
+    }
 
     /**
      * @param devMode allows free "purchases" through /billing/dev/purchase; must stay false in production

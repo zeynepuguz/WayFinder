@@ -29,3 +29,6 @@ Thumbs.db
 **/__pycache__/
 **/.pytest_cache/
 **/.env.production
+
+# Production secrets
+deploy/secrets/

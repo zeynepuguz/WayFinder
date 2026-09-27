@@ -27,6 +27,16 @@ public final class AuthDtos {
     ) {
     }
 
+    public record ForgotPasswordRequest(@NotBlank @Email String email) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank @Email String email,
+            @NotBlank @Pattern(regexp = "\\s*\\d{6}\\s*", message = "must be the 6-digit code") String code,
+            @NotBlank @Size(min = 8, max = 100) String newPassword
+    ) {
+    }
+
     public record AuthResponse(String accessToken, String tokenType, Instant expiresAt, UserResponse user) {
     }
 

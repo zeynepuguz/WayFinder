@@ -9,6 +9,7 @@ import { SavedPlacesProvider } from './context/SavedPlacesContext'
 import { setupNativeShell } from './lib/native'
 import { AssistantPage } from './pages/AssistantPage'
 import { AuthPage } from './pages/AuthPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ExplorePage } from './pages/ExplorePage'
 import { HomePage } from './pages/HomePage'
 import { hasOnboarded, OnboardingPage } from './pages/OnboardingPage'
@@ -68,6 +69,7 @@ function AppRoutes() {
       <Routes>
         <Route path="welcome" element={<OnboardingPage />} />
         <Route path="login" element={<AuthPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
         <Route element={<FullScreen />}>
           <Route path="premium" element={<PremiumPage />} />
           <Route path="places/:id" element={<PlaceDetailPage />} />

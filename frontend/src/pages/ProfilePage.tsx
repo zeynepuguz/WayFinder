@@ -93,7 +93,7 @@ export function ProfilePage() {
           <ChevronRight size={18} className="muted" />
         </button>
         {isNativeApp() && (
-          <button className="list-item" onClick={() => void restorePurchases().then(() => toast('Satın alımlar kontrol edildi'))}>
+          <button className="list-item" onClick={() => void restorePurchases().then(() => toast('Satın alımlar kontrol edildi'), (e: unknown) => toast(e instanceof Error ? e.message : 'Satın alımlar kontrol edilemedi'))}>
             <span className="list-item-icon"><RotateCcw size={18} /></span>
             <span className="grow">Satın alımları geri yükle</span>
           </button>

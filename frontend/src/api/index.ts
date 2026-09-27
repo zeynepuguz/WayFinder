@@ -10,6 +10,9 @@ export const api = {
   register: (email: string, password: string, displayName: string) =>
     http.post<AuthResponse>('/auth/register', { email, password, displayName }),
   login: (email: string, password: string) => http.post<AuthResponse>('/auth/login', { email, password }),
+  forgotPassword: (email: string) => http.post<void>('/auth/password/forgot', { email }),
+  resetPassword: (email: string, code: string, newPassword: string) =>
+    http.post<AuthResponse>('/auth/password/reset', { email, code, newPassword }),
   me: () => http.get<User>('/users/me'),
   deleteAccount: () => http.delete<void>('/users/me'),
 

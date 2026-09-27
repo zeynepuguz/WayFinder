@@ -87,6 +87,23 @@ public class BillingService {
         );
     }
 
+    /**
+     * Ends the pass bought with a refunded / charged-back purchase.
+     * Returns false when the token is unknown or the pass was already revoked.
+     */
+    @Transactional
+    public boolean revokePurchase(String purchaseToken) {
+        return passRepository.findByPurchaseToken(purchaseToken)
+                .filter(pass -> pass.getStatus() == AccessPass.Status.ACTIVE)
+                .map(pass -> {
+                    pass.setStatus(AccessPass.Status.REVOKED);
+                    passRepository.save(pass);
+                    log.info("Access pass {} of user {} revoked: purchase was voided", pass.getId(), pass.getUserId());
+                    return true;
+                })
+                .orElse(false);
+    }
+
     // Accounts listed in FREE_ACCESS_EMAILS (e.g. the owner) never need a pass
     private boolean isFreeAccess(Long userId) {
         if (properties.freeAccessEmails() == null || properties.freeAccessEmails().isEmpty()) {

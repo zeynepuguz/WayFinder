@@ -57,7 +57,7 @@ class BillingServiceTest {
 
     private BillingService service(boolean devMode) {
         NomiProperties properties = new NomiProperties("Europe/Istanbul", null, null, null, null,
-                new NomiProperties.Billing(devMode, "com.nomi.app", "", PRICES, List.of(" Owner@Example.com ")));
+                new NomiProperties.Billing(devMode, "com.nomi.app", "", PRICES, List.of(" Owner@Example.com ")), null);
         return new BillingService(repository, googlePlay, users, properties, Clock.fixed(NOW, ISTANBUL));
     }
 
@@ -158,5 +158,19 @@ class BillingServiceTest {
         assertThat(service(false).status(1L)).isEqualTo(BillingService.AccessStatus.FREE);
         assertThat(service(false).hasAccess(2L)).isFalse();
         assertThat(service(false).status(2L).active()).isFalse();
+    }
+
+    @Test
+    void refundedPurchaseLosesItsAccess() {
+        googleSays(0, null);
+        service(false).verifyGooglePlay(7L, "nomi_pass_weekly", "token-r");
+        when(repository.hasAccessAt(eq(7L), any())).thenAnswer(inv -> saved.stream()
+                .anyMatch(p -> p.getStatus() == AccessPass.Status.ACTIVE && p.getExpiresAt().isAfter(inv.getArgument(1))));
+        assertThat(service(false).hasAccess(7L)).isTrue();
+
+        assertThat(service(false).revokePurchase("token-r")).isTrue();
+        assertThat(service(false).revokePurchase("token-r")).isFalse();
+        assertThat(service(false).revokePurchase("unknown")).isFalse();
+        assertThat(service(false).hasAccess(7L)).isFalse();
     }
 }

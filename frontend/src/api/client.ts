@@ -88,8 +88,10 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
     throw new ApiRequestError(error)
   }
 
-  if (response.status === 204) return undefined as T
-  return response.json() as Promise<T>
+  // 202/204 and other bodiless responses
+  const text = await response.text()
+  if (!text) return undefined as T
+  return JSON.parse(text) as T
 }
 
 export const http = {

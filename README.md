@@ -68,6 +68,43 @@ kaydetme için giriş + aktif paket gerekir (backend 402 döner, uygulama paywal
 - **OpenAI panelinde** (platform.openai.com → Settings → Limits) aylık bütçe limiti ve e-posta uyarısı koy.
   Limit dolarsa backend yine kural tabanlı parser'a düşer, uygulama çalışmaya devam eder.
 
+### İadeler
+
+Google Play'den iade edilen / ters ibraz edilen satın almalar saatte bir Voided Purchases API'den okunur ve
+verdikleri paket `REVOKED` olur (`VoidedPurchaseSync`). Servis hesabı ayarlanana kadar iş hiçbir şey yapmaz.
+
+## Şifremi unuttum
+
+`POST /api/v1/auth/password/forgot` e-postaya 6 haneli kod yollar (15 dk geçerli, 5 deneme, dakikada 1 yeni kod);
+`POST /api/v1/auth/password/reset` kod + yeni şifreyle şifreyi değiştirip oturum açar. Kayıtlı olmayan e-postaya da
+aynı cevap döner. E-posta için bir SMTP sağlayıcısı gerekir (`MAIL_*`); yerelde `MAIL_DEV_LOG_CODES=true` ile kod
+backend loguna yazılır.
+
+## Mekan verisi
+
+Kadıköy mekanları `V2` ile eklendi, `V6` ile 27.09.2026'da web üzerinden kontrol edildi: koordinatlar
+OpenStreetMap'ten, çalışma saatleri yalnızca kaynağı olanlar için (kaynaklar çelişiyorsa hepsinin açık olduğu aralık).
+Saati bilinmeyen mekanların satırı yoktur (planlayıcı "bilinmiyor" sayar). Fiyatlar tahminidir.
+
+## Sunucuya kurulum (production)
+
+`deploy/` klasörü tek komutla PostgreSQL/PostGIS, Redis, backend, AI servisi ve HTTPS'i (Caddy, Let's Encrypt) kurar.
+Dışarıya yalnızca 80/443 açılır. Gizlilik politikası ve kullanım koşulları da aynı alan adından yayınlanır.
+
+```bash
+# Linux sunucuda (Docker kurulu), alan adının DNS A kaydı sunucuya yönlenmiş olmalı
+git clone <repo> && cd WayFinder/deploy
+cp .env.prod.example .env                       # doldur: DOMAIN, şifreler, anahtarlar
+mkdir -p secrets && cp <indirilen-json> secrets/play-service-account.json   # ilk çalıştırmadan ÖNCE
+docker compose -f docker-compose.prod.yml up -d --build
+curl https://<DOMAIN>/actuator/health            # {"status":"UP"}
+```
+
+- API: `https://<DOMAIN>/api/v1` → `frontend/.env.production` içindeki `VITE_API_BASE_URL`
+- Gizlilik: `https://<DOMAIN>/gizlilik`, koşullar: `https://<DOMAIN>/kosullar` (`deploy/site/` içindeki `[...]`
+  yer tutucularını doldur) → Play Console ve `VITE_PRIVACY_URL` / `VITE_TERMS_URL`
+- Güncelleme: `git pull && docker compose -f docker-compose.prod.yml up -d --build`
+
 ## Android uygulaması (Capacitor)
 
 ```bash
@@ -79,13 +116,14 @@ npx cap open android               # Android Studio'da aç, çalıştır / imzal
 
 Play Store'a çıkmadan önce yapılacaklar:
 
-1. Backend'i HTTPS ile yayınla; `frontend/.env.production` içine `VITE_API_BASE_URL` yaz.
-2. `.env`: `CORS_ALLOWED_ORIGINS` içine `https://localhost` ekle (uygulamanın WebView origin'i).
+1. Backend'i HTTPS ile yayınla (yukarıdaki "Sunucuya kurulum"); `frontend/.env.production` içine `VITE_API_BASE_URL` yaz.
+2. Sunucu `.env`: `CORS_ALLOWED_ORIGINS=https://localhost` (uygulamanın WebView origin'i), `BILLING_DEV_MODE=false`.
 3. Play Console'da uygulamayı `com.nomi.app` paket adıyla oluştur; yukarıdaki 4 ürünü **tüketilebilir (consumable)
    uygulama içi ürün** olarak tanımla.
 4. Google Cloud'da servis hesabı oluştur, Play Console'da bu hesaba "Finansal verileri görüntüle / siparişleri yönet"
    izni ver, JSON anahtarının yolunu `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`'a yaz.
-5. Gizlilik politikası ve kullanım koşulları sayfalarını yayınla (`VITE_PRIVACY_URL`, `VITE_TERMS_URL`).
+5. Gizlilik politikası ve kullanım koşulları: `deploy/site/` sayfalarını doldur, sunucuyla birlikte yayınlanır
+   (`VITE_PRIVACY_URL`, `VITE_TERMS_URL`).
 6. Harita için ticari kullanıma uygun bir karo sağlayıcısı (MapTiler, Stadia vb.) ve `VITE_MAP_TILE_URL`.
 7. İmza anahtarı (upload key) oluştur, Android Studio'dan imzalı **AAB** üret, dahili test kanalına yükle.
 

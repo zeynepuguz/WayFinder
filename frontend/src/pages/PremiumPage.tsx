@@ -71,6 +71,8 @@ export function PremiumPage() {
     try {
       await restorePurchases()
       toast('Satın alımlar kontrol edildi')
+    } catch (e) {
+      setPurchaseError(e instanceof Error ? e.message : 'Satın alımlar kontrol edilemedi')
     } finally {
       setBusy(false)
     }

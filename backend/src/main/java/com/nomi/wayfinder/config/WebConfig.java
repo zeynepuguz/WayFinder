@@ -18,7 +18,8 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(rateLimitInterceptor)
-                .addPathPatterns("/api/v1/routes", "/api/v1/routes/*/replan", "/api/v1/assistant/**");
+                // auth: slows down password guessing and reset-code spam
+                .addPathPatterns("/api/v1/routes", "/api/v1/routes/*/replan", "/api/v1/assistant/**", "/api/v1/auth/**");
 
         // Paid features
         registry.addInterceptor(accessInterceptor)

@@ -66,42 +66,27 @@ export function setAccessChangedHandler(handler: (status: AccessStatus) => void)
   onAccessChanged = handler
 }
 
+// Without Google Play services (no Play Store, no Google account, some brands) the store never
+// finishes starting; give up after this so the user gets an answer instead of a spinner
+const INIT_TIMEOUT_MS = 15_000
+const STORE_UNAVAILABLE = 'Google Play ödeme hizmetine ulaşılamadı. Cihazında Play Store yüklü ve Google hesabın açık olmalı; sonra tekrar dene.'
+let registered = false
+
 function nativeStore(plans: Plan[]): Promise<CdvStore> {
   if (initialized) return initialized
 
-  initialized = new Promise<CdvStore>((resolve, reject) => {
+  const starting = new Promise<CdvStore>((resolve, reject) => {
     const start = async () => {
       const cdv = window.CdvPurchase
       if (!cdv) {
         reject(new Error('Ödeme altyapısı yüklenemedi'))
         return
       }
-      const { store, ProductType, Platform } = cdv
-
-      // Send our user id as-is; the backend checks that a purchase belongs to the caller
-      store.obfuscator = 'disabled'
-      store.register(plans.map(p => ({ id: p.productId, type: ProductType.CONSUMABLE, platform: Platform.GOOGLE_PLAY })))
-
-      // Also fires on app start for purchases that were paid but not verified yet (e.g. app was killed)
-      store.when().approved(async transaction => {
-        const productId = transaction.products[0]?.id
-        const token = transaction.parentReceipt?.purchaseToken ?? transaction.purchaseId
-        if (!productId || !token) return
-
-        const waiter = waiting.get(productId)
-        try {
-          const status = await api.verifyGooglePlay(productId, token)
-          // Consume only after the server granted access, so a failed check can be retried
-          await transaction.finish()
-          onAccessChanged(status)
-          waiter?.resolve(status)
-        } catch (e) {
-          waiter?.reject(e instanceof Error ? e : new Error('Satın alma doğrulanamadı'))
-        } finally {
-          waiting.delete(productId)
-        }
-      })
-
+      const { store, Platform } = cdv
+      if (!registered) {
+        registerProducts(cdv, plans)
+        registered = true
+      }
       await store.initialize([Platform.GOOGLE_PLAY])
       resolve(store)
     }
@@ -111,7 +96,42 @@ function nativeStore(plans: Plan[]): Promise<CdvStore> {
     else document.addEventListener('deviceready', () => void start(), { once: true })
   })
 
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(STORE_UNAVAILABLE)), INIT_TIMEOUT_MS)
+  })
+  initialized = Promise.race([starting, timeout]).finally(() => clearTimeout(timer))
+  // A failed start can be retried with the next purchase attempt
+  initialized.catch(() => { initialized = null })
   return initialized
+}
+
+function registerProducts(cdv: CdvPurchaseGlobal, plans: Plan[]) {
+  const { store, ProductType, Platform } = cdv
+
+  // Send our user id as-is; the backend checks that a purchase belongs to the caller
+  store.obfuscator = 'disabled'
+  store.register(plans.map(p => ({ id: p.productId, type: ProductType.CONSUMABLE, platform: Platform.GOOGLE_PLAY })))
+
+  // Also fires on app start for purchases that were paid but not verified yet (e.g. app was killed)
+  store.when().approved(async transaction => {
+    const productId = transaction.products[0]?.id
+    const token = transaction.parentReceipt?.purchaseToken ?? transaction.purchaseId
+    if (!productId || !token) return
+
+    const waiter = waiting.get(productId)
+    try {
+      const status = await api.verifyGooglePlay(productId, token)
+      // Consume only after the server granted access, so a failed check can be retried
+      await transaction.finish()
+      onAccessChanged(status)
+      waiter?.resolve(status)
+    } catch (e) {
+      waiter?.reject(e instanceof Error ? e : new Error('Satın alma doğrulanamadı'))
+    } finally {
+      waiting.delete(productId)
+    }
+  })
 }
 
 /** Store-localized price (Google requires showing the price from Play), or null on web. */

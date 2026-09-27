@@ -95,6 +95,13 @@ public class RoutePlanner {
                 continue;
             }
 
+            // The scorer only penalizes outdoor places in rain; say so when nothing indoor was left
+            if (!stop.place().isIndoor()
+                    && WeatherContext.at(forecast.orElse(null), stop.start(), request.assumeWet()).wet()) {
+                slotNotes.add(stop.place().getName() + " açık alan ve o saatte yağış bekleniyor; yakında uygun kapalı bir "
+                        + slot.type().getLabel().toLowerCase(java.util.Locale.forLanguageTag("tr")) + " mekanı bulamadım.");
+            }
+
             notes.addAll(slotNotes);
             stops.add(stop);
             used.add(stop.place().getId());

@@ -1,6 +1,6 @@
 import { Eye, EyeOff, KeyRound, Mail, User } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { ApiRequestError } from '../api/client'
 import { Alert, BackButton, Segmented, Spinner } from '../components/ui'
 import { BrandMark } from '../components/visuals'
@@ -94,6 +94,13 @@ export function AuthPage() {
             </span>
           </div>
 
+          {mode === 'login' && (
+            <Link className="t-caption" style={{ alignSelf: 'flex-end', marginTop: -4, fontWeight: 600, color: 'var(--brand-strong)' }}
+                  to={`/forgot-password?next=${encodeURIComponent(next)}${email ? `&email=${encodeURIComponent(email)}` : ''}`}>
+              Şifremi unuttum
+            </Link>
+          )}
+
           {error && <Alert tone="danger"><span>{error}</span></Alert>}
 
           <button className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
@@ -119,6 +126,7 @@ function errorText(e: unknown): string {
   if (e instanceof ApiRequestError) {
     if (e.status === 0) return 'Sunucuya ulaşılamıyor. İnternet bağlantını kontrol et.'
     if (e.status === 401) return 'E-posta veya şifre hatalı.'
+    if (e.status === 429) return 'Çok fazla deneme yaptın. Bir dakika sonra tekrar dene.'
     if (e.status === 409) return 'Bu e-posta ile zaten bir hesap var.'
     if (e.errors.password) return 'Şifre en az 8 karakter olmalı.'
     if (e.errors.email) return 'Geçerli bir e-posta adresi gir.'

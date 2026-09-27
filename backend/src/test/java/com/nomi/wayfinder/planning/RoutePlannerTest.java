@@ -83,6 +83,20 @@ class RoutePlannerTest {
     }
 
     @Test
+    void warnsWhenOnlyAnOutdoorPlaceIsLeftInTheRain() {
+        add(place(1, "Sahil", PlaceCategory.PARK, false, 4.8, 0), 200);
+
+        PlanResult rainy = planner.plan(request(List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))),
+                null, true));
+        PlanResult dry = planner.plan(request(List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))),
+                null, false));
+
+        assertThat(rainy.stops()).extracting(s -> s.place().getName()).containsExactly("Sahil");
+        assertThat(rainy.notes()).anyMatch(n -> n.contains("Sahil açık alan ve o saatte yağış bekleniyor"));
+        assertThat(dry.notes()).noneMatch(n -> n.contains("yağış bekleniyor"));
+    }
+
+    @Test
     void usesTheForecastAtTheTimeOfEachStop() {
         add(place(1, "Sahil", PlaceCategory.PARK, false, 4.8, 0, "sea"), 200);
         add(place(2, "Müze", PlaceCategory.MUSEUM, true, 4.3, 0), 400);

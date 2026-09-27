@@ -109,7 +109,8 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    private AuthResponse toAuthResponse(User user) {
+    // Signs the user in: new JWT + profile
+    public AuthResponse toAuthResponse(User user) {
         JwtService.IssuedToken token = jwtService.issue(user);
         return new AuthResponse(token.value(), "Bearer", token.expiresAt(), toUserResponse(user));
     }

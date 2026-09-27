@@ -5,7 +5,8 @@ import { haversineMeters } from '../lib/format'
 export const KADIKOY = { latitude: 40.991, longitude: 29.023 }
 const MVP_RADIUS_METERS = 15000
 
-export type LocationSource = 'gps' | 'demo-outside' | 'demo-denied' | 'loading'
+// demo-denied: the user refused location; demo-unavailable: allowed but no fix (indoors, GPS off, timeout)
+export type LocationSource = 'gps' | 'demo-outside' | 'demo-denied' | 'demo-unavailable' | 'loading'
 
 interface LocationState {
   latitude: number
@@ -24,15 +25,27 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       setPosition({ ...KADIKOY, source: 'demo-denied' })
       return
     }
+    const onPosition = ({ coords }: GeolocationPosition) => {
+      const inside = haversineMeters(coords.latitude, coords.longitude, KADIKOY.latitude, KADIKOY.longitude)
+        <= MVP_RADIUS_METERS
+      setPosition(inside
+        ? { latitude: coords.latitude, longitude: coords.longitude, source: 'gps' }
+        : { ...KADIKOY, source: 'demo-outside' })
+    }
+    const onFinalError = (error: GeolocationPositionError) =>
+      setPosition({ ...KADIKOY, source: error.code === error.PERMISSION_DENIED ? 'demo-denied' : 'demo-unavailable' })
+
+    // GPS often has no fix indoors: fall back to a network (Wi-Fi/cell) position before giving up
     navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const inside = haversineMeters(coords.latitude, coords.longitude, KADIKOY.latitude, KADIKOY.longitude)
-          <= MVP_RADIUS_METERS
-        setPosition(inside
-          ? { latitude: coords.latitude, longitude: coords.longitude, source: 'gps' }
-          : { ...KADIKOY, source: 'demo-outside' })
+      onPosition,
+      error => {
+        if (error.code === error.PERMISSION_DENIED) {
+          onFinalError(error)
+          return
+        }
+        navigator.geolocation.getCurrentPosition(onPosition, onFinalError,
+          { enableHighAccuracy: false, timeout: 10000, maximumAge: 5 * 60000 })
       },
-      () => setPosition({ ...KADIKOY, source: 'demo-denied' }),
       { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
     )
   }, [])
@@ -57,6 +70,8 @@ export function locationLabel(source: LocationSource): string {
       return 'Nomi şimdilik sadece Kadıköy’de: demo konum kullanılıyor'
     case 'demo-denied':
       return 'Konum izni yok: Kadıköy iskelesi kullanılıyor'
+    case 'demo-unavailable':
+      return 'Konum alınamadı: Kadıköy iskelesi kullanılıyor'
     default:
       return 'Konum alınıyor…'
   }

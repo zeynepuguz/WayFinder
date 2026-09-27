@@ -72,7 +72,7 @@ export function PlaceDetailPage() {
               : todayHours.length ? `Bugün ${todayHours.map(h => `${formatTime(h.opensAt)}–${formatTime(h.closesAt)}`).join(', ')}`
                 : 'Bugün kapalı'}
           </div>
-          <div className="info-row"><Wallet size={18} />{formatCost(place.estimatedCost)}{place.estimatedCost ? ' kişi başı' : ''}</div>
+          <div className="info-row"><Wallet size={18} />{formatCost(place.estimatedCost)}{place.estimatedCost ? ' kişi başı, tahmini' : ''}</div>
           {place.avgVisitMinutes && <div className="info-row"><Timer size={18} />Ortalama {place.avgVisitMinutes} dakika</div>}
         </div>
 
@@ -103,11 +103,12 @@ export function PlaceDetailPage() {
           </section>
         )}
 
-        {!place.lastVerifiedAt && (
-          <p className="t-caption row" style={{ alignItems: 'flex-start' }}>
-            <Info size={14} style={{ marginTop: 2 }} /> Fiyat ve saat bilgileri henüz doğrulanmadı; gitmeden önce kontrol etmeni öneririz.
-          </p>
-        )}
+        <p className="t-caption row" style={{ alignItems: 'flex-start' }}>
+          <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
+          {place.lastVerifiedAt
+            ? `Konum ve saatler ${new Date(place.lastVerifiedAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })} tarihinde kontrol edildi. Fiyatlar tahminidir; saatler değişebilir.`
+            : 'Fiyat ve saat bilgileri henüz doğrulanmadı; gitmeden önce kontrol etmeni öneririz.'}
+        </p>
       </div>
 
       <div className="sticky-cta">
