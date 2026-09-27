@@ -25,6 +25,9 @@ public class Place {
 
     private String description;
 
+    // English description for tourists; null = show the Turkish one
+    private String descriptionEn;
+
     private String address;
 
     private String neighborhood;
@@ -142,6 +145,14 @@ public class Place {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getDescriptionEn() {
+        return descriptionEn;
+    }
+
+    public void setDescriptionEn(String descriptionEn) {
+        this.descriptionEn = descriptionEn;
     }
 
     public String getAddress() {

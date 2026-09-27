@@ -9,12 +9,17 @@ import com.nomi.wayfinder.planning.ReplanType;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Keyword based Turkish parser. Works without any AI service and is the fallback when the
+ * Keyword based Turkish + basic English parser. Works without any AI service and is the fallback when the
  * AI service is down. Deliberately simple: it only has to cover the common sentences.
+ *
+ * Turkish keywords are substrings (Turkish adds suffixes: "kahvaltı" / "kahvaltıda").
+ * English keywords are whole words or phrases, so they never match inside Turkish words
+ * ("art" must not match "artık").
  */
 @Component
 public class RuleBasedIntentParser implements IntentParser {
@@ -22,13 +27,29 @@ public class RuleBasedIntentParser implements IntentParser {
     private static final Locale TR = Locale.forLanguageTag("tr-TR");
 
     private static final Pattern PARTY_DIGITS = Pattern.compile("(\\d{1,2})\\s*kişi");
+    private static final Pattern PARTY_DIGITS_EN = Pattern.compile(
+            "(?<![\\d.,])(\\d{1,2})\\s*(?:people|persons|person|adults|of us|pax)(?!\\p{L})"
+                    + "|(?:party|group) of (\\d{1,2})(?!\\d)");
     private static final Pattern BUDGET = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})\\s*(?:tl|₺|lira)");
+    // "budget of 700", "budget is 700", "₺700", "tl 700"
+    private static final Pattern BUDGET_EN = Pattern.compile(
+            "(?:budget(?:\\s+(?:of|is))?\\s*:?\\s*(?:₺|tl)?|₺|(?<!\\p{L})tl)\\s*(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})(?![\\d])");
     private static final Pattern START_TIME = Pattern.compile("saat\\s*(\\d{1,2})(?:[:.](\\d{2}))?");
-    // Clauses are handled separately: "akşam yemeğini çıkar, onun yerine tatlı ekle"
-    private static final Pattern CLAUSE_SPLIT = Pattern.compile("[,.;!?\\n]|\\byerine\\b|\\bsonra\\b");
+    // "at 10", "from 10:30", "start at 9am", "10 am"
+    private static final Pattern START_TIME_EN = Pattern.compile(
+            "(?:(?<!\\p{L})(?:at|from|around)\\s+(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.)?"
+                    + "|(?<![\\d.,:])(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.))"
+                    + "(?![\\d])(?!\\s*(?:people|persons|person|kişi|tl|₺|lira|min|km|m\\b))");
+    // Clauses are handled separately: "akşam yemeğini çıkar, onun yerine tatlı ekle" / "remove dinner and add dessert"
+    private static final Pattern CLAUSE_SPLIT = Pattern.compile(
+            "[,.;!?\\n]|\\byerine\\b|\\bsonra\\b|\\binstead\\b|\\bthen\\b"
+                    + "|\\band\\s+(?=(?:add|remove|drop|skip|replace|change|swap|cancel|delete|include|put)\\b)");
 
     private static final Map<String, Integer> PARTY_WORDS = new LinkedHashMap<>();
+    private static final Map<String, Integer> PARTY_WORDS_EN = new LinkedHashMap<>();
     private static final Map<String, String> INTEREST_KEYWORDS = new LinkedHashMap<>();
+    private static final Map<String, String> INTEREST_KEYWORDS_EN = new LinkedHashMap<>();
+    private static final Map<String, Pattern> WORD_PATTERNS = new ConcurrentHashMap<>();
 
     static {
         PARTY_WORDS.put("tek başıma", 1);
@@ -43,6 +64,28 @@ public class RuleBasedIntentParser implements IntentParser {
         PARTY_WORDS.put("dört kişi", 4);
         PARTY_WORDS.put("dördümüz", 4);
         PARTY_WORDS.put("beş kişi", 5);
+
+        PARTY_WORDS_EN.put("by myself", 1);
+        PARTY_WORDS_EN.put("on my own", 1);
+        PARTY_WORDS_EN.put("alone", 1);
+        PARTY_WORDS_EN.put("solo", 1);
+        PARTY_WORDS_EN.put("just me", 1);
+        PARTY_WORDS_EN.put("two people", 2);
+        PARTY_WORDS_EN.put("two of us", 2);
+        PARTY_WORDS_EN.put("a couple", 2);
+        PARTY_WORDS_EN.put("with my partner", 2);
+        PARTY_WORDS_EN.put("with my wife", 2);
+        PARTY_WORDS_EN.put("with my husband", 2);
+        PARTY_WORDS_EN.put("with my girlfriend", 2);
+        PARTY_WORDS_EN.put("with my boyfriend", 2);
+        PARTY_WORDS_EN.put("with my friend", 2);
+        PARTY_WORDS_EN.put("with a friend", 2);
+        PARTY_WORDS_EN.put("three people", 3);
+        PARTY_WORDS_EN.put("three of us", 3);
+        PARTY_WORDS_EN.put("four people", 4);
+        PARTY_WORDS_EN.put("four of us", 4);
+        PARTY_WORDS_EN.put("five people", 5);
+        PARTY_WORDS_EN.put("five of us", 5);
 
         INTEREST_KEYWORDS.put("tarih", "history");
         INTEREST_KEYWORDS.put("müze", "museum");
@@ -64,11 +107,25 @@ public class RuleBasedIntentParser implements IntentParser {
         INTEREST_KEYWORDS.put("uygun bütçe", "budget");
         INTEREST_KEYWORDS.put("ucuz", "budget");
         INTEREST_KEYWORDS.put("ekonomik", "budget");
+
+        for (String w : List.of("history", "historical", "historic")) INTEREST_KEYWORDS_EN.put(w, "history");
+        for (String w : List.of("museum", "museums")) INTEREST_KEYWORDS_EN.put(w, "museum");
+        for (String w : List.of("sea", "seaside", "coast", "waterfront", "seafront", "beach")) INTEREST_KEYWORDS_EN.put(w, "sea");
+        for (String w : List.of("nature", "park", "parks", "green")) INTEREST_KEYWORDS_EN.put(w, "nature");
+        for (String w : List.of("street art", "graffiti", "mural", "murals")) INTEREST_KEYWORDS_EN.put(w, "street-art");
+        for (String w : List.of("art", "arts", "gallery", "galleries")) INTEREST_KEYWORDS_EN.put(w, "art");
+        for (String w : List.of("view", "views", "sunset", "sunsets", "scenery")) INTEREST_KEYWORDS_EN.put(w, "view");
+        INTEREST_KEYWORDS_EN.put("local", "local");
+        for (String w : List.of("books", "bookshop", "bookshops", "bookstore", "bookstores", "booksellers")) INTEREST_KEYWORDS_EN.put(w, "books");
+        INTEREST_KEYWORDS_EN.put("architecture", "architecture");
+        for (String w : List.of("fish", "seafood")) INTEREST_KEYWORDS_EN.put(w, "seafood");
+        for (String w : List.of("cheap", "budget-friendly", "budget friendly", "affordable", "inexpensive", "on a budget", "low budget"))
+            INTEREST_KEYWORDS_EN.put(w, "budget");
     }
 
     @Override
     public AssistantIntent parse(String message, IntentContext context) {
-        String text = message.toLowerCase(TR).trim();
+        String text = message.toLowerCase(TR).replace('’', '\'').trim();
 
         // ---- 1) Changes to the current route ----
         if (context.hasRoute()) {
@@ -87,18 +144,25 @@ public class RuleBasedIntentParser implements IntentParser {
         }
 
         // ---- 2) Simple questions ----
-        if (containsAny(text, "rotam", "rotamı göster", "sıradaki", "sonraki durak") && context.hasRoute()) {
+        if ((containsAny(text, "rotam", "rotamı göster", "sıradaki", "sonraki durak")
+                || hasWord(text, "my route", "show the route", "show route", "next stop", "what's next", "whats next",
+                "where next")) && context.hasRoute()) {
             return new AssistantIntent(IntentType.SHOW_ROUTE, null, List.of(), null, "rules");
         }
 
-        boolean planWords = mentionsNewPlan(text) || containsAny(text, "bütçe", "kişiyiz", "günlük", "bugün", "gün ");
+        boolean planWords = mentionsNewPlan(text) || containsAny(text, "bütçe", "kişiyiz", "günlük", "bugün", "gün ")
+                || hasWord(text, "budget", "people", "for the day", "a day");
         List<StopType> stops = stopTypes(text);
 
-        if (!planWords && containsAny(text, "hava", "yağmur yağacak", "sıcaklık", "derece")) {
+        if (!planWords && (containsAny(text, "hava", "yağmur yağacak", "sıcaklık", "derece")
+                || hasWord(text, "weather", "forecast", "temperature", "degrees", "will it rain", "is it raining",
+                "how hot", "how cold"))) {
             return new AssistantIntent(IntentType.WEATHER, null, List.of(), null, "rules");
         }
 
-        if (!planWords && stops.size() == 1 && containsAny(text, "öner", "nerede", "yakın", "nereye", "bul")) {
+        if (!planWords && stops.size() == 1 && (containsAny(text, "öner", "nerede", "yakın", "nereye", "bul")
+                || hasWord(text, "recommend", "suggest", "suggestion", "near", "nearby", "close by", "around here",
+                "where", "find", "any good"))) {
             return new AssistantIntent(IntentType.RECOMMEND, null, List.of(), stops.getFirst(), "rules");
         }
 
@@ -106,7 +170,10 @@ public class RuleBasedIntentParser implements IntentParser {
         if (planWords || !stops.isEmpty() || budget(text) != null) {
             List<StopType> planStops = new ArrayList<>(stops);
             // "gezi / gezmek / gezilecek" in a plan with explicit stops means: add sightseeing too
-            if (!planStops.isEmpty() && containsAny(text, "gez", "günlük", "bir gün") && !planStops.contains(StopType.SIGHTSEEING)) {
+            if (!planStops.isEmpty()
+                    && (containsAny(text, "gez", "günlük", "bir gün")
+                    || hasWord(text, "a day", "day trip", "explore", "sightseeing", "whole day", "full day"))
+                    && !planStops.contains(StopType.SIGHTSEEING)) {
                 planStops.add(StopType.SIGHTSEEING);
                 planStops.add(StopType.SIGHTSEEING);
             }
@@ -132,13 +199,18 @@ public class RuleBasedIntentParser implements IntentParser {
     private List<RouteEdit> parseEdits(String text) {
         List<RouteEdit> edits = new ArrayList<>();
 
-        if (containsAny(text, "yoruldu", "yorgun", "yorulduk", "bitkin")) {
+        if (containsAny(text, "yoruldu", "yorgun", "yorulduk", "bitkin")
+                || hasWord(text, "tired", "exhausted", "worn out")) {
             edits.add(RouteEdit.of(ReplanType.TIRED));
         }
-        if (containsAny(text, "yağmur başla", "yağmur yağıyor", "yağmur geldi", "ıslandık", "sağanak")) {
+        if (containsAny(text, "yağmur başla", "yağmur yağıyor", "yağmur geldi", "ıslandık", "sağanak")
+                || hasWord(text, "started raining", "started to rain", "starting to rain", "began raining",
+                "began to rain", "it's raining", "its raining", "it is raining", "raining now", "raining again", "rain started",
+                "got wet", "pouring", "downpour")) {
             edits.add(RouteEdit.of(ReplanType.WEATHER_CHANGED));
         }
-        if (containsAny(text, "çok yürümek istemiyor", "daha az yürü", "az yürü", "yürümek istemiyor")) {
+        if (containsAny(text, "çok yürümek istemiyor", "daha az yürü", "az yürü", "yürümek istemiyor")
+                || lessWalkingEnglish(text)) {
             edits.add(RouteEdit.of(ReplanType.LESS_WALKING));
         }
 
@@ -150,13 +222,19 @@ public class RuleBasedIntentParser implements IntentParser {
 
             List<StopType> types = stopTypes(c);
             StopType targetType = types.isEmpty() ? null : types.getFirst();
-            boolean current = containsAny(c, "bura", "bunu", "şurayı");
+            boolean current = containsAny(c, "bura", "bunu", "şurayı")
+                    || hasWord(c, "this", "here", "it", "this one", "this place", "this stop");
 
-            if (containsAny(c, "çıkar", "kaldır", "iptal", "atla", "gitmeyelim")) {
+            if (containsAny(c, "çıkar", "kaldır", "iptal", "atla", "gitmeyelim")
+                    || hasWord(c, "remove", "drop", "skip", "cancel", "delete", "take out", "get rid of",
+                    "don't want to go", "do not want to go")) {
                 edits.add(new RouteEdit(ReplanType.REMOVE_STOP, null, null, c, targetType, current));
-            } else if (containsAny(c, "değiştir", "başka bir", "başka yer", "beğenmedi")) {
+            } else if (containsAny(c, "değiştir", "başka bir", "başka yer", "beğenmedi")
+                    || hasWord(c, "replace", "change", "swap", "somewhere else", "another place", "different place",
+                    "don't like", "do not like")) {
                 edits.add(new RouteEdit(ReplanType.REPLACE_STOP, null, null, c, targetType, current));
-            } else if (containsAny(c, "ekle", "de olsun", "da olsun", "gidelim")) {
+            } else if (containsAny(c, "ekle", "de olsun", "da olsun", "gidelim")
+                    || hasWord(c, "add", "include", "put in", "throw in", "squeeze in")) {
                 List<String> interests = interests(c);
                 if (!interests.isEmpty() && (types.isEmpty() || types.equals(List.of(StopType.SIGHTSEEING)))) {
                     interests.forEach(i -> edits.add(new RouteEdit(ReplanType.ADD_INTEREST, null, i, null, null, false)));
@@ -172,26 +250,31 @@ public class RuleBasedIntentParser implements IntentParser {
     static List<StopType> stopTypes(String text) {
         List<StopType> types = new ArrayList<>();
 
-        if (text.contains("kahvaltı")) {
+        if (text.contains("kahvaltı") || hasWord(text, "breakfast", "brunch")) {
             types.add(StopType.BREAKFAST);
         }
-        if (containsAny(text, "öğle yemeğ", "öğlen yemeğ", "öğle ")) {
+        if (containsAny(text, "öğle yemeğ", "öğlen yemeğ", "öğle ") || hasWord(text, "lunch")) {
             types.add(StopType.LUNCH);
         }
-        if (text.contains("kahve")) {
+        if (text.contains("kahve") || hasWord(text, "coffee", "café", "cafe", "cafés", "cafes")) {
             types.add(StopType.COFFEE);
         }
-        if (containsAny(text, "tatlı", "dondurma", "pasta", "baklava", "lokum")) {
+        if (containsAny(text, "tatlı", "dondurma", "pasta", "baklava", "lokum")
+                || hasWord(text, "dessert", "desserts", "sweet", "sweets", "ice cream", "cake", "turkish delight")) {
             types.add(StopType.DESSERT);
         }
-        if (containsAny(text, "akşam yemeğ", "akşam ye")) {
+        if (containsAny(text, "akşam yemeğ", "akşam ye") || hasWord(text, "dinner", "supper")) {
             types.add(StopType.DINNER);
         }
         // A plain "yemek" without a meal time: lunch, unless lunch/dinner was already mentioned
-        if (containsAny(text, "yemek", "yemeği") && !types.contains(StopType.LUNCH) && !types.contains(StopType.DINNER)) {
+        if ((containsAny(text, "yemek", "yemeği") || hasWord(text, "food", "meal", "eat", "restaurant"))
+                && !types.contains(StopType.LUNCH) && !types.contains(StopType.DINNER)) {
             types.add(StopType.LUNCH);
         }
-        if (containsAny(text, "tarihi", "müze", "görülecek", "gezilecek", "sahil", "park", "manzara", "sanat")) {
+        if (containsAny(text, "tarihi", "müze", "görülecek", "gezilecek", "sahil", "park", "manzara", "sanat")
+                || hasWord(text, "historical", "historic", "history", "museum", "museums", "sights", "sightseeing",
+                "attractions", "landmarks", "places to see", "places to visit", "seaside", "coast", "waterfront",
+                "parks", "view", "views", "art", "gallery")) {
             types.add(StopType.SIGHTSEEING);
         }
 
@@ -202,6 +285,11 @@ public class RuleBasedIntentParser implements IntentParser {
         List<String> result = new ArrayList<>();
         INTEREST_KEYWORDS.forEach((keyword, interest) -> {
             if (text.contains(keyword) && !result.contains(interest)) {
+                result.add(interest);
+            }
+        });
+        INTEREST_KEYWORDS_EN.forEach((keyword, interest) -> {
+            if (hasWord(text, keyword) && !result.contains(interest)) {
                 result.add(interest);
             }
         });
@@ -222,22 +310,38 @@ public class RuleBasedIntentParser implements IntentParser {
                 return e.getValue();
             }
         }
+        Matcher en = PARTY_DIGITS_EN.matcher(english(text));
+        if (en.find()) {
+            return Integer.parseInt(en.group(1) != null ? en.group(1) : en.group(2));
+        }
+        for (Map.Entry<String, Integer> e : PARTY_WORDS_EN.entrySet()) {
+            if (hasWord(text, e.getKey())) {
+                return e.getValue();
+            }
+        }
         return null;
     }
 
     static Integer budget(String text) {
         Matcher m = BUDGET.matcher(text);
-        if (!m.find()) {
-            return null;
+        if (m.find()) {
+            return Integer.parseInt(m.group(1).replaceAll("[.,]", ""));
         }
-        return Integer.parseInt(m.group(1).replaceAll("[.,]", ""));
+        Matcher en = BUDGET_EN.matcher(english(text));
+        if (en.find()) {
+            return Integer.parseInt(en.group(1).replaceAll("[.,]", ""));
+        }
+        return null;
     }
 
     static WalkingTolerance walking(String text) {
-        if (containsAny(text, "çok yürümek istemiyor", "az yürü", "yürümek istemiyor", "yürüyemiyor", "yorgun")) {
+        if (containsAny(text, "çok yürümek istemiyor", "az yürü", "yürümek istemiyor", "yürüyemiyor", "yorgun")
+                || lessWalkingEnglish(text) || hasWord(text, "tired")) {
             return WalkingTolerance.LOW;
         }
-        if (containsAny(text, "yürümeyi sev", "çok yürüyebil", "yürümek sorun değil", "bol bol yürü")) {
+        if (containsAny(text, "yürümeyi sev", "çok yürüyebil", "yürümek sorun değil", "bol bol yürü")
+                || hasWord(text, "love walking", "like walking", "enjoy walking", "don't mind walking",
+                "happy to walk", "lots of walking", "walk a lot")) {
             return WalkingTolerance.HIGH;
         }
         return null;
@@ -245,20 +349,49 @@ public class RuleBasedIntentParser implements IntentParser {
 
     static java.time.LocalTime startTime(String text) {
         Matcher m = START_TIME.matcher(text);
-        if (!m.find()) {
+        if (m.find()) {
+            int hour = Integer.parseInt(m.group(1));
+            int minute = m.group(2) == null ? 0 : Integer.parseInt(m.group(2));
+            if (hour > 23 || minute > 59) {
+                return null;
+            }
+            return java.time.LocalTime.of(hour, minute);
+        }
+
+        Matcher en = START_TIME_EN.matcher(english(text));
+        if (!en.find()) {
             return null;
         }
-        int hour = Integer.parseInt(m.group(1));
-        int minute = m.group(2) == null ? 0 : Integer.parseInt(m.group(2));
+        boolean first = en.group(1) != null;
+        int hour = Integer.parseInt(first ? en.group(1) : en.group(4));
+        String minutes = first ? en.group(2) : en.group(5);
+        String suffix = first ? en.group(3) : en.group(6);
+        int minute = minutes == null ? 0 : Integer.parseInt(minutes);
+        if (suffix != null) {
+            if (hour < 1 || hour > 12) {
+                return null;
+            }
+            boolean pm = suffix.startsWith("p");
+            hour = hour % 12 + (pm ? 12 : 0);
+        }
         if (hour > 23 || minute > 59) {
             return null;
         }
         return java.time.LocalTime.of(hour, minute);
     }
 
+    private static boolean lessWalkingEnglish(String text) {
+        return hasWord(text, "less walking", "walk less", "not walk much", "not walk a lot", "don't want to walk",
+                "do not want to walk", "don't want to walk much", "too much walking", "can't walk", "cannot walk",
+                "shorter walks", "fewer walks", "closer places", "closer together", "walking less");
+    }
+
     private static boolean mentionsNewPlan(String text) {
         return containsAny(text, "plan", "rota oluştur", "yeni rota", "rota hazırla", "ne yapabilir",
-                "ne yapılır", "ne yapsak", "gezi yap", "gezmek istiyor", "ilk defa", "ilk kez");
+                "ne yapılır", "ne yapsak", "gezi yap", "gezmek istiyor", "ilk defa", "ilk kez")
+                || hasWord(text, "itinerary", "a route", "new route", "day trip", "day out", "a day in",
+                "what can we do", "what can i do", "what should we do", "what should i do", "what to do",
+                "first time", "spend the day", "spend a day", "for a day", "one day", "whole day", "full day");
     }
 
     private static boolean containsAny(String text, String... words) {
@@ -268,5 +401,25 @@ public class RuleBasedIntentParser implements IntentParser {
             }
         }
         return false;
+    }
+
+    /**
+     * Whole-word/phrase match for English keywords. The text was lowercased with Turkish rules,
+     * so "It" became "ıt"; English matching undoes that.
+     */
+    private static boolean hasWord(String text, String... words) {
+        String en = english(text);
+        for (String w : words) {
+            Pattern p = WORD_PATTERNS.computeIfAbsent(w,
+                    k -> Pattern.compile("(?<![\\p{L}\\p{N}])" + Pattern.quote(k) + "(?![\\p{L}\\p{N}])"));
+            if (p.matcher(en).find()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String english(String text) {
+        return text.replace('ı', 'i');
     }
 }

@@ -11,6 +11,7 @@ import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
 import { formatCost, formatTime } from '../lib/format'
+import { locale, tr, useT } from '../lib/i18n'
 
 interface Message {
   key: string
@@ -21,21 +22,30 @@ interface Message {
   recommendations?: Recommendation[]
 }
 
-const STARTERS = [
-  '2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz',
-  'Kadıköy’e ilk defa geliyorum, bir günlük rota planla',
-  'Yakında iyi bir kahveci öner',
+// Functions, not constants: the texts follow the language chosen at runtime
+const starters = () => [
+  tr('2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz', 'We’re 2 people with 700 TL, we’d like breakfast and coffee'),
+  tr('Kadıköy’e ilk defa geliyorum, bir günlük rota planla', 'It’s my first time in Kadıköy, plan a day for me'),
+  tr('Yakında iyi bir kahveci öner', 'Suggest a good coffee place nearby'),
 ]
-const DURING_TRIP = ['Çok yorulduk', 'Yağmur başladı', 'Biraz daha tarihi yer ekle', 'Sıradaki durak ne?', 'Hava nasıl?']
+const duringTrip = () => [
+  tr('Çok yorulduk', 'We’re really tired'),
+  tr('Yağmur başladı', 'It started raining'),
+  tr('Biraz daha tarihi yer ekle', 'Add a few more historic sights'),
+  tr('Sıradaki durak ne?', 'What’s the next stop?'),
+  tr('Hava nasıl?', 'How’s the weather?'),
+]
 
 export function AssistantPage() {
   const { user, hasAccess } = useAuth()
+  const t = useT()
 
   if (!user) {
     return (
       <main className="screen">
-        <Locked icon={Sparkles} title="Kişisel şehir asistanın"
-                text="Bütçeni, kaç kişi olduğunuzu ve ne istediğini yaz; Nomi gerçek mekan, saat ve mesafe bilgileriyle gününü planlasın." />
+        <Locked icon={Sparkles} title={t('Kişisel şehir asistanın', 'Your personal city assistant')}
+                text={t('Bütçeni, kaç kişi olduğunuzu ve ne istediğini yaz; Nomi gerçek mekan, saat ve mesafe bilgileriyle gününü planlasın.',
+                        'Tell Nomi your budget, how many of you there are and what you’d like to do; it plans your day with real places, opening hours and distances.')} />
       </main>
     )
   }
@@ -43,6 +53,7 @@ export function AssistantPage() {
 }
 
 function Chat({ canSend }: { canSend: boolean }) {
+  const t = useT()
   const location = useUserLocation()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
@@ -90,7 +101,7 @@ function Chat({ canSend }: { canSend: boolean }) {
       }])
     } catch (e) {
       if (!(e instanceof ApiRequestError && e.status === 402)) {
-        setError(e instanceof Error ? e.message : 'Mesaj gönderilemedi')
+        setError(e instanceof Error ? e.message : t('Mesaj gönderilemedi', 'Message could not be sent'))
       }
     } finally {
       setSending(false)
@@ -109,18 +120,19 @@ function Chat({ canSend }: { canSend: boolean }) {
       <header className="chat-header">
         <span className="bot-avatar"><Sparkles size={20} /></span>
         <div className="grow">
-          <h1 className="t-headline">Nomi Asistan</h1>
-          <p className="t-caption">Gerçek mekan, saat ve hava verisiyle plan yapar</p>
+          <h1 className="t-headline">{t('Nomi Asistan', 'Nomi Assistant')}</h1>
+          <p className="t-caption">{t('Gerçek mekan, saat ve hava verisiyle plan yapar', 'Plans with real places, opening hours and weather')}</p>
         </div>
       </header>
 
       <div className="chat" aria-live="polite">
         {messages.length === 0 && !sending && (
           <div className="card card-pad-lg stack">
-            <h2 className="t-title">Merhaba! Bugün nasıl bir gün istersin?</h2>
-            <p className="ink-2">Kaç kişi olduğunuzu, bütçeni ve ne yapmak istediğini yaz. Gezerken “çok yorulduk” ya da “yağmur başladı” dersen rotanı hemen güncellerim.</p>
+            <h2 className="t-title">{t('Merhaba! Bugün nasıl bir gün istersin?', 'Hi! What kind of day would you like?')}</h2>
+            <p className="ink-2">{t('Kaç kişi olduğunuzu, bütçeni ve ne yapmak istediğini yaz. Gezerken “çok yorulduk” ya da “yağmur başladı” dersen rotanı hemen güncellerim.',
+              'Tell me how many of you there are, your budget and what you’d like to do. While you’re out, just say “we’re tired” or “it started raining” and I’ll update your route right away.')}</p>
             <div className="stack-sm">
-              {STARTERS.map(s => (
+              {starters().map(s => (
                 <button key={s} className="list-item card" style={{ borderRadius: 14, minHeight: 48 }}
                         onClick={() => void send(s)} disabled={!canSend}>
                   <Sparkles size={16} color="var(--brand)" />
@@ -144,7 +156,7 @@ function Chat({ canSend }: { canSend: boolean }) {
               <div className="chat-attachment">
                 {m.route && <RoutePreview route={m.route} />}
                 {!m.route && m.routeId && (
-                  <Link to={`/routes/${m.routeId}`} className="section-link">Rotayı aç <ChevronRight size={16} /></Link>
+                  <Link to={`/routes/${m.routeId}`} className="section-link">{t('Rotayı aç', 'Open route')} <ChevronRight size={16} /></Link>
                 )}
                 {m.recommendations?.map(r => <PlaceRow key={r.place.id} place={r.place} />)}
               </div>
@@ -155,7 +167,7 @@ function Chat({ canSend }: { canSend: boolean }) {
         {sending && (
           <div className="msg msg-bot">
             <span className="bot-avatar"><Sparkles size={15} /></span>
-            <div className="bubble bubble-bot typing" aria-label="Nomi yazıyor"><span /><span /><span /></div>
+            <div className="bubble bubble-bot typing" aria-label={t('Nomi yazıyor', 'Nomi is typing')}><span /><span /><span /></div>
           </div>
         )}
         {error && <Alert tone="danger"><span>{error}</span></Alert>}
@@ -167,20 +179,20 @@ function Chat({ canSend }: { canSend: boolean }) {
           <>
             {(hasRouteInChat || messages.length > 0) && (
               <div className="suggestions">
-                {DURING_TRIP.map(q => (
+                {duringTrip().map(q => (
                   <button key={q} className="chip" onClick={() => void send(q)} disabled={sending}>{q}</button>
                 ))}
               </div>
             )}
             <form className="composer-box" onSubmit={submit}>
-              <input value={input} onChange={e => setInput(e.target.value)} placeholder="Nomi’ye yaz…" maxLength={1000}
-                     aria-label="Mesaj" enterKeyHint="send" />
-              <button className="send-btn" disabled={sending || !input.trim()} aria-label="Gönder"><ArrowUp size={20} /></button>
+              <input value={input} onChange={e => setInput(e.target.value)} placeholder={t('Nomi’ye yaz…', 'Message Nomi…')} maxLength={1000}
+                     aria-label={t('Mesaj', 'Message')} enterKeyHint="send" />
+              <button className="send-btn" disabled={sending || !input.trim()} aria-label={t('Gönder', 'Send')}><ArrowUp size={20} /></button>
             </form>
           </>
         ) : (
           <button className="btn btn-premium btn-lg btn-block" onClick={() => navigate('/premium?next=/assistant')}>
-            <Crown size={18} /> Asistanı kullanmak için Premium’a geç
+            <Crown size={18} /> {t('Asistanı kullanmak için Premium’a geç', 'Go Premium to use the assistant')}
           </button>
         )}
       </div>
@@ -189,12 +201,13 @@ function Chat({ canSend }: { canSend: boolean }) {
 }
 
 function RoutePreview({ route }: { route: Route }) {
+  const t = useT()
   const upcoming = route.stops.filter(s => s.status === 'PLANNED')
   return (
     <Link to={`/routes/${route.id}`} className="card route-mini card-press">
       <div className="row-between">
         <span className="t-headline" style={{ fontSize: 15 }}>{route.title}</span>
-        <span className="badge badge-brand">~{route.totalEstimatedCost.toLocaleString('tr-TR')} TL</span>
+        <span className="badge badge-brand">~{route.totalEstimatedCost.toLocaleString(locale())} TL</span>
       </div>
       <ol>
         {upcoming.slice(0, 7).map(stop => {
@@ -210,7 +223,7 @@ function RoutePreview({ route }: { route: Route }) {
           )
         })}
       </ol>
-      <span className="section-link">Haritada gör <ChevronRight size={16} /></span>
+      <span className="section-link">{t('Haritada gör', 'View on map')} <ChevronRight size={16} /></span>
     </Link>
   )
 }

@@ -1,5 +1,7 @@
 package com.nomi.wayfinder.entity;
 
+import com.nomi.wayfinder.i18n.Texts;
+
 import java.time.Period;
 
 /**
@@ -8,19 +10,21 @@ import java.time.Period;
  * created in Google Play Console.
  */
 public enum AccessPlan {
-    DAILY(Period.ofDays(1), "nomi_pass_daily", "Günlük"),
-    WEEKLY(Period.ofWeeks(1), "nomi_pass_weekly", "Haftalık"),
-    MONTHLY(Period.ofMonths(1), "nomi_pass_monthly", "Aylık"),
-    YEARLY(Period.ofYears(1), "nomi_pass_yearly", "Yıllık");
+    DAILY(Period.ofDays(1), "nomi_pass_daily", "Günlük", "Daily"),
+    WEEKLY(Period.ofWeeks(1), "nomi_pass_weekly", "Haftalık", "Weekly"),
+    MONTHLY(Period.ofMonths(1), "nomi_pass_monthly", "Aylık", "Monthly"),
+    YEARLY(Period.ofYears(1), "nomi_pass_yearly", "Yıllık", "Yearly");
 
     private final Period duration;
     private final String productId;
     private final String label;
+    private final String labelEn;
 
-    AccessPlan(Period duration, String productId, String label) {
+    AccessPlan(Period duration, String productId, String label, String labelEn) {
         this.duration = duration;
         this.productId = productId;
         this.label = label;
+        this.labelEn = labelEn;
     }
 
     public Period getDuration() {
@@ -31,8 +35,9 @@ public enum AccessPlan {
         return productId;
     }
 
+    // In the request's language (Turkish unless the request asked for English)
     public String getLabel() {
-        return label;
+        return Texts.t(label, labelEn);
     }
 
     public static AccessPlan fromProductId(String productId) {

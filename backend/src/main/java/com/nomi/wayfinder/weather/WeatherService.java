@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.weather;
 
+import com.nomi.wayfinder.i18n.Texts;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -47,32 +48,38 @@ public class WeatherService {
         }
     }
 
-    // One or two sentences that explain how the weather changes the plan
+    // One or two sentences that explain how the weather changes the plan (in the request's language)
     public String advice(WeatherForecast.DaySummary summary) {
         List<String> parts = new ArrayList<>();
 
         if (summary.wet()) {
-            parts.add(String.format(Locale.ROOT,
-                    "Yağış bekleniyor (olasılık %%%d). Kapalı mekanlara öncelik verdim.",
+            parts.add(String.format(Locale.ROOT, Texts.t(
+                            "Yağış bekleniyor (olasılık %%%d). Kapalı mekanlara öncelik verdim.",
+                            "Rain is expected (%d%% chance). I prioritized indoor places."),
                     summary.maxPrecipitationProbability()));
         }
         if (summary.hot()) {
-            parts.add(String.format(Locale.ROOT,
-                    "Sıcaklık %.0f°C (hissedilen %.0f°C). Öğle saatlerinde uzun süre güneş altında kalmamanızı öneririm; açık alanları serin saatlere kaydırdım.",
+            parts.add(String.format(Locale.ROOT, Texts.t(
+                            "Sıcaklık %.0f°C (hissedilen %.0f°C). Öğle saatlerinde uzun süre güneş altında kalmamanızı öneririm; açık alanları serin saatlere kaydırdım.",
+                            "It will be %.0f°C (feels like %.0f°C). I suggest not staying in the sun for long around midday; I moved outdoor places to cooler hours."),
                     summary.maxTemperature(), summary.maxApparentTemperature()));
         }
         if (summary.windy()) {
-            parts.add(String.format(Locale.ROOT,
-                    "Rüzgar %.0f km/s'ye çıkabilir. Sahil ve açık alanları azalttım.", summary.maxWindSpeed()));
+            parts.add(String.format(Locale.ROOT, Texts.t(
+                            "Rüzgar %.0f km/s'ye çıkabilir. Sahil ve açık alanları azalttım.",
+                            "Wind may reach %.0f km/h. I reduced seaside and open-air places."),
+                    summary.maxWindSpeed()));
         }
         if (summary.cold()) {
-            parts.add(String.format(Locale.ROOT,
-                    "Hava soğuk (hissedilen %.0f°C). Kapalı mekanlar daha rahat olacaktır.",
+            parts.add(String.format(Locale.ROOT, Texts.t(
+                            "Hava soğuk (hissedilen %.0f°C). Kapalı mekanlar daha rahat olacaktır.",
+                            "It is cold (feels like %.0f°C). Indoor places will be more comfortable."),
                     summary.minApparentTemperature()));
         }
         if (parts.isEmpty()) {
-            parts.add(String.format(Locale.ROOT,
-                    "Hava %s, en fazla %.0f°C. Gezmek için uygun.",
+            parts.add(String.format(Locale.ROOT, Texts.t(
+                            "Hava %s, en fazla %.0f°C. Gezmek için uygun.",
+                            "The weather is %s, up to %.0f°C. Good for exploring."),
                     summary.condition().getLabel(), summary.maxTemperature()));
         }
 

@@ -10,17 +10,19 @@ import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
 import { INTEREST_LABELS, STOP_TYPE_LABELS, todayIso, WALKING_LABELS } from '../lib/format'
+import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
 const STOP_ORDER: StopType[] = ['BREAKFAST', 'SIGHTSEEING', 'LUNCH', 'COFFEE', 'DESSERT', 'DINNER']
 
 export function RoutesPage() {
   const { user } = useAuth()
+  const t = useT()
   if (!user) {
     return (
       <main className="screen">
-        <Locked icon={MapIcon} title="Rotaların burada"
-                text="Oluşturduğun ve gezdiğin rotalar burada saklanır. Başlamak için giriş yap." />
+        <Locked icon={MapIcon} title={t('Rotaların burada', 'Your routes live here')}
+                text={t('Oluşturduğun ve gezdiğin rotalar burada saklanır. Başlamak için giriş yap.', 'Routes you create and walk are kept here. Sign in to get started.')} />
       </main>
     )
   }
@@ -29,6 +31,7 @@ export function RoutesPage() {
 
 function RouteList() {
   const gate = useGate()
+  const t = useT()
   const [tab, setTab] = useState<'all' | 'saved'>('all')
   const [creating, setCreating] = useState(false)
   const { data, error, loading, reload } = useAsync(() => api.routes(tab === 'saved'), [tab])
@@ -38,27 +41,27 @@ function RouteList() {
   return (
     <main className="screen">
       <div className="row-between">
-        <h1 className="t-display">Rotalarım</h1>
-        <button className="btn btn-primary btn-sm" onClick={openCreate}><Plus size={18} /> Yeni rota</button>
+        <h1 className="t-display">{t('Rotalarım', 'My routes')}</h1>
+        <button className="btn btn-primary btn-sm" onClick={openCreate}><Plus size={18} /> {t('Yeni rota', 'New route')}</button>
       </div>
 
-      <Segmented value={tab} onChange={setTab} options={[{ value: 'all', label: 'Tümü' }, { value: 'saved', label: 'Kaydedilenler' }]} />
+      <Segmented value={tab} onChange={setTab} options={[{ value: 'all', label: t('Tümü', 'All') }, { value: 'saved', label: t('Kaydedilenler', 'Saved') }]} />
 
       {loading && <ListSkeleton rows={3} height={92} />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {data?.length === 0 && (
         <EmptyState
           icon={MapIcon}
-          title={tab === 'saved' ? 'Kaydedilen rota yok' : 'Henüz rotan yok'}
-          text={tab === 'saved' ? 'Bir rotanın detayında kalbe dokunarak kaydedebilirsin.' : 'Birkaç tercihle ilk rotanı oluştur ya da asistana ne istediğini yaz.'}
-          action={tab === 'all' && <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> Rota oluştur</button>}
+          title={tab === 'saved' ? t('Kaydedilen rota yok', 'No saved routes') : t('Henüz rotan yok', 'No routes yet')}
+          text={tab === 'saved' ? t('Bir rotanın detayında kalbe dokunarak kaydedebilirsin.', 'Tap the heart on a route to save it.') : t('Birkaç tercihle ilk rotanı oluştur ya da asistana ne istediğini yaz.', 'Create your first route with a few choices, or tell the assistant what you’d like.')}
+          action={tab === 'all' && <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> {t('Rota oluştur', 'Create route')}</button>}
         />
       )}
       <div className="stack">
         {data?.map(route => <RouteCard key={route.id} route={route} />)}
       </div>
 
-      <Sheet open={creating} onClose={() => setCreating(false)} label="Yeni rota">
+      <Sheet open={creating} onClose={() => setCreating(false)} label={t('Yeni rota', 'New route')}>
         <NewRouteForm />
       </Sheet>
     </main>
@@ -69,6 +72,7 @@ function NewRouteForm() {
   const { user } = useAuth()
   const location = useUserLocation()
   const navigate = useNavigate()
+  const t = useT()
   const prefs = user?.preferences
 
   const [date, setDate] = useState(todayIso())
@@ -101,7 +105,7 @@ function NewRouteForm() {
       })
       navigate(`/routes/${route.id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Rota oluşturulamadı')
+      setError(e instanceof Error ? e.message : t('Rota oluşturulamadı', 'Could not create the route'))
       setBusy(false)
     }
   }
@@ -110,24 +114,24 @@ function NewRouteForm() {
     <form className="stack" style={{ gap: 20 }} onSubmit={submit}>
       <div className="field-row">
         <label className="field">
-          <span className="field-label">Tarih</span>
+          <span className="field-label">{t('Tarih', 'Date')}</span>
           <span className="input"><input type="date" value={date} min={todayIso()} onChange={e => setDate(e.target.value)} required /></span>
         </label>
         <label className="field">
-          <span className="field-label">Başlangıç</span>
+          <span className="field-label">{t('Başlangıç', 'Start time')}</span>
           <span className="input"><input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} /></span>
         </label>
       </div>
 
       <div className="field-row">
         <div className="field">
-          <span className="field-label">Kişi sayısı</span>
-          <Stepper value={partySize} min={1} max={20} onChange={setPartySize} label="Kişi sayısı" />
+          <span className="field-label">{t('Kişi sayısı', 'People')}</span>
+          <Stepper value={partySize} min={1} max={20} onChange={setPartySize} label={t('Kişi sayısı', 'Number of people')} />
         </div>
         <label className="field">
-          <span className="field-label">Toplam bütçe</span>
+          <span className="field-label">{t('Toplam bütçe', 'Total budget')}</span>
           <span className="input">
-            <input type="number" inputMode="numeric" min={0} step={50} value={budget} placeholder="Sınırsız"
+            <input type="number" inputMode="numeric" min={0} step={50} value={budget} placeholder={t('Sınırsız', 'No limit')}
                    onChange={e => setBudget(e.target.value)} />
             TL
           </span>
@@ -135,13 +139,13 @@ function NewRouteForm() {
       </div>
 
       <div className="field">
-        <span className="field-label">Ne kadar yürüyelim?</span>
+        <span className="field-label">{t('Ne kadar yürüyelim?', 'How much walking?')}</span>
         <Segmented value={walking} onChange={setWalking}
                    options={(Object.keys(WALKING_LABELS) as WalkingTolerance[]).map(w => ({ value: w, label: WALKING_LABELS[w] }))} />
       </div>
 
       <div className="field">
-        <span className="field-label">Duraklar <span className="muted">· seçmezsen tam gün</span></span>
+        <span className="field-label">{t('Duraklar', 'Stops')} <span className="muted">· {t('seçmezsen tam gün', 'full day if none selected')}</span></span>
         <div className="option-grid">
           {STOP_ORDER.map(s => {
             const Icon = STOP_ICON[s]
@@ -156,7 +160,7 @@ function NewRouteForm() {
       </div>
 
       <div className="field">
-        <span className="field-label">İlgi alanları</span>
+        <span className="field-label">{t('İlgi alanları', 'Interests')}</span>
         <div className="chips">
           {Object.entries(INTEREST_LABELS).map(([key, label]) => (
             <button type="button" key={key} className={`chip ${interests.includes(key) ? 'active' : ''}`}
@@ -169,7 +173,7 @@ function NewRouteForm() {
 
       {error && <Alert tone="danger"><span>{error}</span></Alert>}
       <button className="btn btn-primary btn-lg btn-block" disabled={busy}>
-        {busy ? <><Spinner /> Rotan hazırlanıyor</> : 'Rotamı oluştur'}
+        {busy ? <><Spinner /> {t('Rotan hazırlanıyor', 'Preparing your route')}</> : t('Rotamı oluştur', 'Create my route')}
       </button>
     </form>
   )

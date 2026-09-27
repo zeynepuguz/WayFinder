@@ -2,6 +2,7 @@ import { Crown, LogIn, type LucideIcon } from 'lucide-react'
 import { useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { useAuth } from '../context/AuthContext'
+import { useT } from '../lib/i18n'
 
 /**
  * Guests can look around; using Nomi needs an account and an active pass.
@@ -31,6 +32,7 @@ export function useGate() {
 export function Locked({ icon: Icon, title, text }: { icon: LucideIcon; title: string; text: string }) {
   const { user } = useAuth()
   const gate = useGate()
+  const t = useT()
 
   return (
     <div className="locked">
@@ -39,9 +41,11 @@ export function Locked({ icon: Icon, title, text }: { icon: LucideIcon; title: s
       <p className="ink-2" style={{ maxWidth: 320 }}>{text}</p>
       <button className={`btn btn-lg btn-block ${user ? 'btn-premium' : 'btn-primary'}`} onClick={() => gate()}
               style={{ maxWidth: 360, marginTop: 8 }}>
-        {user ? <><Crown size={18} /> Nomi Premium’a geç</> : <><LogIn size={18} /> Giriş yap veya kaydol</>}
+        {user
+          ? <><Crown size={18} /> {t('Nomi Premium’a geç', 'Get Nomi Premium')}</>
+          : <><LogIn size={18} /> {t('Giriş yap veya kaydol', 'Log in or sign up')}</>}
       </button>
-      {!user && <p className="t-caption">Hesabın varsa giriş yaptıktan sonra devam edebilirsin.</p>}
+      {!user && <p className="t-caption">{t('Hesabın varsa giriş yaptıktan sonra devam edebilirsin.', 'Already have an account? Log in to continue.')}</p>}
     </div>
   )
 }

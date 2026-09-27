@@ -2,6 +2,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useEffect } from 'react'
 import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
+import { useT } from '../lib/i18n'
 
 export interface MapPoint {
   latitude: number
@@ -20,9 +21,9 @@ interface Props {
 
 // Map tiles: a commercial app needs its own tile provider/key (VITE_MAP_TILE_URL). The default is
 // the public OpenStreetMap server, which is only fine for development.
-const TILE_URL = import.meta.env.VITE_MAP_TILE_URL ?? 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const TILE_URL = import.meta.env.VITE_MAP_TILE_URL || 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
 const TILE_ATTRIBUTION = import.meta.env.VITE_MAP_ATTRIBUTION
-  ?? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+  || '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 
 // Pins are drawn with CSS, so no marker image files need to be bundled
 function pinIcon(label: string, muted?: boolean) {
@@ -49,6 +50,7 @@ function FitBounds({ coords }: { coords: [number, number][] }) {
 }
 
 export function RouteMap({ points, start, height = 260, hero }: Props) {
+  const t = useT()
   const coords: [number, number][] = points.map(p => [p.latitude, p.longitude])
   const all: [number, number][] = start ? [[start.latitude, start.longitude], ...coords] : coords
   const center = all[0] ?? [40.991, 29.023]
@@ -60,7 +62,7 @@ export function RouteMap({ points, start, height = 260, hero }: Props) {
           attribution={TILE_ATTRIBUTION}
           url={TILE_URL}
         />
-        {start && <Marker position={[start.latitude, start.longitude]} icon={startIcon}><Popup>Başlangıç</Popup></Marker>}
+        {start && <Marker position={[start.latitude, start.longitude]} icon={startIcon}><Popup>{t('Başlangıç', 'Start')}</Popup></Marker>}
         {all.length > 1 && <Polyline positions={all} pathOptions={{ color: '#ff5a36', weight: 4, opacity: 0.85, dashArray: '2 8', lineCap: 'round' }} />}
         {points.map((p, i) => (
           <Marker key={`${i}-${p.title}`} position={[p.latitude, p.longitude]} icon={pinIcon(p.label, p.muted)}>

@@ -2,6 +2,7 @@ package com.nomi.wayfinder.controller;
 
 import com.nomi.wayfinder.dto.RouteDtos.RouteSummary;
 import com.nomi.wayfinder.entity.StopType;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.security.CurrentUser;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
@@ -30,6 +31,14 @@ public class HomeController {
             "Yakında iyi bir kahveci öner",
             "2 kişiyiz, 700 TL bütçemiz var, çok yürümek istemiyoruz",
             "Tarihi yerler ve tatlı içeren bir rota oluştur"
+    );
+
+    // Same prompts for English requests; the rule-based parser understands each of them
+    private static final List<String> PROMPTS_EN = List.of(
+            "Plan a budget-friendly day in Kadıköy today",
+            "Recommend a good coffee place nearby",
+            "We are 2 people, our budget is 700 TL, we don't want to walk much",
+            "Create a route with historical places and dessert"
     );
 
     private final WeatherService weatherService;
@@ -68,7 +77,7 @@ public class HomeController {
         RouteSummary currentRoute = userId == null ? null
                 : routeService.findCurrentRouteSummary(userId).orElse(null);
 
-        return new HomeResponse(weather, suggestedType, suggestions, currentRoute, PROMPTS);
+        return new HomeResponse(weather, suggestedType, suggestions, currentRoute, Texts.english() ? PROMPTS_EN : PROMPTS);
     }
 
     private WeatherNow toWeatherNow(WeatherForecast forecast, LocalTime now) {

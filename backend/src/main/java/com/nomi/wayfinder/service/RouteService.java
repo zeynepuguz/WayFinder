@@ -4,6 +4,7 @@ import com.nomi.wayfinder.dto.RouteDtos.*;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.*;
 import com.nomi.wayfinder.repository.RouteRepository;
 import com.nomi.wayfinder.weather.WeatherForecast;
@@ -22,6 +23,8 @@ public class RouteService {
     private static final LocalTime DEFAULT_END = LocalTime.of(22, 0);
     private static final DateTimeFormatter TITLE_DATE =
             DateTimeFormatter.ofPattern("d MMMM EEEE", Locale.forLanguageTag("tr-TR"));
+    private static final DateTimeFormatter TITLE_DATE_EN =
+            DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.ENGLISH);
 
     private final RouteRepository routeRepository;
     private final RoutePlanner planner;
@@ -85,7 +88,7 @@ public class RouteService {
         Route route = new Route();
         route.setUserId(userId);
         route.setTitle(request.title() != null && !request.title().isBlank()
-                ? request.title().trim() : date.format(TITLE_DATE) + " Rotası");
+                ? request.title().trim() : defaultTitle(date));
         route.setDate(date);
         route.setStartLocation(request.latitude(), request.longitude());
         route.setStartTime(start);
@@ -213,19 +216,22 @@ public class RouteService {
                     // Pull a planned coffee forward as the rest stop instead of adding a second one
                     slots.removeIf(slot -> slot.type() == StopType.COFFEE);
                     slots.addFirst(PlanningSlot.next(StopType.COFFEE, 30));
-                    changes.add("Yakında kısa bir dinlenme molası ekledim.");
+                    changes.add(Texts.t("Yakında kısa bir dinlenme molası ekledim.", "I added a short rest stop nearby."));
                 }
-                changes.add("Yürüme mesafelerini kısalttım ve açık alan gezilerini çıkardım.");
+                changes.add(Texts.t("Yürüme mesafelerini kısalttım ve açık alan gezilerini çıkardım.",
+                        "I shortened the walks and removed outdoor sightseeing."));
             }
             case WEATHER_CHANGED -> {
                 // Pinned outdoor places are replaced by the planner when it is wet
                 assumeWet = true;
-                changes.add("Yağış nedeniyle açık alanları kapalı mekanlarla değiştirdim.");
+                changes.add(Texts.t("Yağış nedeniyle açık alanları kapalı mekanlarla değiştirdim.",
+                        "Because of the rain I replaced outdoor places with indoor ones."));
             }
             case LESS_WALKING -> {
                 tolerance = WalkingTolerance.LOW;
                 slots.replaceAll(PlanningSlot::unpinned);
-                changes.add("Rotayı birbirine daha yakın mekanlarla yeniden düzenledim.");
+                changes.add(Texts.t("Rotayı birbirine daha yakın mekanlarla yeniden düzenledim.",
+                        "I rearranged the route with places closer to each other."));
             }
             case REMOVE_STOP -> {
                 RouteStop target = findRemainingStop(remaining, request.stopId());
@@ -343,13 +349,14 @@ public class RouteService {
         List<String> changes = new ArrayList<>();
         before.stream()
                 .filter(s -> !afterIds.contains(s.getPlace().getId()))
-                .forEach(s -> changes.add("Çıkarıldı: " + s.getPlace().getName()));
+                .forEach(s -> changes.add(Texts.t("Çıkarıldı: ", "Removed: ") + s.getPlace().getName()));
         after.stream()
                 .filter(s -> !beforeIds.contains(s.place().getId()))
-                .forEach(s -> changes.add("Eklendi: " + s.place().getName()
+                .forEach(s -> changes.add(Texts.t("Eklendi: ", "Added: ") + s.place().getName()
                         + " (" + s.type().getLabel() + ", " + s.start() + ")"));
         if (changes.isEmpty()) {
-            changes.add("Mekanlar aynı kaldı, saatleri güncelledim.");
+            changes.add(Texts.t("Mekanlar aynı kaldı, saatleri güncelledim.",
+                    "The places stayed the same; I updated the times."));
         }
         return changes;
     }
@@ -391,6 +398,13 @@ public class RouteService {
                 .filter(s -> Objects.equals(s.getId(), stopId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Stop not found with id: " + stopId));
+    }
+
+    // "27 Eylül Pazar Rotası" / "Sunday, 27 September route"
+    public static String defaultTitle(LocalDate date) {
+        return Texts.english()
+                ? date.format(TITLE_DATE_EN) + " route"
+                : date.format(TITLE_DATE) + " Rotası";
     }
 
     private LocalTime defaultStart(LocalDate date) {

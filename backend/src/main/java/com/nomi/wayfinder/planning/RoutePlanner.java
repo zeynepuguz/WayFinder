@@ -3,6 +3,7 @@ package com.nomi.wayfinder.planning;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.repository.PlaceDistance;
 import com.nomi.wayfinder.repository.PlaceRepository;
 import com.nomi.wayfinder.weather.WeatherForecast;
@@ -52,12 +53,16 @@ public class RoutePlanner {
 
         List<String> notes = new ArrayList<>();
         if (forecast.isEmpty() && !request.assumeWet()) {
-            notes.add("Hava durumu bilgisi alınamadı; plan hava durumu dikkate alınmadan oluşturuldu.");
+            notes.add(Texts.t("Hava durumu bilgisi alınamadı; plan hava durumu dikkate alınmadan oluşturuldu.",
+                    "Weather information was not available; the plan was made without taking the weather into account."));
         }
 
         String advice = forecast
                 .map(f -> weatherService.advice(f, request.startTime(), request.endTime()))
-                .orElse(request.assumeWet() ? "Yağmur nedeniyle kapalı mekanlara öncelik verdim." : null);
+                .orElse(request.assumeWet()
+                        ? Texts.t("Yağmur nedeniyle kapalı mekanlara öncelik verdim.",
+                        "I prioritized indoor places because of the rain.")
+                        : null);
 
         List<PlannedStop> stops = new ArrayList<>();
         Set<Long> used = new HashSet<>(request.excludedPlaceIds());
@@ -91,15 +96,19 @@ public class RoutePlanner {
             PlannedStop stop = planned.get();
             int stopEnd = toDayMinutes(stop.end(), clock);
             if (stopEnd > endOfDay) {
-                notes.add(slot.type().getLabel() + " gün sonuna sığmadığı için eklenmedi.");
+                notes.add(Texts.t(slot.type().getLabel() + " gün sonuna sığmadığı için eklenmedi.",
+                        slot.type().getLabel() + " was not added because it did not fit before the end of the day."));
                 continue;
             }
 
             // The scorer only penalizes outdoor places in rain; say so when nothing indoor was left
             if (!stop.place().isIndoor()
                     && WeatherContext.at(forecast.orElse(null), stop.start(), request.assumeWet()).wet()) {
-                slotNotes.add(stop.place().getName() + " açık alan ve o saatte yağış bekleniyor; yakında uygun kapalı bir "
-                        + slot.type().getLabel().toLowerCase(java.util.Locale.forLanguageTag("tr")) + " mekanı bulamadım.");
+                slotNotes.add(Texts.t(
+                        stop.place().getName() + " açık alan ve o saatte yağış bekleniyor; yakında uygun kapalı bir "
+                                + slot.type().getLabel().toLowerCase(java.util.Locale.forLanguageTag("tr")) + " mekanı bulamadım.",
+                        stop.place().getName() + " is outdoors and rain is expected at that time; I could not find a suitable indoor "
+                                + Texts.lower(slot.type().getLabel()) + " place nearby."));
             }
 
             notes.addAll(slotNotes);
@@ -115,7 +124,8 @@ public class RoutePlanner {
         }
 
         if (remainingBudget != null && remainingBudget < 0) {
-            notes.add("Tahmini harcama bütçeyi yaklaşık " + (-remainingBudget) + " TL aşıyor.");
+            notes.add(Texts.t("Tahmini harcama bütçeyi yaklaşık " + (-remainingBudget) + " TL aşıyor.",
+                    "Estimated spending is about " + (-remainingBudget) + " TL over the budget."));
         }
 
         return new PlanResult(stops, notes, forecast, advice);
@@ -149,15 +159,18 @@ public class RoutePlanner {
         // 2) a bit further but within budget
         SearchOutcome far = search(slot, leg, request, forecast, used, maxLeg * EXPANDED_SEARCH_FACTOR, maxLeg);
         if (far.affordable().isPresent()) {
-            notes.add(slot.type().getLabel() + " için yakında uygun yer bulunamadı; biraz daha uzaktaki "
-                    + far.affordable().get().place().getName() + " seçildi.");
+            notes.add(Texts.t(slot.type().getLabel() + " için yakında uygun yer bulunamadı; biraz daha uzaktaki "
+                            + far.affordable().get().place().getName() + " seçildi.",
+                    "No suitable " + Texts.lower(slot.type().getLabel()) + " place was found nearby; "
+                            + far.affordable().get().place().getName() + ", a little further away, was chosen."));
             return far.affordable();
         }
 
         // 3) over budget: best overall score (the score already penalizes cost)
         Optional<PlannedStop> fallback = near.overBudget().isPresent() ? near.overBudget() : far.overBudget();
         if (fallback.isEmpty()) {
-            notes.add(slot.type().getLabel() + " için bu saatte açık ve uygun bir mekan bulunamadı.");
+            notes.add(Texts.t(slot.type().getLabel() + " için bu saatte açık ve uygun bir mekan bulunamadı.",
+                    "No suitable " + Texts.lower(slot.type().getLabel()) + " place is open at this time."));
         }
         return fallback;
     }
@@ -255,28 +268,37 @@ public class RoutePlanner {
         Boolean open = place.isOpenDuring(request.date().plusDays(timing.arrival() / 1440),
                 time(timing.arrival()), timing.duration());
         if (Boolean.FALSE.equals(open)) {
-            notes.add(place.getName() + " yeni saatte kapalı olacağı için yerine başka bir mekan arandı.");
+            notes.add(Texts.t(place.getName() + " yeni saatte kapalı olacağı için yerine başka bir mekan arandı.",
+                    place.getName() + " will be closed at the new time, so another place was looked for instead."));
             return Optional.empty();
         }
 
         // Too far for how much the user wants to walk now (e.g. after "çok yorulduk")
         double maxPinnedLeg = request.walkingTolerance().getMaxLegMeters() * 2.0;
         if (distance != null && distance > maxPinnedLeg) {
-            notes.add(place.getName() + " artık uzak kaldığı için daha yakın bir yerle değiştirildi.");
+            notes.add(Texts.t(place.getName() + " artık uzak kaldığı için daha yakın bir yerle değiştirildi.",
+                    place.getName() + " is now too far away, so it was replaced with a closer place."));
             return Optional.empty();
         }
 
         WeatherContext weather = WeatherContext.at(forecast, time(timing.arrival()), request.assumeWet());
         if (weather.wet() && !place.isIndoor()) {
-            notes.add(place.getName() + " açık alan olduğu ve yağış beklendiği için değiştirildi.");
+            notes.add(Texts.t(place.getName() + " açık alan olduğu ve yağış beklendiği için değiştirildi.",
+                    place.getName() + " was replaced because it is outdoors and rain is expected."));
             return Optional.empty();
         }
 
         List<String> reasons = new ArrayList<>();
-        reasons.add("Rotanda zaten vardı");
-        reasons.add(String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)",
-                leg.firstLeg() ? "Bulunduğun noktaya" : "Önceki durağa",
-                Math.round(distance == null ? 0 : distance), timing.walkingMinutes()));
+        reasons.add(Texts.t("Rotanda zaten vardı", "Already in your route"));
+        if (Texts.english()) {
+            reasons.add(String.format(Locale.ROOT, "%d m from %s (~%d min walk)",
+                    Math.round(distance == null ? 0 : distance),
+                    leg.firstLeg() ? "where you are" : "the previous stop", timing.walkingMinutes()));
+        } else {
+            reasons.add(String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)",
+                    leg.firstLeg() ? "Bulunduğun noktaya" : "Önceki durağa",
+                    Math.round(distance == null ? 0 : distance), timing.walkingMinutes()));
+        }
 
         return Optional.of(toStop(slot, place, timing, reasons));
     }

@@ -1,6 +1,6 @@
 import { List, Map as MapIcon, Search, SearchX, SlidersHorizontal, Umbrella } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import type { Place, PlaceCategory } from '../api/types'
 import { PlaceRow } from '../components/PlaceViews'
@@ -8,12 +8,13 @@ import { RouteMap } from '../components/RouteMap'
 import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
 import { CATEGORY_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { CATEGORY_LABELS } from '../lib/format'
+import { CATEGORY_BY_SLUG, CATEGORY_LABELS } from '../lib/format'
+import { useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
-const PRICE_OPTIONS = [
-  { value: '', label: 'Hepsi' },
-  { value: '0', label: 'Ücretsiz' },
+const priceOptions = (t: (turkish: string, english: string) => string) => [
+  { value: '', label: t('Hepsi', 'All') },
+  { value: '0', label: t('Ücretsiz', 'Free') },
   { value: '200', label: '≤ 200 TL' },
   { value: '400', label: '≤ 400 TL' },
   { value: '700', label: '≤ 700 TL' },
@@ -22,9 +23,14 @@ const PRICE_OPTIONS = [
 export function ExplorePage() {
   const location = useUserLocation()
   const [params, setParams] = useSearchParams()
-  const category = (params.get('category') as PlaceCategory | null) ?? null
+  // /kadikoy/kafe (crawlable category page) or /explore?category=CAFE
+  const { slug } = useParams()
+  const navigate = useNavigate()
+  const t = useT()
+  const slugCategory = slug ? CATEGORY_BY_SLUG[slug] ?? null : null
+  const category = slugCategory ?? (params.get('category') as PlaceCategory | null) ?? null
 
-  const [mode, setMode] = useState<Mode>('nearby')
+  const [mode, setMode] = useState<Mode>(slugCategory ? 'all' : 'nearby')
   const [query, setQuery] = useState('')
   const [indoorOnly, setIndoorOnly] = useState(false)
   const [maxCost, setMaxCost] = useState('')
@@ -37,7 +43,9 @@ export function ExplorePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const setCategory = (c: PlaceCategory | null) => setParams(c ? { category: c } : {}, { replace: true })
+  const setCategory = (c: PlaceCategory | null) => slug
+    ? navigate(c ? `/explore?category=${c}` : '/explore', { replace: true })
+    : setParams(c ? { category: c } : {}, { replace: true })
   const activeFilters = (indoorOnly ? 1 : 0) + (maxCost ? 1 : 0)
 
   useEffect(() => {
@@ -53,12 +61,12 @@ export function ExplorePage() {
       if (mode === 'nearby') {
         // Nearby list is sorted by PostGIS distance; filters are applied on that small result
         const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500)
-        const q = query.toLocaleLowerCase('tr')
+        const q = fold(query)
         setPlaces(nearby.filter(p =>
           (!category || p.category === category)
           && (!indoorOnly || p.indoor)
           && (!maxCost || (p.estimatedCost ?? 0) <= Number(maxCost))
-          && (!q || p.name.toLocaleLowerCase('tr').includes(q))))
+          && (!q || fold(p.name).includes(q))))
         setHasMore(false)
       } else {
         const result = await api.searchPlaces({
@@ -74,7 +82,7 @@ export function ExplorePage() {
       }
       setPage(nextPage)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Mekanlar yüklenemedi')
+      setError(e instanceof Error ? e.message : t('Mekanlar yüklenemedi', 'Couldn’t load places'))
     } finally {
       setLoading(false)
     }
@@ -83,8 +91,8 @@ export function ExplorePage() {
   return (
     <main className="screen">
       <div className="row-between">
-        <h1 className="t-display">Keşfet</h1>
-        <button className="icon-btn" aria-label={view === 'list' ? 'Harita görünümü' : 'Liste görünümü'}
+        <h1 className="t-display">{t('Keşfet', 'Explore')}</h1>
+        <button className="icon-btn" aria-label={view === 'list' ? t('Harita görünümü', 'Map view') : t('Liste görünümü', 'List view')}
                 onClick={() => setView(v => (v === 'list' ? 'map' : 'list'))}>
           {view === 'list' ? <MapIcon size={20} /> : <List size={20} />}
         </button>
@@ -93,10 +101,10 @@ export function ExplorePage() {
       <div className="row">
         <label className="search grow">
           <Search size={18} />
-          <input type="search" placeholder="Mekan, kafe, müze ara" value={query} onChange={e => setQuery(e.target.value)}
-                 aria-label="Mekan ara" />
+          <input type="search" placeholder={t('Mekan, kafe, müze ara', 'Search places, cafés, museums')} value={query} onChange={e => setQuery(e.target.value)}
+                 aria-label={t('Mekan ara', 'Search places')} />
         </label>
-        <button className="icon-btn" aria-label="Filtreler" onClick={() => setFiltersOpen(true)} style={{ position: 'relative' }}>
+        <button className="icon-btn" aria-label={t('Filtreler', 'Filters')} onClick={() => setFiltersOpen(true)} style={{ position: 'relative' }}>
           <SlidersHorizontal size={19} />
           {activeFilters > 0 && (
             <span className="badge badge-brand" style={{ position: 'absolute', top: -6, right: -6, padding: '1px 6px' }}>{activeFilters}</span>
@@ -105,7 +113,7 @@ export function ExplorePage() {
       </div>
 
       <div className="h-scroll" style={{ gap: 8 }}>
-        <button className={`chip ${category === null ? 'active' : ''}`} onClick={() => setCategory(null)}>Tümü</button>
+        <button className={`chip ${category === null ? 'active' : ''}`} onClick={() => setCategory(null)}>{t('Tümü', 'All')}</button>
         {(Object.keys(CATEGORY_LABELS) as PlaceCategory[]).map(c => {
           const Icon = CATEGORY_ICON[c]
           return (
@@ -118,7 +126,7 @@ export function ExplorePage() {
       </div>
 
       <Segmented value={mode} onChange={setMode}
-                 options={[{ value: 'nearby', label: 'Yakınımda' }, { value: 'all', label: 'Tüm Kadıköy' }]} />
+                 options={[{ value: 'nearby', label: t('Yakınımda', 'Near me') }, { value: 'all', label: t('Tüm Kadıköy', 'All of Kadıköy') }]} />
 
       {error && <ErrorState message={error} onRetry={() => void load(0)} />}
 
@@ -128,7 +136,7 @@ export function ExplorePage() {
       )}
 
       {!loading && places.length === 0 && !error && (
-        <EmptyState icon={SearchX} title="Sonuç bulunamadı" text="Filtreleri değiştir ya da “Tüm Kadıköy” sekmesine bak." />
+        <EmptyState icon={SearchX} title={t('Sonuç bulunamadı', 'No results')} text={t('Filtreleri değiştir ya da “Tüm Kadıköy” sekmesine bak.', 'Change the filters or check the “All of Kadıköy” tab.')} />
       )}
 
       <div className="stack">
@@ -137,15 +145,15 @@ export function ExplorePage() {
 
       {loading && <ListSkeleton rows={places.length ? 1 : 4} />}
       {hasMore && !loading && (
-        <button className="btn btn-secondary btn-block" onClick={() => void load(page + 1)}>Daha fazla göster</button>
+        <button className="btn btn-secondary btn-block" onClick={() => void load(page + 1)}>{t('Daha fazla göster', 'Show more')}</button>
       )}
 
-      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} label="Filtreler">
+      <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} label={t('Filtreler', 'Filters')}>
         <div className="stack" style={{ gap: 20 }}>
           <div className="stack-sm">
-            <span className="field-label">Kişi başı fiyat</span>
+            <span className="field-label">{t('Kişi başı fiyat', 'Price per person')}</span>
             <div className="chips">
-              {PRICE_OPTIONS.map(o => (
+              {priceOptions(t).map(o => (
                 <button key={o.value} className={`chip ${maxCost === o.value ? 'active' : ''}`} onClick={() => setMaxCost(o.value)}>
                   {o.label}
                 </button>
@@ -156,17 +164,22 @@ export function ExplorePage() {
                   aria-pressed={indoorOnly}>
             <span className="list-item-icon"><Umbrella size={18} /></span>
             <span className="grow">
-              <span style={{ display: 'block', fontWeight: 700 }}>Sadece kapalı alanlar</span>
-              <span className="t-caption">Yağmurlu ve sıcak günler için</span>
+              <span style={{ display: 'block', fontWeight: 700 }}>{t('Sadece kapalı alanlar', 'Indoor places only')}</span>
+              <span className="t-caption">{t('Yağmurlu ve sıcak günler için', 'For rainy and hot days')}</span>
             </span>
-            <span className={`badge ${indoorOnly ? 'badge-success' : ''}`}>{indoorOnly ? 'Açık' : 'Kapalı'}</span>
+            <span className={`badge ${indoorOnly ? 'badge-success' : ''}`}>{indoorOnly ? t('Açık', 'On') : t('Kapalı', 'Off')}</span>
           </button>
           <div className="row">
-            <button className="btn btn-secondary grow" onClick={() => { setMaxCost(''); setIndoorOnly(false) }}>Temizle</button>
-            <button className="btn btn-primary grow" onClick={() => setFiltersOpen(false)}>Uygula</button>
+            <button className="btn btn-secondary grow" onClick={() => { setMaxCost(''); setIndoorOnly(false) }}>{t('Temizle', 'Clear')}</button>
+            <button className="btn btn-primary grow" onClick={() => setFiltersOpen(false)}>{t('Uygula', 'Apply')}</button>
           </div>
         </div>
       </Sheet>
     </main>
   )
+}
+
+// "kadikoy" matches "Kadıköy": case- and diacritic-insensitive, so English keyboards work too
+function fold(text: string): string {
+  return text.toLocaleLowerCase('tr').replace(/ı/g, 'i').normalize('NFD').replace(/[̀-ͯ]/g, '')
 }

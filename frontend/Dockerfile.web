@@ -1,0 +1,21 @@
+# Web version of Nomi: builds the SPA, then (at container start) writes crawlable pages for search
+# engines into the shared web-root volume that Caddy serves. See deploy/docker-compose.prod.yml.
+FROM node:22-alpine
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY . .
+ARG VITE_MAP_TILE_URL=
+ARG VITE_MAP_ATTRIBUTION=
+ARG VITE_SUPPORT_EMAIL=
+ARG VITE_PLAY_STORE_URL=
+ENV VITE_API_BASE_URL=/api/v1 \
+    VITE_PRIVACY_URL=/gizlilik \
+    VITE_TERMS_URL=/kosullar \
+    VITE_MAP_TILE_URL=$VITE_MAP_TILE_URL \
+    VITE_MAP_ATTRIBUTION=$VITE_MAP_ATTRIBUTION \
+    VITE_SUPPORT_EMAIL=$VITE_SUPPORT_EMAIL \
+    VITE_PLAY_STORE_URL=$VITE_PLAY_STORE_URL
+RUN npx vite build
+# Waits for the backend, then copies dist/ + generated pages to /srv/app
+CMD ["sh", "-c", "node scripts/prerender.mjs --api http://backend:8080/api/v1 --site https://$DOMAIN --out /srv/app"]

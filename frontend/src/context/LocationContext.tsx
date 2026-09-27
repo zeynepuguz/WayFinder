@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { haversineMeters } from '../lib/format'
+import { tr } from '../lib/i18n'
 
 // MVP data only covers Kadıköy. Outside of it we use a demo location so the app still works.
 export const KADIKOY = { latitude: 40.991, longitude: 29.023 }
@@ -65,14 +66,14 @@ export function useUserLocation(): LocationState {
 export function locationLabel(source: LocationSource): string {
   switch (source) {
     case 'gps':
-      return 'Konumun kullanılıyor'
+      return tr('Konumun kullanılıyor', 'Using your location')
     case 'demo-outside':
-      return 'Nomi şimdilik sadece Kadıköy’de: demo konum kullanılıyor'
+      return tr('Nomi şimdilik sadece Kadıköy’de: demo konum kullanılıyor', 'Nomi only covers Kadıköy for now: using a demo location')
     case 'demo-denied':
-      return 'Konum izni yok: Kadıköy iskelesi kullanılıyor'
+      return tr('Konum izni yok: Kadıköy iskelesi kullanılıyor', 'No location permission: using Kadıköy pier')
     case 'demo-unavailable':
-      return 'Konum alınamadı: Kadıköy iskelesi kullanılıyor'
+      return tr('Konum alınamadı: Kadıköy iskelesi kullanılıyor', 'Couldn’t get your location: using Kadıköy pier')
     default:
-      return 'Konum alınıyor…'
+      return tr('Konum alınıyor…', 'Getting your location…')
   }
 }

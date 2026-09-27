@@ -55,6 +55,9 @@ kaydetme için giriş + aktif paket gerekir (backend 402 döner, uygulama paywal
 - Otomatik yenilenmez; süre bitmeden alınan paket mevcut sürenin sonuna eklenir.
 - Android'de ödeme **Google Play Billing** ile alınır (Play politikası gereği zorunlu). Uygulama satın alma
   token'ını backend'e yollar, backend Google Play Developer API ile doğrular ve ancak o zaman süreyi açar.
+- **Web sitesi vitrindir:** mekanlar, kategoriler ve öneriler herkese açık; Premium webde satılmaz, yalnızca Android
+  uygulamasında Google Play ile alınır. Premium'u olan hesap (uygulamadan alan ya da `FREE_ACCESS_EMAILS`) webde de
+  her şeyi kullanır. `VITE_PLAY_STORE_URL` ayarlanınca web paywall'ı "Google Play'den indir" butonu gösterir.
 - Yerelde store olmadan denemek için `BILLING_DEV_MODE=true` (production'da asla).
 - `FREE_ACCESS_EMAILS`: virgülle ayrılmış e-postalar hiç ödeme yapmadan süresiz erişir (ör. uygulama sahibi). Sadece `.env`de tutulur.
 
@@ -73,6 +76,15 @@ kaydetme için giriş + aktif paket gerekir (backend 402 döner, uygulama paywal
 Google Play'den iade edilen / ters ibraz edilen satın almalar saatte bir Voided Purchases API'den okunur ve
 verdikleri paket `REVOKED` olur (`VoidedPurchaseSync`). Servis hesabı ayarlanana kadar iş hiçbir şey yapmaz.
 
+## Dil: Türkçe / For tourists (English)
+
+- Uygulama Türkçe ve İngilizcedir. Cihaz dili Türkçe değilse İngilizce açılır; "For tourists · English" düğmesi
+  (ana sayfa, tanıtım ekranı, profil) ile değiştirilir, seçim hatırlanır. `?lang=en` bağlantısı da İngilizce açar.
+- Metinler kullanıldıkları yerde iki dilli yazılır: `const t = useT(); t('Kaydedilenler', 'Saved')`
+  (`frontend/src/lib/i18n.tsx`). Dil değişince uygulama yeniden kurulur, API istekleri `Accept-Language` gönderir.
+- Backend asistan cevaplarını, rota notlarını, hava önerilerini ve mekan açıklamalarını (`places.description_en`)
+  isteğin dilinde döner. Kural tabanlı parser temel İngilizce cümleleri de anlar.
+
 ## Şifremi unuttum
 
 `POST /api/v1/auth/password/forgot` e-postaya 6 haneli kod yollar (15 dk geçerli, 5 deneme, dakikada 1 yeni kod);
@@ -88,8 +100,19 @@ Saati bilinmeyen mekanların satırı yoktur (planlayıcı "bilinmiyor" sayar). 
 
 ## Sunucuya kurulum (production)
 
-`deploy/` klasörü tek komutla PostgreSQL/PostGIS, Redis, backend, AI servisi ve HTTPS'i (Caddy, Let's Encrypt) kurar.
-Dışarıya yalnızca 80/443 açılır. Gizlilik politikası ve kullanım koşulları da aynı alan adından yayınlanır.
+`deploy/` klasörü tek komutla web sitesini, PostgreSQL/PostGIS, Redis, backend, AI servisi ve HTTPS'i (Caddy,
+Let's Encrypt) kurar. Dışarıya yalnızca 80/443 açılır. Site, API ve yasal sayfalar aynı alan adındadır:
+
+| Adres | Ne |
+|---|---|
+| `/`, `/places/{id}`, `/kadikoy/{kafe,restoran,…}` | Web sitesi; Google için önceden oluşturulmuş sayfalar |
+| `/api/v1/...` | Backend |
+| `/gizlilik`, `/kosullar`, `/iletisim` | Yasal sayfalar (`deploy/site/`) |
+| `/sitemap.xml`, `/robots.txt` | Arama motorları için |
+
+`web` servisi kurulumda backend hazır olunca mekanları okuyup her mekan ve kategori için başlık, açıklama ve
+yapısal veri (schema.org) içeren HTML üretir (`frontend/scripts/prerender.mjs`). Mekan ekleyip değiştirdikten sonra:
+`docker compose -f docker-compose.prod.yml run --rm web`.
 
 ```bash
 # Linux sunucuda (Docker kurulu), alan adının DNS A kaydı sunucuya yönlenmiş olmalı
@@ -100,10 +123,35 @@ docker compose -f docker-compose.prod.yml up -d --build
 curl https://<DOMAIN>/actuator/health            # {"status":"UP"}
 ```
 
-- API: `https://<DOMAIN>/api/v1` → `frontend/.env.production` içindeki `VITE_API_BASE_URL`
-- Gizlilik: `https://<DOMAIN>/gizlilik`, koşullar: `https://<DOMAIN>/kosullar` (`deploy/site/` içindeki `[...]`
-  yer tutucularını doldur) → Play Console ve `VITE_PRIVACY_URL` / `VITE_TERMS_URL`
+- `deploy/site/` içindeki `[...]` yer tutucularını (geliştirici adı, destek e-postası, sağlayıcılar) doldur.
+- Android uygulaması için: `frontend/.env.production` içinde `VITE_API_BASE_URL=https://<DOMAIN>/api/v1`,
+  `VITE_PRIVACY_URL=https://<DOMAIN>/gizlilik`.
 - Güncelleme: `git pull && docker compose -f docker-compose.prod.yml up -d --build`
+
+### Rehberler ve İngilizce sayfalar
+
+Aynı betik doğrulanmış mekan verisinden seyahat rehberleri de üretir (uygulama kodu yüklemeyen hızlı HTML,
+`frontend/scripts/guides.mjs`). Her sayfanın Türkçe/İngilizce eşi `hreflang` ile bağlıdır:
+
+| Türkçe | English |
+|---|---|
+| `/rehber/kadikoy-gezi-rehberi` | `/en/guides/things-to-do-in-kadikoy` |
+| `/rehber/kadikoyde-yagmurlu-gunde-ne-yapilir` | `/en/guides/kadikoy-rainy-day` |
+| `/rehber/kadikoyde-ucretsiz-gezilecek-yerler` | `/en/guides/free-things-to-do-in-kadikoy` |
+| `/rehber/kadikoy-1-gunluk-gezi-rotasi` | `/en/guides/kadikoy-one-day-itinerary` |
+| `/rehber/kadikoyde-kahvalti-ve-kahve` | `/en/guides/kadikoy-coffee-and-breakfast` |
+| `/places/{id}`, `/kadikoy/{kategori}` | `/en/places/{id}`, `/en/kadikoy/{category}` |
+
+Rehberlerde yalnızca veritabanındaki bilgiler (açıklama, adres, doğrulanmış saatler, tahmini fiyat) kullanılır;
+İngilizce açıklaması olmayan mekanın İngilizce sayfasında açıklama gösterilmez.
+
+### Google'da görünmek
+
+1. Site yayındayken [Google Search Console](https://search.google.com/search-console)'a alan adını ekle (DNS TXT
+   kaydıyla doğrula).
+2. **Site haritaları** bölümüne `https://<DOMAIN>/sitemap.xml` ekle. Dizine girme birkaç gün–birkaç hafta sürer.
+3. Google Business Profile ve sosyal medya hesaplarından siteye bağlantı vermek "Nomi Kadıköy" aramasında
+   öne çıkmayı hızlandırır.
 
 ## Android uygulaması (Capacitor)
 

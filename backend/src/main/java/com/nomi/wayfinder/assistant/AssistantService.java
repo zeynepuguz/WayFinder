@@ -9,6 +9,7 @@ import com.nomi.wayfinder.dto.RouteDtos.RoutePlanRequest;
 import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.ReplanType;
 import com.nomi.wayfinder.repository.AssistantMessageRepository;
 import com.nomi.wayfinder.service.RecommendationService;
@@ -118,7 +119,8 @@ public class AssistantService {
             if (edit.type() == ReplanType.REMOVE_STOP || edit.type() == ReplanType.REPLACE_STOP) {
                 Optional<RouteStop> target = resolveTarget(route, edit);
                 if (target.isEmpty()) {
-                    changes.add("Hangi durağı kastettiğini anlayamadım; mekan adını yazar mısın?");
+                    changes.add(Texts.t("Hangi durağı kastettiğini anlayamadım; mekan adını yazar mısın?",
+                            "I could not tell which stop you meant; could you write the name of the place?"));
                     continue;
                 }
                 stopId = target.get().getId();
@@ -128,7 +130,7 @@ public class AssistantService {
                 changes.addAll(routeService.replanRoute(route, new ReplanRequest(
                         edit.type(), request.latitude(), request.longitude(), stopId, edit.stopType(), edit.interest())));
             } catch (BusinessException e) {
-                changes.add("Bu değişikliği yapamadım: " + e.getMessage());
+                changes.add(Texts.t("Bu değişikliği yapamadım: ", "I could not make this change: ") + e.getMessage());
             }
         }
 
@@ -153,10 +155,10 @@ public class AssistantService {
                     LocalTime now = LocalTime.now(clock);
                     LocalTime until = now.isBefore(LocalTime.of(21, 0)) ? LocalTime.of(22, 0) : LocalTime.of(23, 59);
                     var current = f.current() != null ? f.current() : f.at(now);
-                    return String.format(TR, "Şu an %.0f°C ve %s. %s",
+                    return String.format(Texts.locale(), Texts.t("Şu an %.0f°C ve %s. %s", "It is %.0f°C and %s right now. %s"),
                             current.temperature(), current.condition().getLabel(), weatherService.advice(f, now, until));
                 })
-                .orElse("Şu an hava durumu bilgisine ulaşamıyorum.");
+                .orElse(Texts.t("Şu an hava durumu bilgisine ulaşamıyorum.", "I cannot get the weather information right now."));
         return text(intent, answer);
     }
 

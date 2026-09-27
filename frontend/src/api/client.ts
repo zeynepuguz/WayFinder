@@ -1,3 +1,4 @@
+import { currentLang, tr } from '../lib/i18n'
 import type { ApiError } from './types'
 
 // Web (dev): same origin through the Vite proxy. Android app: the public API URL (VITE_API_BASE_URL).
@@ -53,7 +54,8 @@ export function buildQuery(query?: Query): string {
 }
 
 async function request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-  const headers: Record<string, string> = { Accept: 'application/json' }
+  // Accept-Language: the backend answers (assistant, route notes, place texts) in the app's language
+  const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': currentLang() }
   const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
   if (body !== undefined) headers['Content-Type'] = 'application/json'
@@ -66,7 +68,7 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
       body: body === undefined ? undefined : JSON.stringify(body),
     })
   } catch {
-    throw new ApiRequestError({ status: 0, message: 'Sunucuya ulaşılamıyor', errors: {} })
+    throw new ApiRequestError({ status: 0, message: tr('Sunucuya ulaşılamıyor', 'Can’t reach the server'), errors: {} })
   }
 
   // 402 = paid feature without an active pass: the app opens the paywall

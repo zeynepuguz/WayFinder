@@ -1,4 +1,4 @@
-# Production stack: Caddy (HTTPS) -> backend -> PostgreSQL/PostGIS, Redis, AI service.
+# Production stack: Caddy (HTTPS, website + API) -> backend -> PostgreSQL/PostGIS, Redis, AI service.
 # Only Caddy is reachable from outside (ports 80/443); everything else stays on the internal network.
 #
 #   cd deploy
@@ -58,6 +58,25 @@ services:
       redis:
         condition: service_healthy
 
+  # Builds the website and writes crawlable pages into web-root once the backend answers, then exits.
+  # Refresh them after changing places: docker compose -f docker-compose.prod.yml run --rm web
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile.web
+      args:
+        VITE_MAP_TILE_URL: ${VITE_MAP_TILE_URL:-}
+        VITE_MAP_ATTRIBUTION: ${VITE_MAP_ATTRIBUTION:-}
+        VITE_SUPPORT_EMAIL: ${VITE_SUPPORT_EMAIL:-}
+        VITE_PLAY_STORE_URL: ${VITE_PLAY_STORE_URL:-}
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - web-root:/srv/app
+    depends_on:
+      - backend
+    restart: "no"
+
   caddy:
     image: caddy:2
     restart: unless-stopped
@@ -70,6 +89,7 @@ services:
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./site:/srv/site:ro
+      - web-root:/srv/app:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
@@ -80,3 +100,4 @@ volumes:
   redis-data:
   caddy-data:
   caddy-config:
+  web-root:

@@ -1,21 +1,24 @@
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, LoaderCircle, Minus, Plus, X, type LucideIcon } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
+import { useT } from '../lib/i18n'
 
 export function Skeleton({ height = 16, width = '100%', radius }: { height?: number; width?: number | string; radius?: number }) {
   return <div className="skeleton" style={{ height, width, borderRadius: radius }} aria-hidden />
 }
 
 export function ListSkeleton({ rows = 3, height = 96 }: { rows?: number; height?: number }) {
+  const t = useT()
   return (
-    <div className="stack" role="status" aria-label="Yükleniyor">
+    <div className="stack" role="status" aria-label={t('Yükleniyor', 'Loading')}>
       {Array.from({ length: rows }, (_, i) => <Skeleton key={i} height={height} radius={20} />)}
     </div>
   )
 }
 
 export function Spinner({ size = 18 }: { size?: number }) {
-  return <LoaderCircle size={size} className="spin" aria-label="Yükleniyor" />
+  const t = useT()
+  return <LoaderCircle size={size} className="spin" aria-label={t('Yükleniyor', 'Loading')} />
 }
 
 type AlertTone = 'info' | 'warning' | 'success' | 'danger'
@@ -38,8 +41,9 @@ export function Alert({ tone = 'info', icon, children, action }: {
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  const t = useT()
   return (
-    <Alert tone="danger" action={onRetry && <button className="btn btn-sm btn-secondary" onClick={onRetry}>Tekrar dene</button>}>
+    <Alert tone="danger" action={onRetry && <button className="btn btn-sm btn-secondary" onClick={onRetry}>{t('Tekrar dene', 'Try again')}</button>}>
       <span>{message}</span>
     </Alert>
   )
@@ -63,8 +67,9 @@ export function EmptyState({ icon: Icon, title, text, action }: {
 
 export function BackButton({ to, glass }: { to?: string; glass?: boolean }) {
   const navigate = useNavigate()
+  const t = useT()
   return (
-    <button className={`icon-btn ${glass ? 'icon-btn-glass' : ''}`} aria-label="Geri"
+    <button className={`icon-btn ${glass ? 'icon-btn-glass' : ''}`} aria-label={t('Geri', 'Back')}
             onClick={() => (to ? navigate(to) : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
       <ChevronLeft size={22} />
     </button>
@@ -95,11 +100,12 @@ export function Stepper({ value, min, max, onChange, label }: {
   onChange: (value: number) => void
   label: string
 }) {
+  const t = useT()
   return (
     <div className="stepper" aria-label={label}>
-      <button type="button" aria-label="Azalt" disabled={value <= min} onClick={() => onChange(value - 1)}><Minus size={18} /></button>
+      <button type="button" aria-label={t('Azalt', 'Decrease')} disabled={value <= min} onClick={() => onChange(value - 1)}><Minus size={18} /></button>
       <strong aria-live="polite">{value}</strong>
-      <button type="button" aria-label="Arttır" disabled={value >= max} onClick={() => onChange(value + 1)}><Plus size={18} /></button>
+      <button type="button" aria-label={t('Arttır', 'Increase')} disabled={value >= max} onClick={() => onChange(value + 1)}><Plus size={18} /></button>
     </div>
   )
 }
@@ -110,6 +116,7 @@ export function Sheet({ open, onClose, children, label }: {
   children: ReactNode
   label: string
 }) {
+  const t = useT()
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -124,7 +131,7 @@ export function Sheet({ open, onClose, children, label }: {
         <div className="sheet-grip" />
         <div className="row-between" style={{ marginBottom: 12 }}>
           <h2 className="t-title">{label}</h2>
-          <button className="icon-btn icon-btn-plain" aria-label="Kapat" onClick={onClose}><X size={20} /></button>
+          <button className="icon-btn icon-btn-plain" aria-label={t('Kapat', 'Close')} onClick={onClose}><X size={20} /></button>
         </div>
         {children}
       </div>

@@ -12,6 +12,7 @@ import { Alert, BackButton, ErrorState, Sheet, Skeleton, Spinner, useToast } fro
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
 import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, STOP_TYPE_LABELS } from '../lib/format'
+import { locale, useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
 type Change = Omit<ReplanRequest, 'latitude' | 'longitude'>
@@ -23,6 +24,7 @@ export function RouteDetailPage() {
   const location = useUserLocation()
   const gate = useGate()
   const toast = useToast()
+  const t = useT()
 
   const { data: route, setData: setRoute, error, loading, reload } = useAsync(() => api.route(routeId), [routeId])
   const [busy, setBusy] = useState(false)
@@ -46,7 +48,7 @@ export function RouteDetailPage() {
         setRoute(result)
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : 'İşlem başarısız')
+      setActionError(e instanceof Error ? e.message : t('İşlem başarısız', 'Something went wrong'))
     } finally {
       setBusy(false)
     }
@@ -58,7 +60,7 @@ export function RouteDetailPage() {
 
   async function remove() {
     await api.deleteRoute(routeId)
-    toast('Rota silindi')
+    toast(t('Rota silindi', 'Route deleted'))
     navigate('/routes', { replace: true })
   }
 
@@ -71,7 +73,7 @@ export function RouteDetailPage() {
     )
   }
   if (error || !route) {
-    return <main className="screen"><BackButton to="/routes" /><ErrorState message={error ?? 'Rota bulunamadı'} onRetry={reload} /></main>
+    return <main className="screen"><BackButton to="/routes" /><ErrorState message={error ?? t('Rota bulunamadı', 'Route not found')} onRetry={reload} /></main>
   }
 
   const finished = route.status === 'COMPLETED'
@@ -93,7 +95,7 @@ export function RouteDetailPage() {
         <div className="place-hero-bar" style={{ top: 'calc(var(--safe-top) + 12px)', zIndex: 500 }}>
           <BackButton to="/routes" glass />
           <button className="icon-btn icon-btn-glass" disabled={busy} aria-pressed={route.saved}
-                  aria-label={route.saved ? 'Kaydedilenlerden çıkar' : 'Rotayı kaydet'}
+                  aria-label={route.saved ? t('Kaydedilenlerden çıkar', 'Remove from saved') : t('Rotayı kaydet', 'Save route')}
                   onClick={() => act(() => api.updateRoute(routeId, { saved: !route.saved }))}>
             <Heart size={20} fill={route.saved ? '#ff5a36' : 'none'} color={route.saved ? '#ff5a36' : 'currentColor'} />
           </button>
@@ -102,22 +104,22 @@ export function RouteDetailPage() {
 
       <div className="place-sheet pad">
         <div className="stack-sm">
-          <span className="t-overline">{formatDate(route.date)} · {route.partySize} kişi</span>
+          <span className="t-overline">{formatDate(route.date)} · {t(`${route.partySize} kişi`, route.partySize === 1 ? '1 person' : `${route.partySize} people`)}</span>
           <h1 className="t-title">{route.title}</h1>
         </div>
 
         <div className="stats">
-          <div className="stat"><Wallet size={16} className="muted" /><strong>~{route.totalEstimatedCost.toLocaleString('tr-TR')} TL</strong>
-            <span>{route.budget != null ? `bütçe ₺${route.budget.toLocaleString('tr-TR')}` : 'tahmini'}</span></div>
-          <div className="stat"><Footprints size={16} className="muted" /><strong>~{route.totalWalkingMinutes} dk</strong><span>yürüme</span></div>
-          <div className="stat"><Clock size={16} className="muted" /><strong>{route.stops.length}</strong><span>durak</span></div>
+          <div className="stat"><Wallet size={16} className="muted" /><strong>~{route.totalEstimatedCost.toLocaleString(locale())} TL</strong>
+            <span>{route.budget != null ? t(`bütçe ₺${route.budget.toLocaleString(locale())}`, `budget ₺${route.budget.toLocaleString(locale())}`) : t('tahmini', 'estimated')}</span></div>
+          <div className="stat"><Footprints size={16} className="muted" /><strong>~{route.totalWalkingMinutes} {t('dk', 'min')}</strong><span>{t('yürüme', 'walking')}</span></div>
+          <div className="stat"><Clock size={16} className="muted" /><strong>{route.stops.length}</strong><span>{t('durak', route.stops.length === 1 ? 'stop' : 'stops')}</span></div>
         </div>
 
         {changes.length > 0 && (
           <Alert tone="success" icon={RefreshCw} action={
-            <button className="icon-btn icon-btn-plain" style={{ width: 28, height: 28 }} aria-label="Kapat" onClick={() => setChanges([])}><X size={16} /></button>
+            <button className="icon-btn icon-btn-plain" style={{ width: 28, height: 28 }} aria-label={t('Kapat', 'Close')} onClick={() => setChanges([])}><X size={16} /></button>
           }>
-            <strong>Rotan güncellendi</strong>
+            <strong>{t('Rotan güncellendi', 'Your route has been updated')}</strong>
             <ul>{changes.map(c => <li key={c}>{c}</li>)}</ul>
           </Alert>
         )}
@@ -131,28 +133,28 @@ export function RouteDetailPage() {
         {!finished && (
           <section className="section">
             <div className="row-between">
-              <h2 className="t-headline">Planı değiştir</h2>
+              <h2 className="t-headline">{t('Planı değiştir', 'Change the plan')}</h2>
               {busy && <Spinner />}
             </div>
             <div className="quick-actions">
               <button className="quick-action" disabled={busy} onClick={() => replan({ type: 'TIRED' })}>
-                <span className="qa-icon"><BatteryLow size={20} /></span>Yorulduk
+                <span className="qa-icon"><BatteryLow size={20} /></span>{t('Yorulduk', 'We’re tired')}
               </button>
               <button className="quick-action" disabled={busy} onClick={() => replan({ type: 'WEATHER_CHANGED' })}>
-                <span className="qa-icon"><CloudRain size={20} /></span>Yağmur başladı
+                <span className="qa-icon"><CloudRain size={20} /></span>{t('Yağmur başladı', 'It’s raining')}
               </button>
               <button className="quick-action" disabled={busy} onClick={() => replan({ type: 'LESS_WALKING' })}>
-                <span className="qa-icon"><Footprints size={20} /></span>Az yürüyelim
+                <span className="qa-icon"><Footprints size={20} /></span>{t('Az yürüyelim', 'Less walking')}
               </button>
             </div>
             <button className="btn btn-secondary btn-block" disabled={busy} onClick={() => gate() && setAddOpen(true)}>
-              <Plus size={18} /> Durak veya ilgi alanı ekle
+              <Plus size={18} /> {t('Durak veya ilgi alanı ekle', 'Add a stop or interest')}
             </button>
           </section>
         )}
 
         <section className="section">
-          <h2 className="t-headline">Günün akışı</h2>
+          <h2 className="t-headline">{t('Günün akışı', 'Your day')}</h2>
           <ol className="timeline">
             {route.stops.map((stop, index) => (
               <StopItem key={stop.id} stop={stop} index={index} isNext={stop.id === nextStop?.id}
@@ -164,11 +166,11 @@ export function RouteDetailPage() {
         </section>
 
         <button className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} onClick={() => setDeleteOpen(true)}>
-          <Trash2 size={18} /> Rotayı sil
+          <Trash2 size={18} /> {t('Rotayı sil', 'Delete route')}
         </button>
       </div>
 
-      <Sheet open={addOpen} onClose={() => setAddOpen(false)} label="Rotaya ekle">
+      <Sheet open={addOpen} onClose={() => setAddOpen(false)} label={t('Rotaya ekle', 'Add to route')}>
         <AddSheet busy={busy} onPick={change => { setAddOpen(false); void replan(change) }} />
       </Sheet>
 
@@ -177,26 +179,26 @@ export function RouteDetailPage() {
           <div className="list-group">
             <button className="list-item" disabled={busy} onClick={() => { const s = menuStop; setMenuStop(null); void replan({ type: 'REPLACE_STOP', stopId: s.id }) }}>
               <span className="list-item-icon"><Shuffle size={18} /></span>
-              <span className="grow"><strong style={{ display: 'block' }}>Başka bir yerle değiştir</strong><span className="t-caption">Aynı saat için yakında başka bir {menuStop.typeLabel.toLocaleLowerCase('tr')} önerisi</span></span>
+              <span className="grow"><strong style={{ display: 'block' }}>{t('Başka bir yerle değiştir', 'Swap for another place')}</strong><span className="t-caption">{t(`Aynı saat için yakında başka bir ${menuStop.typeLabel.toLocaleLowerCase('tr')} önerisi`, `Another ${menuStop.typeLabel.toLocaleLowerCase(locale())} nearby at the same time`)}</span></span>
             </button>
             <button className="list-item" disabled={busy} onClick={() => { const s = menuStop; setMenuStop(null); void setStopStatus(s, 'SKIPPED') }}>
               <span className="list-item-icon"><SkipForward size={18} /></span>
-              <span className="grow"><strong style={{ display: 'block' }}>Bu durağı atla</strong><span className="t-caption">Rotada kalır, gidilmedi olarak işaretlenir</span></span>
+              <span className="grow"><strong style={{ display: 'block' }}>{t('Bu durağı atla', 'Skip this stop')}</strong><span className="t-caption">{t('Rotada kalır, gidilmedi olarak işaretlenir', 'Stays on the route, marked as not visited')}</span></span>
             </button>
             <button className="list-item list-item-danger" disabled={busy} onClick={() => { const s = menuStop; setMenuStop(null); void replan({ type: 'REMOVE_STOP', stopId: s.id }) }}>
               <span className="list-item-icon"><Trash2 size={18} /></span>
-              <span className="grow"><strong style={{ display: 'block' }}>Rotadan çıkar</strong><span className="t-caption">Kalan duraklar yeniden zamanlanır</span></span>
+              <span className="grow"><strong style={{ display: 'block' }}>{t('Rotadan çıkar', 'Remove from route')}</strong><span className="t-caption">{t('Kalan duraklar yeniden zamanlanır', 'The remaining stops are rescheduled')}</span></span>
             </button>
           </div>
         )}
       </Sheet>
 
-      <Sheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label="Rota silinsin mi?">
+      <Sheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label={t('Rota silinsin mi?', 'Delete this route?')}>
         <div className="stack">
-          <p className="ink-2">Bu rota ve durakları kalıcı olarak silinir.</p>
+          <p className="ink-2">{t('Bu rota ve durakları kalıcı olarak silinir.', 'This route and its stops will be permanently deleted.')}</p>
           <div className="row">
-            <button className="btn btn-secondary grow" onClick={() => setDeleteOpen(false)}>Vazgeç</button>
-            <button className="btn btn-danger grow" onClick={() => void remove()}>Sil</button>
+            <button className="btn btn-secondary grow" onClick={() => setDeleteOpen(false)}>{t('Vazgeç', 'Cancel')}</button>
+            <button className="btn btn-danger grow" onClick={() => void remove()}>{t('Sil', 'Delete')}</button>
           </div>
         </div>
       </Sheet>
@@ -213,6 +215,7 @@ function StopItem({ stop, index, isNext, editable, busy, onVisited, onMore }: {
   onVisited: () => void
   onMore: () => void
 }) {
+  const t = useT()
   const Icon = STOP_ICON[stop.type]
   const stateClass = stop.status === 'VISITED' ? 'stop-done' : stop.status === 'SKIPPED' ? 'stop-skipped' : ''
 
@@ -220,33 +223,33 @@ function StopItem({ stop, index, isNext, editable, busy, onVisited, onMore }: {
     <>
       {stop.walkingMinutes > 0 && (
         <li className="walk" aria-hidden>
-          <Footprints size={13} /> {stop.walkingMinutes} dk yürüme · {formatDistance(stop.distanceFromPreviousMeters)}
+          <Footprints size={13} /> {t(`${stop.walkingMinutes} dk yürüme`, `${stop.walkingMinutes} min walk`)} · {formatDistance(stop.distanceFromPreviousMeters)}
         </li>
       )}
       <li className={`stop ${stateClass}`}>
         <div className="stop-num">{stop.status === 'VISITED' ? <Check size={18} /> : index + 1}</div>
         <div className="card stop-card" style={isNext ? { borderColor: 'var(--brand)', boxShadow: '0 0 0 3px var(--brand-50)' } : undefined}>
           <div className="row-between">
-            <span className="stop-time"><Icon size={14} /> {formatTime(stop.plannedStart)} – {formatTime(stop.plannedEnd)} · {stop.typeLabel.toLocaleUpperCase('tr')}</span>
-            {isNext && <span className="badge badge-brand">Sıradaki</span>}
-            {stop.status === 'VISITED' && <span className="badge badge-success">Gidildi</span>}
-            {stop.status === 'SKIPPED' && <span className="badge">Atlandı</span>}
+            <span className="stop-time"><Icon size={14} /> {formatTime(stop.plannedStart)} – {formatTime(stop.plannedEnd)} · {stop.typeLabel.toLocaleUpperCase(locale())}</span>
+            {isNext && <span className="badge badge-brand">{t('Sıradaki', 'Next')}</span>}
+            {stop.status === 'VISITED' && <span className="badge badge-success">{t('Gidildi', 'Visited')}</span>}
+            {stop.status === 'SKIPPED' && <span className="badge">{t('Atlandı', 'Skipped')}</span>}
           </div>
           <Link to={`/places/${stop.place.id}`} className="stop-title">{stop.place.name}</Link>
           <div className="meta">
             {stop.place.rating != null && <span>★ {stop.place.rating.toFixed(1)}</span>}
             <span>{formatCost(stop.place.estimatedCost)}</span>
             {stop.place.neighborhood && <span>{stop.place.neighborhood}</span>}
-            {stop.place.indoor && <span>Kapalı alan</span>}
+            {stop.place.indoor && <span>{t('Kapalı alan', 'Indoor')}</span>}
           </div>
           <details>
-            <summary>Neden burası? <ChevronDown size={14} /></summary>
+            <summary>{t('Neden burası?', 'Why here?')} <ChevronDown size={14} /></summary>
             <ul className="reasons">{stop.reasons.map(r => <li key={r}><Check size={14} />{r}</li>)}</ul>
           </details>
           {editable && (
             <div className="stop-actions">
-              <button className="btn btn-sm btn-tonal grow" disabled={busy} onClick={onVisited}><Check size={16} /> Gittim</button>
-              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={onMore} aria-label="Diğer seçenekler"><Ellipsis size={18} /> Seçenekler</button>
+              <button className="btn btn-sm btn-tonal grow" disabled={busy} onClick={onVisited}><Check size={16} /> {t('Gittim', 'Been there')}</button>
+              <button className="btn btn-sm btn-secondary" disabled={busy} onClick={onMore} aria-label={t('Diğer seçenekler', 'More options')}><Ellipsis size={18} /> {t('Seçenekler', 'Options')}</button>
             </div>
           )}
         </div>
@@ -256,10 +259,11 @@ function StopItem({ stop, index, isNext, editable, busy, onVisited, onMore }: {
 }
 
 function AddSheet({ busy, onPick }: { busy: boolean; onPick: (change: Change) => void }) {
+  const t = useT()
   return (
     <div className="stack" style={{ gap: 20 }}>
       <div className="field">
-        <span className="field-label">Durak ekle</span>
+        <span className="field-label">{t('Durak ekle', 'Add a stop')}</span>
         <div className="option-grid">
           {(Object.keys(STOP_TYPE_LABELS) as StopType[]).map(s => {
             const Icon = STOP_ICON[s]
@@ -272,7 +276,7 @@ function AddSheet({ busy, onPick }: { busy: boolean; onPick: (change: Change) =>
         </div>
       </div>
       <div className="field">
-        <span className="field-label">Daha fazlası olsun</span>
+        <span className="field-label">{t('Daha fazlası olsun', 'More of this')}</span>
         <div className="chips">
           {Object.entries(INTEREST_LABELS).map(([key, label]) => (
             <button key={key} className="chip" disabled={busy} onClick={() => onPick({ type: 'ADD_INTEREST', interest: key })}>
@@ -281,7 +285,7 @@ function AddSheet({ busy, onPick }: { busy: boolean; onPick: (change: Change) =>
           ))}
         </div>
       </div>
-      <p className="t-caption">Değişiklikler bulunduğun konumdan itibaren planlanır.</p>
+      <p className="t-caption">{t('Değişiklikler bulunduğun konumdan itibaren planlanır.', 'Changes are planned from where you are now.')}</p>
     </div>
   )
 }

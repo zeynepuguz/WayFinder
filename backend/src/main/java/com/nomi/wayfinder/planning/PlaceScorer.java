@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.planning;
 
 import com.nomi.wayfinder.entity.Place;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.service.Interests;
 import org.springframework.stereotype.Component;
 
@@ -29,12 +30,18 @@ public class PlaceScorer {
 
         // 2) Distance: closer is better, relative to how far the user is willing to walk
         score -= (c.distanceMeters() / c.maxLegMeters()) * 25;
-        reasons.add(String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)",
-                c.firstLeg() ? "Başlangıç noktana" : "Önceki durağa",
-                Math.round(c.distanceMeters()), c.walkingMinutes()));
+        if (Texts.english()) {
+            reasons.add(String.format(Locale.ROOT, "%d m from %s (~%d min walk)",
+                    Math.round(c.distanceMeters()),
+                    c.firstLeg() ? "your starting point" : "the previous stop", c.walkingMinutes()));
+        } else {
+            reasons.add(String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)",
+                    c.firstLeg() ? "Başlangıç noktana" : "Önceki durağa",
+                    Math.round(c.distanceMeters()), c.walkingMinutes()));
+        }
 
         if (place.getRating() != null) {
-            reasons.add(String.format(Locale.ROOT, "Puanı %.1f", place.getRating()));
+            reasons.add(String.format(Locale.ROOT, Texts.t("Puanı %.1f", "Rated %.1f"), place.getRating()));
         }
 
         // 3) Weather at the time of the visit
@@ -50,18 +57,19 @@ public class PlaceScorer {
                 score -= 15;
             } else if (isEvening(c.arrival()) && (place.hasTag("sea") || place.hasTag("view"))) {
                 score += 10;
-                reasons.add("Akşam serinliğinde deniz/manzara keyfi");
+                reasons.add(Texts.t("Akşam serinliğinde deniz/manzara keyfi", "Sea and views in the cool of the evening"));
             }
         } else if (weather.badForOutdoor()) {
             score += 10;
-            reasons.add("Hava " + weather.reasonLabel() + " olduğu için kapalı mekan seçildi");
+            reasons.add(Texts.t("Hava " + weather.reasonLabel() + " olduğu için kapalı mekan seçildi",
+                    "Indoor place chosen because the weather is " + weather.reasonLabel()));
         }
 
         // 4) Interests (matched against place tags)
         List<String> matches = c.interests().stream().filter(place::hasTag).toList();
         if (!matches.isEmpty()) {
             score += 12 * Math.min(matches.size(), 2);
-            reasons.add("İlgi alanına uygun: " + String.join(", ", matches.stream().map(Interests::label).toList()));
+            reasons.add(Texts.t("İlgi alanına uygun: ", "Matches your interests: ") + String.join(", ", matches.stream().map(Interests::label).toList()));
         }
 
         // 5) Budget: reward places that leave room for the rest of the day
@@ -75,14 +83,14 @@ public class PlaceScorer {
                 score += Math.max(-20, Math.min(10, 10 * (1 - ratio)));
             }
         }
-        reasons.add(cost == 0 ? "Ücretsiz" :
-                String.format(Locale.ROOT, "Kişi başı ~%d TL", place.getEstimatedCost()));
+        reasons.add(cost == 0 ? Texts.t("Ücretsiz", "Free") :
+                String.format(Locale.ROOT, Texts.t("Kişi başı ~%d TL", "~%d TL per person"), place.getEstimatedCost()));
 
         // 6) Unknown opening hours are a small risk
         if (c.openStatus() == null) {
             score -= 3;
         } else {
-            reasons.add("Bu saatte açık");
+            reasons.add(Texts.t("Bu saatte açık", "Open at this time"));
         }
 
         return new ScoredPlace(place, score, reasons);

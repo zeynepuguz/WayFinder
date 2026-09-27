@@ -8,23 +8,39 @@ import { useAuth } from '../context/AuthContext'
 import { isNativeApp, purchase, PurchaseCancelled, restorePurchases, storePrices } from '../lib/billing'
 import { formatDateTime } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
+import { locale, useLang, useT } from '../lib/i18n'
 
-const PERKS = [
-  { icon: Sparkles, text: 'Sınırsız AI asistan: “2 kişiyiz, 700 TL’miz var…” de, gerisini Nomi planlasın' },
-  { icon: Route, text: 'Bütçene, zamanına ve yürüme isteğine göre günlük rotalar' },
-  { icon: CloudRain, text: 'Hava, yorgunluk ve değişikliklere göre anlık yeniden planlama' },
-  { icon: MessageCircle, text: 'Rotalarını ve mekanları kaydet, istediğin zaman aç' },
+type Translate = (turkish: string, english: string) => string
+
+const perks = (t: Translate) => [
+  { icon: Sparkles, text: t('Sınırsız AI asistan: “2 kişiyiz, 700 TL’miz var…” de, gerisini Nomi planlasın', 'Unlimited AI assistant: say “We’re 2 people with 700 TL…” and Nomi plans the rest') },
+  { icon: Route, text: t('Bütçene, zamanına ve yürüme isteğine göre günlük rotalar', 'Day routes that fit your budget, time and how much you like to walk') },
+  { icon: CloudRain, text: t('Hava, yorgunluk ve değişikliklere göre anlık yeniden planlama', 'Instant re-planning for weather, tiredness and change of plans') },
+  { icon: MessageCircle, text: t('Rotalarını ve mekanları kaydet, istediğin zaman aç', 'Save your routes and places, open them anytime') },
 ]
 
-const PLAN_FLAGS: Partial<Record<AccessPlan, { label: string; tone: string }>> = {
-  WEEKLY: { label: 'Popüler', tone: 'badge-brand' },
-  YEARLY: { label: 'En avantajlı', tone: 'badge-premium' },
+// Store listing of the Android app; the website links to it instead of selling Premium itself
+const PLAY_STORE_URL = import.meta.env.VITE_PLAY_STORE_URL as string | undefined
+
+const planFlags = (t: Translate): Partial<Record<AccessPlan, { label: string; tone: string }>> => ({
+  WEEKLY: { label: t('Popüler', 'Popular'), tone: 'badge-brand' },
+  YEARLY: { label: t('En avantajlı', 'Best value'), tone: 'badge-premium' },
+})
+
+// Plan names come from the backend in Turkish; English visitors see these instead
+const PLAN_LABELS_EN: Record<AccessPlan, string> = {
+  DAILY: 'Daily',
+  WEEKLY: 'Weekly',
+  MONTHLY: 'Monthly',
+  YEARLY: 'Yearly',
 }
 
 export function PremiumPage() {
   const { user, hasAccess } = useAuth()
   const navigate = useNavigate()
   const toast = useToast()
+  const t = useT()
+  const { lang } = useLang()
   const [params] = useSearchParams()
   const next = params.get('next')
 
@@ -40,7 +56,8 @@ export function PremiumPage() {
   }, [data])
 
   const plan = data?.plans.find(p => p.plan === selected)
-  const priceText = (p: Plan) => prices[p.productId] ?? `${p.priceTry.toLocaleString('tr-TR')} TL`
+  const priceText = (p: Plan) => prices[p.productId] ?? `${p.priceTry.toLocaleString(locale())} TL`
+  const planLabel = (p: Plan) => (lang === 'en' ? PLAN_LABELS_EN[p.plan] ?? p.label : p.label)
   const canBuy = isNativeApp() || data?.devMode
   // Owner/admin accounts never pay, so they must never reach the purchase flow
   const unlimited = Boolean(user && (user.role === 'ADMIN' || user.access.free))
@@ -55,11 +72,14 @@ export function PremiumPage() {
     setPurchaseError(null)
     try {
       const status = await purchase(plan, user.id, Boolean(data?.devMode))
-      toast(`Premium aktif! ${status.expiresAt ? formatDateTime(status.expiresAt) + ' tarihine kadar' : ''}`)
+      toast(t(
+        `Premium aktif! ${status.expiresAt ? formatDateTime(status.expiresAt) + ' tarihine kadar' : ''}`,
+        `Premium is active! ${status.expiresAt ? 'Until ' + formatDateTime(status.expiresAt) : ''}`,
+      ))
       navigate(next ?? '/', { replace: true })
     } catch (e) {
       if (!(e instanceof PurchaseCancelled)) {
-        setPurchaseError(e instanceof Error ? e.message : 'Satın alma tamamlanamadı')
+        setPurchaseError(e instanceof Error ? e.message : t('Satın alma tamamlanamadı', 'Purchase couldn’t be completed'))
       }
     } finally {
       setBusy(false)
@@ -70,9 +90,9 @@ export function PremiumPage() {
     setBusy(true)
     try {
       await restorePurchases()
-      toast('Satın alımlar kontrol edildi')
+      toast(t('Satın alımlar kontrol edildi', 'Purchases checked'))
     } catch (e) {
-      setPurchaseError(e instanceof Error ? e.message : 'Satın alımlar kontrol edilemedi')
+      setPurchaseError(e instanceof Error ? e.message : t('Satın alımlar kontrol edilemedi', 'Couldn’t check purchases'))
     } finally {
       setBusy(false)
     }
@@ -83,15 +103,15 @@ export function PremiumPage() {
       <section className="paywall-hero">
         <div className="row-between">
           <span />
-          <button className="icon-btn icon-btn-glass" aria-label="Kapat" onClick={() => navigate(-1)}><X size={20} /></button>
+          <button className="icon-btn icon-btn-glass" aria-label={t('Kapat', 'Close')} onClick={() => navigate(-1)}><X size={20} /></button>
         </div>
         <span className="crown"><Crown size={30} /></span>
         <div className="stack-sm">
           <h1 className="t-display" style={{ color: '#fff' }}>Nomi Premium</h1>
-          <p style={{ color: 'rgb(255 255 255 / 75%)' }}>Şehirde gününü planlayan kişisel asistanın. Ödediğin süre kadar kullan; abonelik yok, sürpriz ödeme yok.</p>
+          <p style={{ color: 'rgb(255 255 255 / 75%)' }}>{t('Şehirde gününü planlayan kişisel asistanın. Ödediğin süre kadar kullan; abonelik yok, sürpriz ödeme yok.', 'Your personal assistant that plans your day in the city. Use it for as long as you pay; no subscription, no surprise charges.')}</p>
         </div>
         <ul className="perks">
-          {PERKS.map(({ icon: Icon, text }) => (
+          {perks(t).map(({ icon: Icon, text }) => (
             <li key={text}><span className="perk-icon"><Icon size={17} /></span>{text}</li>
           ))}
         </ul>
@@ -99,24 +119,24 @@ export function PremiumPage() {
 
       {unlimited && (
         <Alert tone="success" icon={ShieldCheck}>
-          <strong>Hesabında süresiz ücretsiz erişim var</strong>
-          <p>Paket satın alman gerekmiyor, tüm özellikleri kullanabilirsin.</p>
+          <strong>{t('Hesabında süresiz ücretsiz erişim var', 'Your account has unlimited free access')}</strong>
+          <p>{t('Paket satın alman gerekmiyor, tüm özellikleri kullanabilirsin.', 'No need to buy a pass; you can use every feature.')}</p>
         </Alert>
       )}
 
       {!unlimited && hasAccess && user?.access.expiresAt && (
         <Alert tone="success" icon={ShieldCheck}>
-          <strong>Premium aktif · {formatDateTime(user.access.expiresAt)} tarihine kadar</strong>
-          <p>Şimdi alacağın paket mevcut sürenin sonuna eklenir.</p>
+          <strong>{t(`Premium aktif · ${formatDateTime(user.access.expiresAt)} tarihine kadar`, `Premium active · until ${formatDateTime(user.access.expiresAt)}`)}</strong>
+          <p>{t('Şimdi alacağın paket mevcut sürenin sonuna eklenir.', 'A pass you buy now is added to the end of your current one.')}</p>
         </Alert>
       )}
 
       {error && <Alert tone="danger"><span>{error}</span></Alert>}
 
-      <section className="plans" aria-label="Paketler" role="radiogroup">
+      <section className="plans" aria-label={t('Paketler', 'Passes')} role="radiogroup">
         {loading && <Spinner />}
         {data?.plans.map(p => {
-          const flag = PLAN_FLAGS[p.plan]
+          const flag = planFlags(t)[p.plan]
           const perDay = p.priceTry / p.days
           return (
             <button key={p.plan} role="radio" aria-checked={selected === p.plan}
@@ -124,13 +144,16 @@ export function PremiumPage() {
               {flag && <span className={`badge ${flag.tone} plan-flag`}>{flag.label}</span>}
               <span className="plan-radio" />
               <span className="grow">
-                <span className="t-headline" style={{ display: 'block' }}>{p.label}</span>
-                <span className="t-caption">{p.days === 1 ? '24 saat erişim' : `${p.days} gün erişim`}</span>
+                <span className="t-headline" style={{ display: 'block' }}>{planLabel(p)}</span>
+                <span className="t-caption">{p.days === 1 ? t('24 saat erişim', '24-hour access') : t(`${p.days} gün erişim`, `${p.days}-day access`)}</span>
               </span>
               <span className="plan-price">
                 <strong>{priceText(p)}</strong>
                 <span className="t-caption">
-                  {p.days === 1 ? 'tek seferlik' : `günlük ~${perDay.toLocaleString('tr-TR', { maximumFractionDigits: 1 })} TL`}
+                  {p.days === 1 ? t('tek seferlik', 'one-time') : t(
+                    `günlük ~${perDay.toLocaleString(locale(), { maximumFractionDigits: 1 })} TL`,
+                    `~${perDay.toLocaleString(locale(), { maximumFractionDigits: 1 })} TL a day`,
+                  )}
                 </span>
               </span>
             </button>
@@ -141,26 +164,35 @@ export function PremiumPage() {
       {purchaseError && <Alert tone="danger"><span>{purchaseError}</span></Alert>}
 
       <p className="fine-print">
-        Tek seferlik ödemedir ve otomatik olarak yenilenmez. Süre bittiğinde dilersen yeni bir paket alabilirsin.
-        Ödeme Google Play hesabın üzerinden alınır.
+        {t('Tek seferlik ödemedir ve otomatik olarak yenilenmez. Süre bittiğinde dilersen yeni bir paket alabilirsin.', 'This is a one-time payment and does not renew automatically. When it ends, you can buy a new pass if you like.')}
+        {canBuy
+          ? t(' Ödeme Google Play hesabın üzerinden alınır.', ' Payment is taken through your Google Play account.')
+          : t(' Premium yalnızca Nomi Android uygulamasında Google Play ile satılır; aldığın paket bu web sitesinde de geçerlidir.', ' Premium is sold only in the Nomi Android app via Google Play; your pass also works on this website.')}
       </p>
       {isNativeApp() && user && (
         <button className="btn btn-ghost btn-sm" style={{ alignSelf: 'center' }} onClick={restore} disabled={busy}>
-          Satın alımları geri yükle
+          {t('Satın alımları geri yükle', 'Restore purchases')}
         </button>
       )}
 
       <div className="sticky-cta" style={{ flexDirection: 'column', gap: 8 }}>
         {unlimited ? (
           <button className="btn btn-primary btn-lg btn-block" onClick={() => navigate(next ?? '/', { replace: true })}>
-            Devam et
+            {t('Devam et', 'Continue')}
           </button>
-        ) : !canBuy && user ? (
-          <Alert tone="info"><span>Satın alma Nomi Android uygulamasında yapılabilir.</span></Alert>
+        ) : !canBuy ? (
+          // Website: a showcase, Premium is sold only in the Android app
+          PLAY_STORE_URL ? (
+            <a className="btn btn-premium btn-lg btn-block" href={PLAY_STORE_URL} target="_blank" rel="noreferrer">
+              {t('Google Play’den indir', 'Get it on Google Play')}
+            </a>
+          ) : (
+            <Alert tone="info"><span>{t('Nomi Android uygulaması yakında Google Play’de. Premium’u oradan alabileceksin.', 'The Nomi Android app is coming soon to Google Play. You’ll be able to get Premium there.')}</span></Alert>
+          )
         ) : (
           <button className="btn btn-premium btn-lg btn-block" disabled={busy || !plan} onClick={buy}>
-            {busy ? <Spinner /> : !user ? 'Hesap oluştur ve devam et'
-              : plan ? `${plan.label} erişimi al · ${priceText(plan)}` : 'Paket seç'}
+            {busy ? <Spinner /> : !user ? t('Hesap oluştur ve devam et', 'Create an account and continue')
+              : plan ? t(`${plan.label} erişimi al · ${priceText(plan)}`, `Get ${planLabel(plan)} access · ${priceText(plan)}`) : t('Paket seç', 'Choose a pass')}
           </button>
         )}
       </div>

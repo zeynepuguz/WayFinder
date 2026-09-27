@@ -15,6 +15,9 @@ public class PlaceCreateRequest {
 
     private String description;
 
+    // Optional English description (shown to English requests)
+    private String descriptionEn;
+
     private String address;
 
     private String neighborhood;
@@ -71,6 +74,14 @@ public class PlaceCreateRequest {
 
     public void setDescription(String description) {
         this.description = description;
+    }
+
+    public String getDescriptionEn() {
+        return descriptionEn;
+    }
+
+    public void setDescriptionEn(String descriptionEn) {
+        this.descriptionEn = descriptionEn;
     }
 
     public String getAddress() {

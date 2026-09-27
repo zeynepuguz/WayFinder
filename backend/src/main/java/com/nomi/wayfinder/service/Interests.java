@@ -1,5 +1,7 @@
 package com.nomi.wayfinder.service;
 
+import com.nomi.wayfinder.i18n.Texts;
+
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
@@ -9,7 +11,7 @@ import java.util.Objects;
 // Interests are matched against place tags, so they are stored the same way: lowercase, trimmed, unique
 public final class Interests {
 
-    // Tags are English keys in the database; users see Turkish labels
+    // Tags are English keys in the database; users see labels in their language
     private static final Map<String, String> LABELS = Map.ofEntries(
             Map.entry("history", "tarih"),
             Map.entry("museum", "müze"),
@@ -33,6 +35,29 @@ public final class Interests {
             Map.entry("sports", "spor")
     );
 
+    private static final Map<String, String> LABELS_EN = Map.ofEntries(
+            Map.entry("history", "history"),
+            Map.entry("museum", "museums"),
+            Map.entry("sea", "sea"),
+            Map.entry("nature", "nature"),
+            Map.entry("art", "art"),
+            Map.entry("street-art", "street art"),
+            Map.entry("view", "views"),
+            Map.entry("local", "local"),
+            Map.entry("books", "books"),
+            Map.entry("architecture", "architecture"),
+            Map.entry("seafood", "seafood"),
+            Map.entry("budget", "budget-friendly"),
+            Map.entry("traditional", "traditional"),
+            Map.entry("coffee", "coffee"),
+            Map.entry("dessert", "dessert"),
+            Map.entry("breakfast", "breakfast"),
+            Map.entry("walk", "walking"),
+            Map.entry("shopping", "shopping"),
+            Map.entry("music", "music"),
+            Map.entry("sports", "sports")
+    );
+
     private Interests() {
     }
 
@@ -49,6 +74,6 @@ public final class Interests {
     }
 
     public static String label(String tag) {
-        return LABELS.getOrDefault(tag, tag);
+        return (Texts.english() ? LABELS_EN : LABELS).getOrDefault(tag, tag);
     }
 }

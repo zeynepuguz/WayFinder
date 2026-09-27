@@ -2,14 +2,16 @@ import { ChevronRight, Route as RouteIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import type { RouteSummary } from '../api/types'
 import { formatDate } from '../lib/format'
+import { locale, useT } from '../lib/i18n'
 
-const STATUS: Record<RouteSummary['status'], { label: string; tone: string }> = {
-  DRAFT: { label: 'Planlandı', tone: 'badge-sea' },
-  ACTIVE: { label: 'Devam ediyor', tone: 'badge-success' },
-  COMPLETED: { label: 'Tamamlandı', tone: '' },
+const STATUS: Record<RouteSummary['status'], { label: [string, string]; tone: string }> = {
+  DRAFT: { label: ['Planlandı', 'Planned'], tone: 'badge-sea' },
+  ACTIVE: { label: ['Devam ediyor', 'In progress'], tone: 'badge-success' },
+  COMPLETED: { label: ['Tamamlandı', 'Completed'], tone: '' },
 }
 
 export function RouteCard({ route }: { route: RouteSummary }) {
+  const t = useT()
   const status = STATUS[route.status]
   return (
     <Link to={`/routes/${route.id}`} className="card route-card card-press">
@@ -20,10 +22,10 @@ export function RouteCard({ route }: { route: RouteSummary }) {
         </div>
         <div className="meta">
           <span>{formatDate(route.date)}</span>
-          <span>{route.stopCount} durak</span>
-          <span>~{route.totalEstimatedCost.toLocaleString('tr-TR')} TL</span>
+          <span>{route.stopCount} {route.stopCount === 1 ? t('durak', 'stop') : t('durak', 'stops')}</span>
+          <span>~{route.totalEstimatedCost.toLocaleString(locale())} TL</span>
         </div>
-        <div><span className={`badge ${status.tone}`}>{status.label}</span></div>
+        <div><span className={`badge ${status.tone}`}>{t(status.label[0], status.label[1])}</span></div>
       </div>
       <ChevronRight size={20} className="muted" />
     </Link>

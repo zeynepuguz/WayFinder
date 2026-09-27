@@ -3,6 +3,7 @@ import { Link } from 'react-router'
 import type { Place } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
 import { CATEGORY_LABELS, formatCost, formatDistance } from '../lib/format'
+import { useT } from '../lib/i18n'
 import { useGate } from './gate'
 import { CategoryTile, Rating } from './visuals'
 
@@ -10,13 +11,14 @@ function SaveButton({ place, glass }: { place: Place; glass?: boolean }) {
   const saved = useSavedPlaces()
   const gate = useGate()
   const isSaved = saved.isSaved(place.id)
+  const t = useT()
 
   return (
     <button
       className={`icon-btn save ${glass ? 'icon-btn-glass' : 'icon-btn-plain'}`}
       style={{ width: 38, height: 38 }}
       aria-pressed={isSaved}
-      aria-label={isSaved ? 'Kaydedilenlerden çıkar' : 'Kaydet'}
+      aria-label={isSaved ? t('Kaydedilenlerden çıkar', 'Remove from saved') : t('Kaydet', 'Save')}
       onClick={e => {
         e.preventDefault()
         if (gate()) void saved.toggle(place)
@@ -28,12 +30,14 @@ function SaveButton({ place, glass }: { place: Place; glass?: boolean }) {
 }
 
 export function OpenBadge({ openNow }: { openNow: boolean | null }) {
+  const t = useT()
   if (openNow == null) return null
-  return <span className={`badge ${openNow ? 'badge-success' : 'badge-danger'}`}>{openNow ? 'Açık' : 'Kapalı'}</span>
+  return <span className={`badge ${openNow ? 'badge-success' : 'badge-danger'}`}>{openNow ? t('Açık', 'Open') : t('Kapalı', 'Closed')}</span>
 }
 
 // Compact row for lists
 export function PlaceRow({ place, reasons }: { place: Place; reasons?: string[] }) {
+  const t = useT()
   return (
     <div className="card" style={{ padding: 0 }}>
       <Link to={`/places/${place.id}`} className="place-row card-press">
@@ -48,7 +52,7 @@ export function PlaceRow({ place, reasons }: { place: Place; reasons?: string[] 
           <div className="row" style={{ gap: 6 }}>
             <OpenBadge openNow={place.openNow} />
             <span className="badge">{formatCost(place.estimatedCost)}</span>
-            {place.indoor && <span className="badge badge-sea">Kapalı alan</span>}
+            {place.indoor && <span className="badge badge-sea">{t('Kapalı alan', 'Indoor')}</span>}
           </div>
         </div>
         <SaveButton place={place} />

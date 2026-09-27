@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.planning;
 
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.weather.HourlyWeather;
 import com.nomi.wayfinder.weather.WeatherForecast;
 
@@ -36,20 +37,20 @@ public record WeatherContext(boolean wet, boolean hot, boolean windy, boolean co
         return wet || hot || windy || cold;
     }
 
-    // Short Turkish reason used in stop explanations
+    // Short reason used in stop explanations, in the request's language
     public String reasonLabel() {
         if (wet) {
-            return "yağışlı";
+            return Texts.t("yağışlı", "rainy");
         }
         if (hot) {
-            return "çok sıcak";
+            return Texts.t("çok sıcak", "very hot");
         }
         if (windy) {
-            return "rüzgarlı";
+            return Texts.t("rüzgarlı", "windy");
         }
         if (cold) {
-            return "soğuk";
+            return Texts.t("soğuk", "cold");
         }
-        return "uygun";
+        return Texts.t("uygun", "fine");
     }
 }

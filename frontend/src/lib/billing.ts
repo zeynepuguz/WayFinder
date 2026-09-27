@@ -10,6 +10,7 @@
 import { Capacitor } from '@capacitor/core'
 import { api } from '../api'
 import type { AccessStatus, Plan } from '../api/types'
+import { tr } from './i18n'
 
 export function isNativeApp(): boolean {
   return Capacitor.isNativePlatform()
@@ -69,7 +70,10 @@ export function setAccessChangedHandler(handler: (status: AccessStatus) => void)
 // Without Google Play services (no Play Store, no Google account, some brands) the store never
 // finishes starting; give up after this so the user gets an answer instead of a spinner
 const INIT_TIMEOUT_MS = 15_000
-const STORE_UNAVAILABLE = 'Google Play ödeme hizmetine ulaşılamadı. Cihazında Play Store yüklü ve Google hesabın açık olmalı; sonra tekrar dene.'
+const storeUnavailable = () => tr(
+  'Google Play ödeme hizmetine ulaşılamadı. Cihazında Play Store yüklü ve Google hesabın açık olmalı; sonra tekrar dene.',
+  'Couldn’t reach Google Play billing. Make sure the Play Store is installed and you’re signed in to a Google account, then try again.',
+)
 let registered = false
 
 function nativeStore(plans: Plan[]): Promise<CdvStore> {
@@ -79,7 +83,7 @@ function nativeStore(plans: Plan[]): Promise<CdvStore> {
     const start = async () => {
       const cdv = window.CdvPurchase
       if (!cdv) {
-        reject(new Error('Ödeme altyapısı yüklenemedi'))
+        reject(new Error(tr('Ödeme altyapısı yüklenemedi', 'Couldn’t load the payment service')))
         return
       }
       const { store, Platform } = cdv
@@ -98,7 +102,7 @@ function nativeStore(plans: Plan[]): Promise<CdvStore> {
 
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(STORE_UNAVAILABLE)), INIT_TIMEOUT_MS)
+    timer = setTimeout(() => reject(new Error(storeUnavailable())), INIT_TIMEOUT_MS)
   })
   initialized = Promise.race([starting, timeout]).finally(() => clearTimeout(timer))
   // A failed start can be retried with the next purchase attempt
@@ -127,7 +131,7 @@ function registerProducts(cdv: CdvPurchaseGlobal, plans: Plan[]) {
       onAccessChanged(status)
       waiter?.resolve(status)
     } catch (e) {
-      waiter?.reject(e instanceof Error ? e : new Error('Satın alma doğrulanamadı'))
+      waiter?.reject(e instanceof Error ? e : new Error(tr('Satın alma doğrulanamadı', 'Couldn’t verify the purchase')))
     } finally {
       waiting.delete(productId)
     }
@@ -152,7 +156,7 @@ export class PurchaseCancelled extends Error {}
 
 export async function purchase(plan: Plan, userId: number, devMode: boolean): Promise<AccessStatus> {
   if (!isNativeApp()) {
-    if (!devMode) throw new Error('Satın alma yalnızca Nomi Android uygulamasında yapılabilir.')
+    if (!devMode) throw new Error(tr('Satın alma yalnızca Nomi Android uygulamasında yapılabilir.', 'Purchases are only available in the Nomi Android app.'))
     const status = await api.devPurchase(plan.plan)
     onAccessChanged(status)
     return status
@@ -162,7 +166,7 @@ export async function purchase(plan: Plan, userId: number, devMode: boolean): Pr
   const store = await nativeStore(plans)
   const cdv = window.CdvPurchase!
   const offer = store.get(plan.productId, cdv.Platform.GOOGLE_PLAY)?.getOffer()
-  if (!offer) throw new Error('Bu paket şu an satın alınamıyor.')
+  if (!offer) throw new Error(tr('Bu paket şu an satın alınamıyor.', 'This pass can’t be bought right now.'))
 
   return new Promise<AccessStatus>((resolve, reject) => {
     waiting.set(plan.productId, { resolve, reject })

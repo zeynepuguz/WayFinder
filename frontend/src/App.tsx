@@ -6,6 +6,8 @@ import { Spinner, ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { LocationProvider } from './context/LocationContext'
 import { SavedPlacesProvider } from './context/SavedPlacesContext'
+import { isNativeApp } from './lib/billing'
+import { LanguageProvider } from './lib/i18n'
 import { setupNativeShell } from './lib/native'
 import { AssistantPage } from './pages/AssistantPage'
 import { AuthPage } from './pages/AuthPage'
@@ -22,7 +24,8 @@ import { SavedPage } from './pages/SavedPage'
 
 // First launch shows the intro; checked on every render (the flag changes when the intro ends)
 function HomeEntry() {
-  return hasOnboarded() ? <HomePage /> : <Navigate to="/welcome" replace />
+  // The onboarding slides are for the app; on the web (and for search engines) go straight home
+  return hasOnboarded() || !isNativeApp() ? <HomePage /> : <Navigate to="/welcome" replace />
 }
 
 // Screens without the tab bar
@@ -78,6 +81,7 @@ function AppRoutes() {
         <Route element={<AppLayout />}>
           <Route index element={<HomeEntry />} />
           <Route path="explore" element={<ExplorePage />} />
+          <Route path="kadikoy/:slug" element={<ExplorePage />} />
           <Route path="assistant" element={<AssistantPage />} />
           <Route path="routes" element={<RoutesPage />} />
           <Route path="routes/:id" element={<RouteDetailPage />} />
@@ -91,16 +95,18 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <ToastProvider>
-        <AuthProvider>
-          <LocationProvider>
-            <SavedPlacesProvider>
-              <AppRoutes />
-            </SavedPlacesProvider>
-          </LocationProvider>
-        </AuthProvider>
-      </ToastProvider>
-    </BrowserRouter>
+    <LanguageProvider>
+      <BrowserRouter>
+        <ToastProvider>
+          <AuthProvider>
+            <LocationProvider>
+              <SavedPlacesProvider>
+                <AppRoutes />
+              </SavedPlacesProvider>
+            </LocationProvider>
+          </AuthProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </LanguageProvider>
   )
 }

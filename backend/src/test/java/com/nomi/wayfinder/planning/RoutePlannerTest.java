@@ -9,8 +9,10 @@ import com.nomi.wayfinder.repository.PlaceRepository;
 import com.nomi.wayfinder.weather.HourlyWeather;
 import com.nomi.wayfinder.weather.WeatherForecast;
 import com.nomi.wayfinder.weather.WeatherService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -153,6 +155,48 @@ class RoutePlannerTest {
         assertThat(result.stops()).extracting(PlannedStop::type).containsExactly(StopType.BREAKFAST);
         assertThat(result.notes()).anyMatch(n -> n.contains("Akşam yemeği gün sonuna sığmadığı"));
         assertThat(result.stops().getFirst().start()).isAfterOrEqualTo(LocalTime.of(9, 0));
+    }
+
+    @AfterEach
+    void resetLocale() {
+        LocaleContextHolder.resetLocaleContext();
+    }
+
+    @Test
+    void writesNotesAndReasonsInEnglishForEnglishRequests() {
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        add(place(1, "Sahil", PlaceCategory.PARK, false, 4.8, 0), 200);
+        add(place(2, "Kahvaltıcı", PlaceCategory.BREAKFAST, true, 4.5, 100), 100);
+        add(place(3, "Restoran", PlaceCategory.RESTAURANT, true, 4.5, 0), 200);
+
+        PlanResult rainy = planner.plan(request(List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))),
+                null, true));
+        assertThat(rainy.notes()).contains(
+                "Sahil is outdoors and rain is expected at that time; I could not find a suitable indoor sightseeing place nearby.");
+        assertThat(rainy.weatherAdvice()).isEqualTo("I prioritized indoor places because of the rain.");
+        assertThat(rainy.stops().getFirst().reasons())
+                .contains("200 m from your starting point (~4 min walk)", "Rated 4.8", "Free");
+
+        PlanResult late = planner.plan(new PlanningRequest(40.99, 29.02, DAY, LocalTime.of(9, 0),
+                LocalTime.of(12, 0), 1, 50, WalkingTolerance.MEDIUM, List.of(),
+                List.of(PlanningSlot.of(StopType.BREAKFAST), PlanningSlot.of(StopType.DINNER)), Set.of(), false));
+        assertThat(late.notes()).contains(
+                "Weather information was not available; the plan was made without taking the weather into account.",
+                "Dinner was not added because it did not fit before the end of the day.",
+                "Estimated spending is about 50 TL over the budget.");
+        assertThat(late.stops().getFirst().reasons()).contains("~100 TL per person");
+    }
+
+    @Test
+    void staysTurkishWithoutAnEnglishRequest() {
+        add(place(2, "Kahvaltıcı", PlaceCategory.BREAKFAST, true, 4.5, 100), 100);
+
+        PlanResult result = planner.plan(request(List.of(PlanningSlot.of(StopType.BREAKFAST)), null, false));
+
+        assertThat(result.notes()).containsExactly(
+                "Hava durumu bilgisi alınamadı; plan hava durumu dikkate alınmadan oluşturuldu.");
+        assertThat(result.stops().getFirst().reasons())
+                .contains("Başlangıç noktana 100 m (~2 dk yürüme)", "Puanı 4.5", "Kişi başı ~100 TL");
     }
 
     // ---------- helpers ----------

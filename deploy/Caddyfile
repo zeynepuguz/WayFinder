@@ -3,16 +3,30 @@
 {$DOMAIN} {
 	encode gzip
 
-	# Only the public API; actuator stays internal except health
+	# API (and health only from actuator)
 	@api path /api/* /actuator/health
 	handle @api {
 		reverse_proxy backend:8080
 	}
 
-	# Privacy policy and terms for Play Console: https://DOMAIN/gizlilik, https://DOMAIN/kosullar
-	handle {
+	# Legal pages: https://DOMAIN/gizlilik, /kosullar, ...
+	@legal path /gizlilik /kosullar /iletisim /legal.css
+	handle @legal {
 		root * /srv/site
 		try_files {path}.html {path}
 		file_server
 	}
+
+	# Website: prerendered pages (/, /places/1, /kadikoy/kafe), else the plain app shell
+	handle {
+		root * /srv/app
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} {path}/index.html /app.html
+		file_server
+	}
+
+	header Strict-Transport-Security "max-age=31536000"
+	header X-Content-Type-Options nosniff
+	header Referrer-Policy strict-origin-when-cross-origin
 }

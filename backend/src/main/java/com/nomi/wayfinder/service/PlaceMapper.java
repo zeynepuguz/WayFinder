@@ -6,10 +6,12 @@ import com.nomi.wayfinder.dto.PlaceCreateRequest;
 import com.nomi.wayfinder.dto.PlaceResponse;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceOpeningHours;
+import com.nomi.wayfinder.i18n.Texts;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
 import java.time.ZonedDateTime;
+import java.util.Objects;
 
 // Entity <-> DTO conversion in one place, so every endpoint returns places the same way
 @Component
@@ -23,6 +25,12 @@ public class PlaceMapper {
 
     public void apply(PlaceCreateRequest request, Place place) {
         place.setName(request.getName());
+        if (request.getDescriptionEn() != null) {
+            place.setDescriptionEn(request.getDescriptionEn().isBlank() ? null : request.getDescriptionEn());
+        } else if (!Objects.equals(place.getDescription(), request.getDescription())) {
+            // The Turkish text changed without a new translation: drop the outdated English one
+            place.setDescriptionEn(null);
+        }
         place.setDescription(request.getDescription());
         place.setAddress(request.getAddress());
         place.setNeighborhood(request.getNeighborhood());
@@ -57,7 +65,9 @@ public class PlaceMapper {
 
         response.setId(place.getId());
         response.setName(place.getName());
-        response.setDescription(place.getDescription());
+        // Same JSON field in both languages; English falls back to Turkish when there is no translation
+        response.setDescription(Texts.english() && place.getDescriptionEn() != null
+                ? place.getDescriptionEn() : place.getDescription());
         response.setAddress(place.getAddress());
         response.setNeighborhood(place.getNeighborhood());
         response.setLatitude(place.getLatitude());

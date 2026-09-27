@@ -3,6 +3,7 @@ package com.nomi.wayfinder.assistant;
 import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.dto.RouteDtos.StopResponse;
 import com.nomi.wayfinder.entity.StopStatus;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
 import org.springframework.stereotype.Component;
 
@@ -10,41 +11,54 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Writes the assistant's Turkish answers from real results only (route, changes, recommendations).
- * Later the AI service can rephrase these texts, but the facts in them come from here.
+ * Writes the assistant's answers (Turkish, or English for English requests) from real results only
+ * (route, changes, recommendations). Later the AI service can rephrase these texts, but the facts in them come from here.
+ * Stop lines always start with "HH:MM →" in both languages; the app relies on that format.
  */
 @Component
 public class ResponseComposer {
 
     public String planCreated(RouteResponse route) {
         if (route.stops().isEmpty()) {
-            return "Bu koşullarla uygun bir rota oluşturamadım. " + String.join(" ", route.notes());
+            return Texts.t("Bu koşullarla uygun bir rota oluşturamadım. ",
+                    "I could not create a suitable route with these conditions. ") + String.join(" ", route.notes());
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append(route.title()).append(" hazır! ")
-                .append(route.stops().size()).append(" duraklı bir rota oluşturdum:\n");
+        if (Texts.english()) {
+            sb.append(route.title()).append(" is ready! I created a route with ")
+                    .append(route.stops().size()).append(route.stops().size() == 1 ? " stop:\n" : " stops:\n");
+        } else {
+            sb.append(route.title()).append(" hazır! ")
+                    .append(route.stops().size()).append(" duraklı bir rota oluşturdum:\n");
+        }
 
         route.stops().forEach(stop -> sb.append(stopLine(stop)).append('\n'));
 
-        sb.append(String.format(Locale.ROOT, "\nToplam tahmini harcama: ~%d TL (%d kişi) · Toplam yürüme: ~%d dk.",
-                route.totalEstimatedCost(), route.partySize(), route.totalWalkingMinutes()));
+        if (Texts.english()) {
+            sb.append(String.format(Locale.ROOT, "\nEstimated total spend: ~%d TL (%d %s) · Total walking: ~%d min.",
+                    route.totalEstimatedCost(), route.partySize(), route.partySize() == 1 ? "person" : "people",
+                    route.totalWalkingMinutes()));
+        } else {
+            sb.append(String.format(Locale.ROOT, "\nToplam tahmini harcama: ~%d TL (%d kişi) · Toplam yürüme: ~%d dk.",
+                    route.totalEstimatedCost(), route.partySize(), route.totalWalkingMinutes()));
+        }
 
         if (route.budget() != null) {
-            sb.append(String.format(Locale.ROOT, " Bütçen: %d TL.", route.budget()));
+            sb.append(String.format(Locale.ROOT, Texts.t(" Bütçen: %d TL.", " Your budget: %d TL."), route.budget()));
         }
         appendWeatherAndNotes(sb, route);
         return sb.toString().trim();
     }
 
     public String routeChanged(RouteResponse route, List<String> changes) {
-        StringBuilder sb = new StringBuilder("Rotanı güncelledim:\n");
+        StringBuilder sb = new StringBuilder(Texts.t("Rotanı güncelledim:\n", "I updated your route:\n"));
         changes.forEach(c -> sb.append("• ").append(c).append('\n'));
 
         route.stops().stream()
                 .filter(s -> s.status() == StopStatus.PLANNED)
                 .findFirst()
-                .ifPresent(next -> sb.append("\nSıradaki durak: ").append(stopLine(next)));
+                .ifPresent(next -> sb.append(Texts.t("\nSıradaki durak: ", "\nNext stop: ")).append(stopLine(next)));
 
         if (!route.notes().isEmpty()) {
             sb.append("\n\n").append(String.join(" ", route.notes()));
@@ -62,11 +76,15 @@ public class ResponseComposer {
 
     public String recommendations(List<Recommendation> recommendations, String typeLabel) {
         if (recommendations.isEmpty()) {
-            return "Yakınında şu an açık ve uygun bir " + typeLabel.toLowerCase(Locale.forLanguageTag("tr-TR"))
+            return Texts.english()
+                    ? "I could not find a suitable " + typeLabel.toLowerCase(Locale.ROOT) + " place open near you right now."
+                    : "Yakınında şu an açık ve uygun bir " + typeLabel.toLowerCase(Locale.forLanguageTag("tr-TR"))
                     + " mekanı bulamadım.";
         }
 
-        StringBuilder sb = new StringBuilder(typeLabel + " için önerilerim:\n");
+        StringBuilder sb = new StringBuilder(Texts.english()
+                ? "My suggestions for " + typeLabel.toLowerCase(Locale.ROOT) + ":\n"
+                : typeLabel + " için önerilerim:\n");
         for (int i = 0; i < recommendations.size(); i++) {
             Recommendation r = recommendations.get(i);
             sb.append(i + 1).append(". ").append(r.place().getName())
@@ -76,21 +94,32 @@ public class ResponseComposer {
     }
 
     public String noRoute() {
-        return "Şu an aktif bir rotan yok. İstersen hemen bir tane oluşturalım: "
-                + "örneğin \"2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz\" yazabilirsin.";
+        return Texts.t("Şu an aktif bir rotan yok. İstersen hemen bir tane oluşturalım: "
+                        + "örneğin \"2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz\" yazabilirsin.",
+                "You don't have an active route right now. Let's create one: "
+                        + "for example, write \"We are 2 people, our budget is 700 TL, we want breakfast and coffee\".");
     }
 
     public String help() {
-        return "Sana şehirde gün planlama konusunda yardımcı olabilirim. Örneğin:\n"
-                + "• \"Kadıköy'de 500 TL'ye bir gün planla\"\n"
-                + "• \"Yakında kahve öner\"\n"
-                + "• \"Çok yorulduk\" / \"Yağmur başladı\" / \"Burayı çıkar\"\n"
-                + "• \"Biraz daha tarihi yer ekle\"";
+        return Texts.t("Sana şehirde gün planlama konusunda yardımcı olabilirim. Örneğin:\n"
+                        + "• \"Kadıköy'de 500 TL'ye bir gün planla\"\n"
+                        + "• \"Yakında kahve öner\"\n"
+                        + "• \"Çok yorulduk\" / \"Yağmur başladı\" / \"Burayı çıkar\"\n"
+                        + "• \"Biraz daha tarihi yer ekle\"",
+                "I can help you plan your day in the city. For example:\n"
+                        + "• \"Plan a day in Kadıköy for 500 TL\"\n"
+                        + "• \"Recommend coffee nearby\"\n"
+                        + "• \"We're tired\" / \"It started raining\" / \"Remove this place\"\n"
+                        + "• \"Add some more historical places\"");
     }
 
+    // "HH:MM → Type: Place (cost)" in both languages
     private static String stopLine(StopResponse stop) {
         String cost = stop.place().estimatedCost() == null || stop.place().estimatedCost() == 0
-                ? "ücretsiz" : "kişi başı ~" + stop.place().estimatedCost() + " TL";
+                ? Texts.t("ücretsiz", "free")
+                : Texts.english()
+                ? "~" + stop.place().estimatedCost() + " TL per person"
+                : "kişi başı ~" + stop.place().estimatedCost() + " TL";
         return String.format(Locale.ROOT, "%s → %s: %s (%s)",
                 stop.plannedStart(), stop.typeLabel(), stop.place().name(), cost);
     }
@@ -105,6 +134,6 @@ public class ResponseComposer {
     }
 
     private static String statusLabel(StopStatus status) {
-        return status == StopStatus.VISITED ? "gidildi" : "atlandı";
+        return status == StopStatus.VISITED ? Texts.t("gidildi", "visited") : Texts.t("atlandı", "skipped");
     }
 }
