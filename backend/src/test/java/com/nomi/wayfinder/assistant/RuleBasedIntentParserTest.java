@@ -217,4 +217,13 @@ class RuleBasedIntentParserTest {
         assertThat(RuleBasedIntentParser.startTime("saat 10:30'da başlayalım"))
                 .isEqualTo(java.time.LocalTime.of(10, 30));
     }
+
+    @Test
+    void aRouteInAnotherCityIsANewPlan() {
+        AssistantIntent ankara = parser.parse("yarın Ankara'da Kızılay'dan başlayan bir rota", NO_ROUTE);
+        assertThat(ankara.type()).isEqualTo(IntentType.PLAN_ROUTE);
+        assertThat(parser.parse("İzmir'de bir rota istiyorum", NO_ROUTE).type()).isEqualTo(IntentType.PLAN_ROUTE);
+        // Asking for the current route is still SHOW_ROUTE
+        assertThat(parser.parse("rotamı göster", WITH_ROUTE).type()).isEqualTo(IntentType.SHOW_ROUTE);
+    }
 }

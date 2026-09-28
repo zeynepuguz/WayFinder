@@ -12,6 +12,10 @@ public class PlaceResponse {
     private String description;
     private String address;
     private String neighborhood;
+    // District name ("Üsküdar"); null = not assigned yet / outside every district
+    private String district;
+    // City (province) name ("İstanbul", "Ankara"); null = not assigned yet
+    private String city;
     private Double latitude;
     private Double longitude;
     private PlaceCategory category;
@@ -69,6 +73,22 @@ public class PlaceResponse {
 
     public void setNeighborhood(String neighborhood) {
         this.neighborhood = neighborhood;
+    }
+
+    public String getDistrict() {
+        return district;
+    }
+
+    public void setDistrict(String district) {
+        this.district = district;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
     }
 
     public Double getLatitude() {

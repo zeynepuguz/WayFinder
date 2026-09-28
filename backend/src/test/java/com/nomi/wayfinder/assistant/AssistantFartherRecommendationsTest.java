@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.assistant;
 
+import com.nomi.wayfinder.area.AreaResolver;
 import com.nomi.wayfinder.assistant.AssistantIntent.IntentType;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantReply;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantRequest;
@@ -38,7 +39,7 @@ class AssistantFartherRecommendationsTest {
         RouteService routeService = mock(RouteService.class);
         when(routeService.findCurrentRoute(anyLong())).thenReturn(Optional.empty());
         service = new AssistantService(intentParser, routeService, recommendationService, mock(WeatherService.class),
-                new ResponseComposer(), mock(AssistantMessageRepository.class), CLOCK);
+                new ResponseComposer(), mock(AssistantMessageRepository.class), mock(AreaResolver.class), CLOCK);
     }
 
     @Test

@@ -2,12 +2,9 @@ package com.nomi.wayfinder.osm;
 
 import com.nomi.wayfinder.dto.OpeningHoursDto;
 import com.nomi.wayfinder.entity.Place;
-import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.osm.OsmPlaceMapper.OsmPlace;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -15,10 +12,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.sql.Array;
 import java.sql.Time;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Imports / refreshes Istanbul places from OpenStreetMap.
+ * Imports / refreshes one city's places from OpenStreetMap (OsmCityImporter runs it for every city).
  *
  * Rows are upserted by osm_id with source = 'OSM'. Price, rating, description and visit length
  * stay NULL (OSM does not have them; we never invent them). Rows that disappeared from OSM are
@@ -27,6 +23,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Commons file when it has neither (for its photo), nothing else. An OSM row an admin
  * has since edited (source no longer 'OSM') is left alone as well.
  * wikidata / commons_file are refreshed on every run, so rows imported before they existed get them too.
+ * Several OSM elements of one place (same category + name, close together) are merged into one; rows an
+ * earlier import wrote for the dropped ones are deleted unless a route stop or saved place uses them.
+ * After writing, the city's places get their city_id (city polygon; an element on the coast just outside it
+ * still belongs to the city whose area query returned it) and district_id (district polygons).
  *
  * Plain JDBC batches in chunks of CHUNK_SIZE, each chunk in its own transaction, so ~12k rows take
  * seconds and a failure only loses the current chunk.
@@ -67,18 +67,41 @@ public class OsmPlaceImporter {
             WHERE id = ? AND source <> 'OSM' AND wikidata IS NULL AND commons_file IS NULL
             """;
 
+    // Duplicate rows of earlier imports; kept when a route or a saved place points at them
+    private static final String DELETE_UNREFERENCED = """
+            DELETE FROM places p
+            WHERE p.source = 'OSM' AND p.osm_id = ANY (?)
+              AND NOT EXISTS (SELECT 1 FROM route_stops rs WHERE rs.place_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM saved_places sp WHERE sp.place_id = p.id)
+            """;
+
+    // Places inside the city polygon; the padded bounding box lets the geography GiST index pre-filter
+    private static final String ASSIGN_CITY = """
+            UPDATE places p SET city_id = c.id
+            FROM cities c
+            WHERE c.id = ? AND c.geom IS NOT NULL
+              AND p.location && CAST(ST_MakeEnvelope(c.west - 0.05, c.south - 0.05, c.east + 0.05, c.north + 0.05, 4326)
+                                     AS geography)
+              AND ST_Intersects(c.geom, p.location::geometry)
+              AND p.city_id IS DISTINCT FROM c.id
+            """;
+
+    // Elements this city's area query returned that lie outside every city polygon (piers, coastline)
+    private static final String ASSIGN_CITY_OUTSIDE_POLYGONS = """
+            UPDATE places SET city_id = ? WHERE city_id IS NULL AND osm_id = ANY (?)
+            """;
+
     private final OverpassClient overpassClient;
+    private final OsmAreaImporter areaImporter;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
-    private final ApplicationEventPublisher events;
-    private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public OsmPlaceImporter(OverpassClient overpassClient, JdbcTemplate jdbc, TransactionTemplate transactions,
-                            ApplicationEventPublisher events) {
+    public OsmPlaceImporter(OverpassClient overpassClient, OsmAreaImporter areaImporter, JdbcTemplate jdbc,
+                            TransactionTemplate transactions) {
         this.overpassClient = overpassClient;
+        this.areaImporter = areaImporter;
         this.jdbc = jdbc;
         this.transactions = transactions;
-        this.events = events;
     }
 
     public boolean hasOsmPlaces() {
@@ -86,32 +109,20 @@ public class OsmPlaceImporter {
                 "SELECT EXISTS (SELECT 1 FROM places WHERE source = 'OSM')", Boolean.class));
     }
 
-    public boolean isRunning() {
-        return running.get();
+    // Downloads and writes the city's places, then assigns city / district to them (the caller serializes runs)
+    public ImportResult importCity(OsmCity city) {
+        long started = System.currentTimeMillis();
+        log.info("OSM import ({}): downloading places from Overpass...", city.name());
+        List<OverpassResponse.Element> elements = overpassClient.fetchPlaces(city.relationId());
+        log.info("OSM import ({}): {} elements downloaded, writing to the database...", city.name(), elements.size());
+
+        ImportResult result = importElements(elements, city);
+        log.info("OSM import ({}) places finished in {} s: {}", city.name(),
+                (System.currentTimeMillis() - started) / 1000, result);
+        return result;
     }
 
-    // Downloads and imports; one run at a time (409 when one is already running)
-    public ImportResult importIstanbul() {
-        if (!running.compareAndSet(false, true)) {
-            throw new BusinessException(HttpStatus.CONFLICT, "An OSM import is already running");
-        }
-        try {
-            long started = System.currentTimeMillis();
-            log.info("OSM import: downloading Istanbul places from Overpass...");
-            List<OverpassResponse.Element> elements = overpassClient.fetchIstanbulPlaces();
-            log.info("OSM import: {} elements downloaded, writing to the database...", elements.size());
-
-            ImportResult result = importElements(elements);
-            log.info("OSM import finished in {} s: {}", (System.currentTimeMillis() - started) / 1000, result);
-            // Photos for new / changed wikidata and Commons references (WikimediaImageJobs listens)
-            events.publishEvent(new OsmImportFinishedEvent(result));
-            return result;
-        } finally {
-            running.set(false);
-        }
-    }
-
-    ImportResult importElements(List<OverpassResponse.Element> elements) {
+    ImportResult importElements(List<OverpassResponse.Element> elements, OsmCity city) {
         OsmDeduplicator deduplicator = new OsmDeduplicator(jdbc.query("""
                         SELECT id, name, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon,
                                (wikidata IS NOT NULL OR commons_file IS NOT NULL) AS has_media
@@ -153,8 +164,35 @@ public class OsmPlaceImporter {
             log.info("OSM import: photo references copied to {} verified places", copied);
         }
 
-        return new ImportResult(elements.size(), inserted, updated, prepared.skippedDuplicates(),
-                prepared.skippedUnusable(), skippedEdited, copied);
+        int removed = 0;
+        if (!prepared.osmDuplicateIds().isEmpty()) {
+            String[] ids = prepared.osmDuplicateIds().toArray(String[]::new);
+            Integer deleted = transactions.execute(status -> jdbc.update(con -> {
+                var ps = con.prepareStatement(DELETE_UNREFERENCED);
+                ps.setArray(1, con.createArrayOf("text", ids));
+                return ps;
+            }));
+            removed = deleted == null ? 0 : deleted;
+            log.info("OSM import: {} elements were another copy of a place; {} rows of earlier imports removed",
+                    ids.length, removed);
+        }
+
+        String[] keptIds = places.stream().map(OsmPlace::osmId).toArray(String[]::new);
+        transactions.executeWithoutResult(status -> {
+            jdbc.update(ASSIGN_CITY, city.id());
+            jdbc.update(con -> {
+                var ps = con.prepareStatement(ASSIGN_CITY_OUTSIDE_POLYGONS);
+                ps.setLong(1, city.id());
+                ps.setArray(2, con.createArrayOf("text", keptIds));
+                return ps;
+            });
+        });
+        int inCity = count("SELECT count(*) FROM places WHERE city_id = ?", city.id());
+        int withDistrict = areaImporter.assignPlaceDistricts(city.id()).withDistrict();
+
+        return new ImportResult(city.slug(), elements.size(), inserted, updated, prepared.skippedDuplicates(),
+                prepared.skippedUnusable(), skippedEdited, copied, prepared.osmDuplicateIds().size(), removed,
+                inCity, withDistrict, null);
     }
 
     // Maps elements to places, drops unusable ones and duplicates of verified places (no database writes)
@@ -183,7 +221,10 @@ public class OsmPlaceImporter {
                 }
             }
         }
-        return new Prepared(new ArrayList<>(places.values()), duplicates, unusable, new ArrayList<>(media.values()));
+        // The same park / cafe mapped twice in OSM becomes one place
+        OsmDeduplicator.Deduped deduped = OsmDeduplicator.dedupeAmongThemselves(new ArrayList<>(places.values()));
+        return new Prepared(new ArrayList<>(deduped.kept()), duplicates, unusable, new ArrayList<>(media.values()),
+                deduped.droppedOsmIds());
     }
 
     private ChunkResult writeChunk(List<OsmPlace> chunk) {
@@ -261,7 +302,7 @@ public class OsmPlaceImporter {
      *                      places that have none yet
      */
     record Prepared(List<OsmPlace> places, int skippedDuplicates, int skippedUnusable,
-                    List<VerifiedMedia> verifiedMedia) {
+                    List<VerifiedMedia> verifiedMedia, List<String> osmDuplicateIds) {
     }
 
     record VerifiedMedia(long placeId, String wikidata, String commonsFile) {
@@ -273,7 +314,13 @@ public class OsmPlaceImporter {
     private record HoursRow(long placeId, OpeningHoursDto hours) {
     }
 
+    private int count(String sql, Object... args) {
+        Integer n = jdbc.queryForObject(sql, Integer.class, args);
+        return n == null ? 0 : n;
+    }
+
     /**
+     * @param city              the city's slug
      * @param fetched           elements Overpass returned
      * @param inserted          new OSM places
      * @param updated           existing OSM places refreshed
@@ -281,8 +328,21 @@ public class OsmPlaceImporter {
      * @param skippedUnusable   no name / coordinates / known kind
      * @param skippedEdited     OSM rows an admin has taken over (source changed); left as they are
      * @param verifiedMediaCopied verified places that got a duplicate's wikidata / Commons file (photo only)
+     * @param osmDuplicatesMerged  OSM elements dropped as another element of the same place
+     * @param duplicateRowsRemoved rows of earlier imports for those elements that were deleted (unreferenced)
+     * @param placesInCity         the city's places (verified + OSM) after the import
+     * @param placesWithDistrict   the city's places with a district after the import
+     * @param areas                the district / neighbourhood import that ran first; null if it failed
      */
-    public record ImportResult(int fetched, int inserted, int updated, int skippedDuplicates,
-                               int skippedUnusable, int skippedEdited, int verifiedMediaCopied) {
+    public record ImportResult(String city, int fetched, int inserted, int updated, int skippedDuplicates,
+                               int skippedUnusable, int skippedEdited, int verifiedMediaCopied,
+                               int osmDuplicatesMerged, int duplicateRowsRemoved, int placesInCity,
+                               int placesWithDistrict, OsmAreaImporter.AreaImportResult areas) {
+
+        ImportResult withAreas(OsmAreaImporter.AreaImportResult areas) {
+            return new ImportResult(city, fetched, inserted, updated, skippedDuplicates, skippedUnusable,
+                    skippedEdited, verifiedMediaCopied, osmDuplicatesMerged, duplicateRowsRemoved, placesInCity,
+                    placesWithDistrict, areas);
+        }
     }
 }

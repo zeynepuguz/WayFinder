@@ -71,6 +71,8 @@ public class PlaceMapper {
                 ? place.getDescriptionEn() : place.getDescription());
         response.setAddress(place.getAddress());
         response.setNeighborhood(place.getNeighborhood());
+        response.setDistrict(place.getDistrictName());
+        response.setCity(place.getCityName());
         response.setLatitude(place.getLatitude());
         response.setLongitude(place.getLongitude());
         response.setCategory(place.getCategory());

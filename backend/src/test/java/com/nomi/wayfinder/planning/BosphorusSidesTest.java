@@ -28,4 +28,17 @@ class BosphorusSidesTest {
         assertThat(BosphorusSides.sameSide(41.0055, 28.9768, 40.9910, 29.0230)).isFalse();
         assertThat(BosphorusSides.sameSide(40.9910, 29.0230, 40.9850, 29.0300)).isTrue();
     }
+
+    @Test
+    void outsideIstanbulThereIsNoStraitToCross() {
+        // Bursa's centre straddles the midline's longitude (29.0): Osmangazi (west) and Yıldırım (east)
+        assertThat(BosphorusSides.sameSide(40.1950, 29.0600, 40.1900, 28.9500)).isTrue();
+        // Ankara, İzmir
+        assertThat(BosphorusSides.sameSide(39.9208, 32.8541, 39.9334, 32.8597)).isTrue();
+        assertThat(BosphorusSides.sameSide(38.4192, 27.1287, 38.4600, 27.2100)).isTrue();
+        // One point in Istanbul, one outside
+        assertThat(BosphorusSides.sameSide(41.0055, 28.9768, 40.1950, 29.0600)).isTrue();
+        assertThat(BosphorusSides.inIstanbul(41.0055, 28.9768)).isTrue();
+        assertThat(BosphorusSides.inIstanbul(39.9208, 32.8541)).isFalse();
+    }
 }

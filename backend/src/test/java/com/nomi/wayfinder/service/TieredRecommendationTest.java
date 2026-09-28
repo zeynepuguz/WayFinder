@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.service;
 
+import com.nomi.wayfinder.area.DistrictService;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
@@ -58,7 +59,7 @@ class TieredRecommendationTest {
         when(userService.getPreferences(1L)).thenReturn(preferences);
 
         PlaceMapper mapper = new PlaceMapper(CLOCK);
-        service = new RecommendationService(repository, new PlaceService(repository, mapper), new PlaceScorer(),
+        service = new RecommendationService(repository, new PlaceService(repository, mapper, mock(DistrictService.class), mock(com.nomi.wayfinder.area.CityService.class)), new PlaceScorer(),
                 mapper, weatherService, userService, CLOCK);
     }
 

@@ -4,6 +4,7 @@ import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.dto.RouteDtos.StopResponse;
 import com.nomi.wayfinder.entity.StopStatus;
 import com.nomi.wayfinder.i18n.Texts;
+import com.nomi.wayfinder.i18n.TurkishSuffix;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
 import org.springframework.stereotype.Component;
 
@@ -19,12 +20,27 @@ import java.util.Locale;
 public class ResponseComposer {
 
     public String planCreated(RouteResponse route) {
+        return planCreated(route, null);
+    }
+
+    /**
+     * @param startArea the district / neighbourhood the user named and the route starts at ("Üsküdar"), or null
+     */
+    public String planCreated(RouteResponse route, String startArea) {
+        String intro = startArea == null ? "" : Texts.t(
+                TurkishSuffix.ablative(startArea) + " başlayan bir rota hazırladım. ",
+                "I made a route starting in " + startArea + ". ");
         if (route.stops().isEmpty()) {
+            if (startArea != null) {
+                return Texts.t(startArea + " çevresinde bu koşullarla uygun bir rota oluşturamadım. ",
+                        "I could not create a suitable route around " + startArea + " with these conditions. ")
+                        + String.join(" ", route.notes());
+            }
             return Texts.t("Bu koşullarla uygun bir rota oluşturamadım. ",
                     "I could not create a suitable route with these conditions. ") + String.join(" ", route.notes());
         }
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder(intro);
         if (Texts.english()) {
             sb.append(route.title()).append(" is ready! I created a route with ")
                     .append(route.stops().size()).append(route.stops().size() == 1 ? " stop:\n" : " stops:\n");
@@ -129,13 +145,15 @@ public class ResponseComposer {
     }
 
     public String help() {
-        return Texts.t("Sana şehirde gün planlama konusunda yardımcı olabilirim. Örneğin:\n"
+        return Texts.t("Sana Türkiye'nin şehirlerinde gün planlama konusunda yardımcı olabilirim. Örneğin:\n"
                         + "• \"Kadıköy'de 500 TL'ye bir gün planla\"\n"
+                        + "• \"Yarın Ankara'da Kızılay'dan başlayan bir rota\"\n"
                         + "• \"Yakında kahve öner\"\n"
                         + "• \"Çok yorulduk\" / \"Yağmur başladı\" / \"Burayı çıkar\"\n"
                         + "• \"Biraz daha tarihi yer ekle\"",
-                "I can help you plan your day in the city. For example:\n"
+                "I can help you plan your day in cities all over Turkey. For example:\n"
                         + "• \"Plan a day in Kadıköy for 500 TL\"\n"
+                        + "• \"Tomorrow in Izmir, a route starting in Alsancak\"\n"
                         + "• \"Recommend coffee nearby\"\n"
                         + "• \"We're tired\" / \"It started raining\" / \"Remove this place\"\n"
                         + "• \"Add some more historical places\"");

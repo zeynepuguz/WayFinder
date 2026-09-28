@@ -5,7 +5,7 @@ import type { Place, Recommendation } from '../api/types'
 import { LiveMap } from './LiveMap'
 
 const place = (id: number, name: string, extra: Partial<Place> = {}): Place => ({
-  id, name, description: null, address: null, neighborhood: null, latitude: 40.99, longitude: 29.02,
+  id, name, description: null, address: null, neighborhood: null, district: null, city: null, latitude: 40.99, longitude: 29.02,
   category: 'CAFE', estimatedCost: null, rating: null, indoor: false, avgVisitMinutes: null, tags: [],
   openingHours: [], openNow: null, source: 'OSM', lastVerifiedAt: null, verified: false,
   sourceUrl: 'https://www.openstreetmap.org/node/1', image: null, distanceMeters: 120, ...extra,

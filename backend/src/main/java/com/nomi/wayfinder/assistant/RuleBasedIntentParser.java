@@ -6,8 +6,12 @@ import com.nomi.wayfinder.assistant.AssistantIntent.RouteEdit;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
 import com.nomi.wayfinder.planning.ReplanType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
@@ -34,7 +38,12 @@ public class RuleBasedIntentParser implements IntentParser {
     // "budget of 700", "budget is 700", "₺700", "tl 700"
     private static final Pattern BUDGET_EN = Pattern.compile(
             "(?:budget(?:\\s+(?:of|is))?\\s*:?\\s*(?:₺|tl)?|₺|(?<!\\p{L})tl)\\s*(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})(?![\\d])");
-    private static final Pattern START_TIME = Pattern.compile("saat\\s*(\\d{1,2})(?:[:.](\\d{2}))?");
+    private static final Pattern START_TIME = Pattern.compile("saat\\s*(\\d{1,2})(?:[:.](\\d{2}))?(?![\\d.,:])");
+    // "saat 1'de" usually means 13:00 in speech: a bare hour is only trusted from 07 on
+    private static final int EARLIEST_BARE_HOUR = 7;
+    // "13:00", "13.00'da" without "saat" (not prices like "2.50 tl" or dates like "12.05.2026")
+    private static final Pattern CLOCK_TIME = Pattern.compile(
+            "(?<![\\d.,:/])([01]?\\d|2[0-3])[:.]([0-5]\\d)(?![\\d]|[.,:/]\\d|\\s*(?:tl|₺|lira|km|kişi|%))");
     // "at 10", "from 10:30", "start at 9am", "10 am"
     private static final Pattern START_TIME_EN = Pattern.compile(
             "(?:(?<!\\p{L})(?:at|from|around)\\s+(\\d{1,2})(?:[:.](\\d{2}))?\\s*(am|pm|a\\.m\\.|p\\.m\\.)?"
@@ -50,6 +59,18 @@ public class RuleBasedIntentParser implements IntentParser {
     private static final Map<String, String> INTEREST_KEYWORDS = new LinkedHashMap<>();
     private static final Map<String, String> INTEREST_KEYWORDS_EN = new LinkedHashMap<>();
     private static final Map<String, Pattern> WORD_PATTERNS = new ConcurrentHashMap<>();
+
+    private final Clock clock;
+
+    @Autowired
+    public RuleBasedIntentParser(Clock clock) {
+        this.clock = clock;
+    }
+
+    // Tests that do not care about dates
+    public RuleBasedIntentParser() {
+        this(Clock.system(ZoneId.of("Europe/Istanbul")));
+    }
 
     static {
         PARTY_WORDS.put("tek başıma", 1);
@@ -125,6 +146,17 @@ public class RuleBasedIntentParser implements IntentParser {
 
     @Override
     public AssistantIntent parse(String message, IntentContext context) {
+        AssistantIntent intent = parseWithoutDate(message, context);
+        // The area is found by AreaResolver (it needs the district / neighbourhood list from the database)
+        return intent.withDateAndArea(date(message, LocalDate.now(clock)), null);
+    }
+
+    // "yarın", "cumartesi", "28 Eylül", ... (null = not said = today)
+    static LocalDate date(String message, LocalDate today) {
+        return IntentDates.parse(message, today);
+    }
+
+    private AssistantIntent parseWithoutDate(String message, IntentContext context) {
         String text = message.toLowerCase(TR).replace('’', '\'').trim();
 
         // ---- 1) Changes to the current route ----
@@ -355,7 +387,16 @@ public class RuleBasedIntentParser implements IntentParser {
             if (hour > 23 || minute > 59) {
                 return null;
             }
+            // "saat 1'de": 01:00 or 13:00? Better no start time than a wrong one
+            if (m.group(2) == null && hour < EARLIEST_BARE_HOUR) {
+                return null;
+            }
             return java.time.LocalTime.of(hour, minute);
+        }
+
+        Matcher clockTime = CLOCK_TIME.matcher(text);
+        if (clockTime.find()) {
+            return java.time.LocalTime.of(Integer.parseInt(clockTime.group(1)), Integer.parseInt(clockTime.group(2)));
         }
 
         Matcher en = START_TIME_EN.matcher(english(text));
@@ -387,7 +428,10 @@ public class RuleBasedIntentParser implements IntentParser {
     }
 
     private static boolean mentionsNewPlan(String text) {
-        return containsAny(text, "plan", "rota oluştur", "yeni rota", "rota hazırla", "ne yapabilir",
+        return containsAny(text, "plan", "rota oluştur", "yeni rota", "rota hazırla", "rota öner", "rota yap",
+                // "yarın Ankara'da Kızılay'dan başlayan bir rota", "Kadıköy'de bir rota istiyorum"
+                "bir rota", "başlayan rota", "rota istiyor", "rota ister",
+                "ne yapabilir",
                 "ne yapılır", "ne yapsak", "gezi yap", "gezmek istiyor", "ilk defa", "ilk kez")
                 || hasWord(text, "itinerary", "a route", "new route", "day trip", "day out", "a day in",
                 "what can we do", "what can i do", "what should we do", "what should i do", "what to do",

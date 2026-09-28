@@ -1,5 +1,7 @@
 package com.nomi.wayfinder.assistant;
 
+import com.nomi.wayfinder.area.AreaResolver;
+import com.nomi.wayfinder.area.NamedArea;
 import com.nomi.wayfinder.assistant.AssistantIntent.PlanParams;
 import com.nomi.wayfinder.assistant.AssistantIntent.RouteEdit;
 import com.nomi.wayfinder.assistant.IntentParser.IntentContext;
@@ -42,6 +44,7 @@ public class AssistantService {
     private final WeatherService weatherService;
     private final ResponseComposer composer;
     private final AssistantMessageRepository messageRepository;
+    private final AreaResolver areaResolver;
     private final Clock clock;
 
     public AssistantService(
@@ -51,6 +54,7 @@ public class AssistantService {
             WeatherService weatherService,
             ResponseComposer composer,
             AssistantMessageRepository messageRepository,
+            AreaResolver areaResolver,
             Clock clock
     ) {
         this.intentParser = intentParser;
@@ -59,6 +63,7 @@ public class AssistantService {
         this.weatherService = weatherService;
         this.composer = composer;
         this.messageRepository = messageRepository;
+        this.areaResolver = areaResolver;
         this.clock = clock;
     }
 
@@ -77,7 +82,7 @@ public class AssistantService {
             case PLAN_ROUTE -> planRoute(userId, request, intent);
             case REPLAN -> route == null ? text(intent, composer.noRoute()) : replan(route, request, intent);
             case RECOMMEND -> recommend(userId, request, intent);
-            case WEATHER -> weather(request, intent);
+            case WEATHER -> weather(request, intent.withDateAndArea(day(intent, request.message()), intent.area()));
             case SHOW_ROUTE -> route == null ? text(intent, composer.noRoute())
                     : withRoute(intent, composer.showRoute(routeService.toResponse(route)), routeService.toResponse(route), List.of());
             case UNKNOWN -> text(intent, composer.help());
@@ -105,12 +110,32 @@ public class AssistantService {
         PlanParams p = intent.plan() != null ? intent.plan()
                 : new PlanParams(null, null, null, List.of(), List.of(), null);
 
+        // "üsküdarda gezeceğiz" / "Ankara'da": start there instead of at the user's GPS position (unknown names change
+        // nothing). A name used in several cities means the one the user is in, unless the message names another city
+        Optional<NamedArea> area = areaResolver.resolve(intent.area(), request.message(),
+                request.latitude(), request.longitude());
+        double latitude = area.map(NamedArea::latitude).orElse(request.latitude());
+        double longitude = area.map(NamedArea::longitude).orElse(request.longitude());
+        LocalDate date = day(intent, request.message());
+
         Route route = routeService.createRoute(userId, new RoutePlanRequest(
-                request.latitude(), request.longitude(), null, p.startTime(), null,
+                latitude, longitude, date, p.startTime(), null,
                 p.partySize(), p.budget(), p.walkingTolerance(), p.stops(), p.interests(), null));
 
         RouteResponse response = routeService.toResponse(route);
-        return withRoute(intent, composer.planCreated(response), response, List.of());
+        AssistantIntent resolved = intent.withDateAndArea(date, area.map(NamedArea::name).orElse(intent.area()));
+        return withRoute(resolved, composer.planCreated(response, area.map(NamedArea::name).orElse(null)),
+                response, List.of());
+    }
+
+    /**
+     * The day the user means: the parser's date (AI or rules), else what the rules find in the message
+     * (the AI may leave it out). Past days are ignored (= today) instead of failing the request.
+     */
+    private LocalDate day(AssistantIntent intent, String message) {
+        LocalDate today = LocalDate.now(clock);
+        LocalDate date = intent.date() != null ? intent.date() : IntentDates.parse(message, today);
+        return date == null || date.isBefore(today) ? null : date;
     }
 
     private AssistantReply replan(Route route, AssistantRequest request, AssistantIntent intent) {
@@ -154,6 +179,10 @@ public class AssistantService {
     }
 
     private AssistantReply weather(AssistantRequest request, AssistantIntent intent) {
+        LocalDate today = LocalDate.now(clock);
+        if (intent.date() != null && !intent.date().equals(today)) {
+            return text(intent, dayWeather(request, intent.date()));
+        }
         String answer = weatherService.getForecast(request.latitude(), request.longitude(), LocalDate.now(clock))
                 .map(f -> {
                     LocalTime now = LocalTime.now(clock);
@@ -164,6 +193,20 @@ public class AssistantService {
                 })
                 .orElse(Texts.t("Şu an hava durumu bilgisine ulaşamıyorum.", "I cannot get the weather information right now."));
         return text(intent, answer);
+    }
+
+    // "yarın hava nasıl": the forecast for the whole day (09:00-22:00)
+    private String dayWeather(AssistantRequest request, LocalDate date) {
+        String day = RouteService.dayName(date);
+        return weatherService.getForecast(request.latitude(), request.longitude(), date)
+                .map(f -> {
+                    var summary = f.summarize(LocalTime.of(9, 0), LocalTime.of(22, 0));
+                    return String.format(Texts.locale(), Texts.t("%s: %s, en yüksek %.0f°C. %s", "%s: %s, up to %.0f°C. %s"),
+                            day, Texts.lower(summary.condition().getLabel()), summary.maxTemperature(),
+                            weatherService.advice(summary));
+                })
+                .orElse(Texts.t(day + " için hava durumu tahminine ulaşamıyorum (en fazla ~15 gün sonrası için tahmin var).",
+                        "I cannot get a forecast for " + day + " (forecasts reach about 15 days ahead)."));
     }
 
     // ============ helpers ============

@@ -8,6 +8,7 @@ opening hours; the Spring backend does that with real data (PostGIS, weather, da
 import json
 import logging
 import re
+from datetime import date, datetime, timedelta, timezone
 from typing import Protocol
 
 from openai import OpenAI
@@ -18,9 +19,19 @@ from .schemas import ALLOWED_INTERESTS, AssistantIntent, IntentRequest, IntentTy
 log = logging.getLogger(__name__)
 
 TIME_PATTERN = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+AREA_MAX_LENGTH = 100
+# How far ahead a plan date may be (a typo'd year must not reach the backend)
+MAX_DAYS_AHEAD = 366
+# Istanbul is UTC+3 all year (no DST since 2016); a fixed offset needs no tzdata package on Windows
+ISTANBUL = timezone(timedelta(hours=3))
+
+
+def istanbul_today() -> date:
+    return datetime.now(ISTANBUL).date()
+
 
 INSTRUCTIONS = f"""
-You are the intent parser of Nomi, a city companion app covering all of Istanbul.
+You are the intent parser of Nomi, a city companion app covering the cities of Turkey (all 81 provinces).
 Users write in Turkish or in English (tourists). Understand both languages the same way and convert the
 message into the given JSON structure. Do not answer the user. The JSON values (intent types, stop types,
 interests, enums) are always the same English keys below, whatever language the message is in.
@@ -51,6 +62,18 @@ Interests must be chosen only from: {", ".join(sorted(ALLOWED_INTERESTS))}.
 walkingTolerance: LOW if they do not want to walk much or are tired, HIGH if they like walking, else null.
 budget: total TL for the whole group as a number (e.g. "700 TL" / "700 lira" -> 700). partySize: number of people
 ("2 kişiyiz" / "we are 2 people" -> 2).
+date: the day the plan / weather question is for, as YYYY-MM-DD. context.today is today's date in Istanbul
+(with its weekday): "bugün"/"today" -> today, "yarın"/"tomorrow" -> today + 1, "yarından sonra"/"öbür gün"/
+"day after tomorrow" -> today + 2, a weekday ("cumartesi", "on Saturday") -> its next occurrence (today only if
+they also say "bugün"/"today"), "28 Eylül"/"September 28"/"28.09" -> that date (next year if it already passed).
+null when no day is mentioned. Never a date before context.today.
+area: the place in Turkey the user wants to be in or start from, as written: a city (il: "Ankara'da" -> "Ankara",
+"in Antalya" -> "Antalya"), a district (ilçe: "üsküdarda gezeceğiz" -> "üsküdar", "Kadıköy'deyim" -> "Kadıköy") or a
+neighbourhood (semt: "around Moda" -> "Moda"). When both a city and a place inside it are named, keep both, city
+first ("İzmir Konak'ta" -> "İzmir Konak", "yarın Ankara'da Kızılay'dan başlayalım" -> "Ankara Kızılay"). Drop
+Turkish case suffixes when you can. null if no city, district or neighbourhood is named. Never a venue name (café,
+museum) and never invented.
+startTime: "saat 13.00", "13:00", "13.00'da" -> "13:00". A bare "saat 1'de" is ambiguous -> null.
 Weather mentioned inside a plan request ("hava çok sıcak" / "it's very hot") does not change the intent; real weather is fetched separately.
 
 For REMOVE_STOP / REPLACE_STOP: copy the place name into targetText if the user named it
@@ -74,8 +97,12 @@ class OpenAIIntentExtractor:
         )
 
     def extract(self, request: IntentRequest) -> AssistantIntent:
+        today = istanbul_today()
+        context = request.context.model_dump()
+        # The model cannot know the date; "yarın" / "on Saturday" are resolved from this
+        context["today"] = f"{today.isoformat()} ({today.strftime('%A')})"
         user_input = json.dumps(
-            {"message": request.message, "context": request.context.model_dump()},
+            {"message": request.message, "context": context},
             ensure_ascii=False,
         )
 
@@ -91,11 +118,16 @@ class OpenAIIntentExtractor:
         if intent is None:
             raise ValueError("LLM returned no parsable intent")
 
-        return sanitize(intent, request)
+        return sanitize(intent, request, today)
 
 
-def sanitize(intent: AssistantIntent, request: IntentRequest) -> AssistantIntent:
+def sanitize(intent: AssistantIntent, request: IntentRequest, today: date | None = None) -> AssistantIntent:
     """Guardrails: the backend must only receive values it understands."""
+    intent.date = clean_date(intent.date, today or istanbul_today())
+    if intent.area is not None:
+        area = intent.area.strip()
+        intent.area = area if area and len(area) <= AREA_MAX_LENGTH else None
+
     if intent.plan is not None:
         intent.plan.interests = [i for i in intent.plan.interests if i in ALLOWED_INTERESTS]
         if intent.plan.startTime and not TIME_PATTERN.match(intent.plan.startTime):
@@ -123,3 +155,16 @@ def sanitize(intent: AssistantIntent, request: IntentRequest) -> AssistantIntent
 
     intent.source = "ai"
     return intent
+
+
+def clean_date(value: str | None, today: date) -> str | None:
+    """An ISO date from today up to MAX_DAYS_AHEAD days ahead, else None (= today in the backend)."""
+    if not value:
+        return None
+    try:
+        parsed = date.fromisoformat(value.strip())
+    except ValueError:
+        return None
+    if parsed < today or parsed > today + timedelta(days=MAX_DAYS_AHEAD):
+        return None
+    return parsed.isoformat()

@@ -4,6 +4,7 @@ import { PAYMENT_REQUIRED_EVENT } from './api/client'
 import { AppLayout } from './components/AppLayout'
 import { Spinner, ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { CityProvider } from './context/CityContext'
 import { LocationProvider } from './context/LocationContext'
 import { SavedPlacesProvider } from './context/SavedPlacesContext'
 import { isNativeApp } from './lib/billing'
@@ -100,9 +101,11 @@ export default function App() {
         <ToastProvider>
           <AuthProvider>
             <LocationProvider>
-              <SavedPlacesProvider>
-                <AppRoutes />
-              </SavedPlacesProvider>
+              <CityProvider>
+                <SavedPlacesProvider>
+                  <AppRoutes />
+                </SavedPlacesProvider>
+              </CityProvider>
             </LocationProvider>
           </AuthProvider>
         </ToastProvider>

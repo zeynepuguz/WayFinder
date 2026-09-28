@@ -8,6 +8,9 @@ import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.PlaceNotFoundException;
+import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.area.CityService;
+import com.nomi.wayfinder.area.DistrictService;
 import com.nomi.wayfinder.repository.PlaceDistance;
 import com.nomi.wayfinder.repository.PlaceRepository;
 import org.springframework.data.domain.PageRequest;
@@ -32,10 +35,15 @@ public class PlaceService {
 
     private final PlaceRepository placeRepository;
     private final PlaceMapper placeMapper;
+    private final DistrictService districtService;
+    private final CityService cityService;
 
-    public PlaceService(PlaceRepository placeRepository, PlaceMapper placeMapper) {
+    public PlaceService(PlaceRepository placeRepository, PlaceMapper placeMapper, DistrictService districtService,
+                        CityService cityService) {
         this.placeRepository = placeRepository;
         this.placeMapper = placeMapper;
+        this.districtService = districtService;
+        this.cityService = cityService;
     }
 
     // Explore screen: filter + paginate
@@ -67,9 +75,25 @@ public class PlaceService {
             String pattern = "%" + filter.query().toLowerCase(Locale.ROOT) + "%";
             spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("name")), pattern));
         }
+        boolean byDistrict = filter.district() != null && !filter.district().isBlank();
+        boolean byCity = filter.city() != null && !filter.city().isBlank();
+        if (byDistrict || byCity) {
+            // A district is looked up inside the city (slugs repeat across cities); Istanbul when no city is given
+            long cityId = cityService.requireBySlugOrDefault(filter.city()).id();
+            if (byDistrict) {
+                Long districtId = districtService.findIdBySlug(cityId, filter.district())
+                        .orElseThrow(() -> new ResourceNotFoundException("District not found: " + filter.district()));
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("districtId"), districtId));
+            } else {
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("cityId"), cityId));
+            }
+        }
 
-        Pageable pageable = PageRequest.of(page, size,
-                Sort.by(Sort.Order.desc("rating").nullsLast(), Sort.Order.asc("name")));
+        // A city / district list shows its best-documented places first: verified, then with a photo
+        Sort sort = byDistrict || byCity
+                ? Sort.by(Sort.Order.asc("verifiedRank"), Sort.Order.asc("imageRank"), Sort.Order.asc("name"))
+                : Sort.by(Sort.Order.desc("rating").nullsLast(), Sort.Order.asc("name"));
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         return PageResponse.of(placeRepository.findAll(spec, pageable).map(placeMapper::toResponse));
     }
@@ -169,7 +193,21 @@ public class PlaceService {
             Boolean indoor,
             String query,
             // true = only hand-verified places (e.g. for the SEO pages), false = only OSM imports
-            Boolean verified
+            Boolean verified,
+            // district slug from GET /api/v1/districts?city= ("uskudar"), looked up in the city; null = whole city
+            String district,
+            // city slug from GET /api/v1/cities ("ankara"); null = no city filter (Istanbul when a district is given)
+            String city
     ) {
+
+        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
+                                 String query, Boolean verified) {
+            this(category, neighborhood, maxCost, indoor, query, verified, null, null);
+        }
+
+        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
+                                 String query, Boolean verified, String district) {
+            this(category, neighborhood, maxCost, indoor, query, verified, district, null);
+        }
     }
 }

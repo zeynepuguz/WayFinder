@@ -1,11 +1,14 @@
 import type { MapBox, PlaceCategory } from '../api/types'
 
-// Istanbul province, roughly (Çatalca/Silivri in the west to Şile in the east)
-export const ISTANBUL_BOUNDS: MapBox = { south: 40.8, west: 27.95, north: 41.6, east: 29.95 }
+// Türkiye, roughly (Edirne/Gökçeada in the west to Iğdır in the east): Nomi's service area
+export const TURKEY_BOUNDS: MapBox = { south: 35.8, west: 25.6, north: 42.2, east: 44.9 }
 
-export function isInIstanbul(latitude: number, longitude: number): boolean {
-  const b = ISTANBUL_BOUNDS
-  return latitude >= b.south && latitude <= b.north && longitude >= b.west && longitude <= b.east
+export function inBox(box: MapBox, latitude: number, longitude: number): boolean {
+  return latitude >= box.south && latitude <= box.north && longitude >= box.west && longitude <= box.east
+}
+
+export function isInTurkey(latitude: number, longitude: number): boolean {
+  return inBox(TURKEY_BOUNDS, latitude, longitude)
 }
 
 // Below this zoom a screen covers too much of the city: the map asks the user to zoom in instead

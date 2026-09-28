@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.entity;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.Formula;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.locationtech.jts.geom.Point;
@@ -89,6 +90,27 @@ public class Place {
 
     @Column(insertable = false, updatable = false)
     private Instant imageCheckedAt;
+
+    // District (districts table) the place lies in; written by OsmAreaImporter from the district polygons
+    @Column(insertable = false, updatable = false)
+    private Long districtId;
+
+    @Formula("(SELECT d.name FROM districts d WHERE d.id = district_id)")
+    private String districtName;
+
+    // City (province, cities table) the place lies in; written by OsmPlaceImporter from the city polygons
+    @Column(insertable = false, updatable = false)
+    private Long cityId;
+
+    @Formula("(SELECT c.name FROM cities c WHERE c.id = city_id)")
+    private String cityName;
+
+    // Sort keys for district lists: verified first, then places with a photo
+    @Formula("(CASE WHEN source = 'OSM' THEN 1 ELSE 0 END)")
+    private int verifiedRank;
+
+    @Formula("(CASE WHEN image_url IS NULL THEN 1 ELSE 0 END)")
+    private int imageRank;
 
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
@@ -315,6 +337,22 @@ public class Place {
 
     public String getCommonsFile() {
         return commonsFile;
+    }
+
+    public Long getDistrictId() {
+        return districtId;
+    }
+
+    public String getDistrictName() {
+        return districtName;
+    }
+
+    public Long getCityId() {
+        return cityId;
+    }
+
+    public String getCityName() {
+        return cityName;
     }
 
     public String getImageUrl() {

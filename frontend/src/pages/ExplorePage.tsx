@@ -1,15 +1,19 @@
-import { Search, SearchX, SlidersHorizontal, Umbrella } from 'lucide-react'
+import { Check, ChevronDown, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Square, SquareCheck, Umbrella } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
-import type { Place, PlaceCategory } from '../api/types'
+import type { City, District, Place, PlaceCategory } from '../api/types'
+import { HScroll } from '../components/HScroll'
 import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
-import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
+import { PopularRoutes } from '../components/PopularRoutes'
+import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet, Skeleton } from '../components/ui'
 import { CATEGORY_ICON } from '../components/visuals'
+import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
-import { CATEGORY_BY_SLUG, CATEGORY_LABELS, withinBudget } from '../lib/format'
-import { useT } from '../lib/i18n'
+import { filterByName, filterDistricts, useDistricts } from '../lib/districts'
+import { appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, withinBudget } from '../lib/format'
+import { locale, useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
 type View = 'list' | 'map'
@@ -33,7 +37,28 @@ export function ExplorePage() {
   // Kept in the URL (?view=map) so the map is still there after opening a place and going back
   const view: View = params.get('view') === 'map' ? 'map' : 'list'
 
-  const [mode, setMode] = useState<Mode>(slugCategory ? 'all' : 'nearby')
+  // City (?sehir=ankara) in the URL when chosen here; otherwise the app-wide city (saved / detected).
+  // The crawlable /kadikoy/... pages are about Istanbul.
+  const cityState = useCity()
+  const urlCity = params.get('sehir') ?? (slug ? DEFAULT_CITY : null)
+  const { cities } = cityState
+  // Unknown slugs in the URL are ignored once the list is known
+  const citySlug = urlCity && (!cities.length || cities.some(c => c.slug === urlCity)) ? urlCity : cityState.citySlug
+  const city: City | null = cities.find(c => c.slug === citySlug) ?? null
+  const cityName = city?.name ?? null
+  const [cityOpen, setCityOpen] = useState(false)
+  // "Popular routes" ticked (?rotalar=1): ready-made routes instead of the place list (list view only)
+  const popular = view === 'list' && params.get('rotalar') === '1'
+
+  // District (ilçe) in the URL (?ilce=kadikoy): shareable and kept on back navigation
+  const districts = useDistricts(citySlug)
+  const districtParam = params.get('ilce')
+  const district: District | null = districts.data?.find(d => d.slug === districtParam) ?? null
+  // Until the list arrives the slug is used as is; afterwards unknown slugs are ignored
+  const districtSlug = districtParam && (!districts.data || district) ? districtParam : null
+  const [districtOpen, setDistrictOpen] = useState(false)
+
+  const [mode, setMode] = useState<Mode>(slugCategory || districtParam || params.get('sehir') ? 'all' : 'nearby')
   const [query, setQuery] = useState('')
   const [indoorOnly, setIndoorOnly] = useState(false)
   const [maxCost, setMaxCost] = useState('')
@@ -45,37 +70,59 @@ export function ExplorePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Changes one search param and keeps the others (category + view)
-  function updateParam(key: string, value: string | null) {
+  // A district chosen (or restored from the URL) shows that district's list
+  useEffect(() => {
+    if (districtSlug) setMode('all')
+  }, [districtSlug])
+
+  // Changes some search params (null removes one) and keeps the others (category, view, city, district)
+  function updateParams(changes: Record<string, string | null>) {
+    const apply = (next: URLSearchParams) => {
+      Object.entries(changes).forEach(([key, value]) => {
+        if (value) next.set(key, value)
+        else next.delete(key)
+      })
+      return next
+    }
     if (slug) {
-      // Leaving a category page: continue on /explore with the same state
-      const next = new URLSearchParams()
-      if (slugCategory && key !== 'category') next.set('category', slugCategory)
-      if (view === 'map' && key !== 'view') next.set('view', 'map')
-      if (value) next.set(key, value)
-      const search = next.toString()
+      // Leaving a category page: continue on /explore with the same state (Istanbul, the category)
+      const next = new URLSearchParams(params)
+      if (slugCategory) next.set('category', slugCategory)
+      next.set('sehir', DEFAULT_CITY)
+      const search = apply(next).toString()
       navigate(search ? `/explore?${search}` : '/explore', { replace: true })
       return
     }
-    setParams(current => {
-      const next = new URLSearchParams(current)
-      if (value) next.set(key, value)
-      else next.delete(key)
-      return next
-    }, { replace: true })
+    setParams(current => apply(new URLSearchParams(current)), { replace: true })
   }
 
-  const setCategory = (c: PlaceCategory | null) => updateParam('category', c)
-  const setView = (v: View) => updateParam('view', v === 'map' ? 'map' : null)
+  const setCategory = (c: PlaceCategory | null) => updateParams({ category: c })
+  // The map and the popular routes exclude each other: each route card has its own map
+  const setView = (v: View) => updateParams(v === 'map' ? { view: 'map', rotalar: null } : { view: null })
+  const togglePopular = () => updateParams({ rotalar: popular ? null : '1', view: null })
+  const chooseCity = (c: City) => {
+    setCityOpen(false)
+    cityState.setCity(c.slug)
+    // A new city starts without a district
+    updateParams({ sehir: c.slug, ilce: null })
+    setMode('all')
+  }
+  const chooseDistrict = (d: District | null) => {
+    setDistrictOpen(false)
+    updateParams({ ilce: d?.slug ?? null })
+    if (d) setMode('all')
+  }
   const activeFilters = (indoorOnly ? 1 : 0) + (maxCost ? 1 : 0)
 
   useEffect(() => {
-    // The map loads its own places for the visible area
-    if (view === 'map') return
+    // The map loads its own places for the visible area; popular routes load their own data
+    if (view === 'map' || popular) return
+    // The city list waits until the city is known (saved choice or detection)
+    if (mode === 'all' && !citySlug) return
     const timer = setTimeout(() => void load(0), query ? 300 : 0)
     return () => clearTimeout(timer)
     // Reload from the first page whenever a filter changes (search is debounced)
-  }, [view, mode, category, query, indoorOnly, maxCost, location.latitude, location.longitude])
+  }, [view, popular, mode, category, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
 
   async function load(nextPage: number) {
     setLoading(true)
@@ -94,13 +141,16 @@ export function ExplorePage() {
       } else {
         const result = await api.searchPlaces({
           category: category ?? undefined,
+          city: citySlug ?? undefined,
+          district: districtSlug ?? undefined,
           q: query || undefined,
           indoor: indoorOnly || undefined,
           maxCost: maxCost ? Number(maxCost) : undefined,
           page: nextPage,
           size: 20,
         })
-        setPlaces(current => (nextPage === 0 ? result.content : [...current, ...result.content]))
+        // A place can shift between pages while data changes: never list it twice
+        setPlaces(current => (nextPage === 0 ? result.content : appendUnique(current, result.content)))
         setHasMore(result.page + 1 < result.totalPages)
       }
       setPage(nextPage)
@@ -111,8 +161,33 @@ export function ExplorePage() {
     }
   }
 
+  // Name once the list is loaded; a neutral word meanwhile (never the raw slug)
+  const districtName = district?.name ?? (districtSlug ? t('İlçe', 'District') : null)
+  const pillLabel = districtName ?? t('Tüm ilçeler', 'All districts')
+  const cityLabel = cityName ?? t('Şehir', 'City')
+  // Second tab: the chosen district, else the whole city
+  const areaLabel = districtName ?? cityLabel
+
+  // [City ▾] [District ▾] [☐ Popular routes]
+  const controls = (
+    <div className="explore-controls">
+      <button className="chip city-pill" onClick={() => setCityOpen(true)}
+              aria-haspopup="dialog" aria-label={`${t('Şehir seç', 'Choose city')}: ${cityLabel}`}>
+        <MapPin size={15} /> <span>{cityLabel}</span> <ChevronDown size={15} />
+      </button>
+      <button className={`chip district-pill ${districtSlug ? 'active' : ''}`} onClick={() => setDistrictOpen(true)}
+              disabled={!citySlug}
+              aria-haspopup="dialog" aria-label={`${t('İlçe seç', 'Choose district')}: ${pillLabel}`}>
+        <MapIcon size={15} /> <span>{pillLabel}</span> <ChevronDown size={15} />
+      </button>
+      <button className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
+        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler rotalar', 'Popular routes')}
+      </button>
+    </div>
+  )
+
   const categoryChips = (
-    <div className="h-scroll" style={{ gap: 8 }}>
+    <HScroll className="h-scroll chip-scroll" style={{ gap: 8 }} label={t('Kategoriler', 'Categories')}>
       <button className={`chip ${category === null ? 'active' : ''}`} onClick={() => setCategory(null)}>{t('Tümü', 'All')}</button>
       {(Object.keys(CATEGORY_LABELS) as PlaceCategory[]).map(c => {
         const Icon = CATEGORY_ICON[c]
@@ -123,7 +198,7 @@ export function ExplorePage() {
           </button>
         )
       })}
-    </div>
+    </HScroll>
   )
 
   return (
@@ -136,11 +211,16 @@ export function ExplorePage() {
         </div>
       </div>
 
+      {controls}
+
       {view === 'map' ? (
         <>
           {categoryChips}
-          <LiveMap category={category} />
+          <LiveMap category={category} focusArea={district} focusCity={city} />
         </>
+      ) : popular ? (
+        // Category chips, search and filters are about places: not shown for the routes
+        citySlug ? <PopularRoutes city={citySlug} district={districtSlug} /> : <ListSkeleton rows={3} height={180} />
       ) : (
         <>
           <div className="row">
@@ -160,17 +240,25 @@ export function ExplorePage() {
           {categoryChips}
 
           <Segmented value={mode} onChange={setMode}
-                     options={[{ value: 'nearby', label: t('Yakınımda', 'Near me') }, { value: 'all', label: t('Tüm İstanbul', 'All of Istanbul') }]} />
+                     options={[
+                       { value: 'nearby', label: t('Yakınımda', 'Near me') },
+                       { value: 'all', label: areaLabel },
+                     ]} />
 
           {error && <ErrorState message={error} onRetry={() => void load(0)} />}
 
           {!loading && places.length === 0 && !error && (
             <EmptyState icon={SearchX} title={t('Sonuç bulunamadı', 'No results')}
-                        text={t('Filtreleri değiştir ya da “Tüm İstanbul” sekmesine bak.', 'Change the filters or check the “All of Istanbul” tab.')} />
+                        text={mode === 'nearby'
+                          ? t(`Filtreleri değiştir ya da “${areaLabel}” sekmesine bak.`, `Change the filters or check the “${areaLabel}” tab.`)
+                          : districtSlug
+                            ? t('Filtreleri değiştir ya da başka bir ilçe seç.', 'Change the filters or choose another district.')
+                            : t('Filtreleri değiştir ya da başka bir şehir seç.', 'Change the filters or choose another city.')} />
           )}
 
           <div className="stack">
-            {places.map(p => <PlaceRow key={p.id} place={p} />)}
+            {/* City-wide list: the district tells same-named places apart (redundant once a district is chosen) */}
+            {places.map(p => <PlaceRow key={p.id} place={p} showDistrict={mode === 'all' && !districtSlug} />)}
           </div>
 
           {loading && <ListSkeleton rows={places.length ? 1 : 4} />}
@@ -179,6 +267,11 @@ export function ExplorePage() {
           )}
         </>
       )}
+
+      <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={citySlug} state={cityState} onChoose={chooseCity} />
+
+      <DistrictSheet open={districtOpen} onClose={() => setDistrictOpen(false)} selected={districtSlug}
+                     districts={districts} onChoose={chooseDistrict} />
 
       <Sheet open={filtersOpen} onClose={() => setFiltersOpen(false)} label={t('Filtreler', 'Filters')}>
         <div className="stack" style={{ gap: 20 }}>
@@ -214,7 +307,115 @@ export function ExplorePage() {
   )
 }
 
-// "kadikoy" matches "Kadıköy": case- and diacritic-insensitive, so English keyboards work too
-function fold(text: string): string {
-  return text.toLocaleLowerCase('tr').replace(/ı/g, 'i').normalize('NFD').replace(/[̀-ͯ]/g, '')
+// Bottom sheet: search field, "All districts" and every district with its number of places
+function DistrictSheet({ open, onClose, selected, districts, onChoose }: {
+  open: boolean
+  onClose: () => void
+  selected: string | null
+  districts: ReturnType<typeof useDistricts>
+  onChoose: (district: District | null) => void
+}) {
+  const t = useT()
+  const [search, setSearch] = useState('')
+  useEffect(() => {
+    if (!open) setSearch('')
+  }, [open])
+
+  const list = districts.data ? filterDistricts(districts.data, search) : []
+  const count = (n: number) => `${n.toLocaleString(locale())} ${t('mekan', n === 1 ? 'place' : 'places')}`
+
+  return (
+    <Sheet open={open} onClose={onClose} label={t('İlçe seç', 'Choose district')}>
+      <div className="stack">
+        <label className="search">
+          <Search size={18} />
+          <input type="search" placeholder={t('İlçe ara', 'Search districts')} value={search} onChange={e => setSearch(e.target.value)}
+                 aria-label={t('İlçe ara', 'Search districts')} />
+        </label>
+
+        {districts.error && <ErrorState message={districts.error} onRetry={() => void districts.reload()} />}
+
+        <div className="list-group district-list">
+          {!search.trim() && (
+            <button className="list-item" aria-pressed={selected == null} onClick={() => onChoose(null)}>
+              <span className="list-item-icon"><MapPin size={18} /></span>
+              <span className="grow" style={{ fontWeight: 700 }}>{t('Tüm ilçeler', 'All districts')}</span>
+              {selected == null && <Check size={18} color="var(--brand)" />}
+            </button>
+          )}
+          {districts.loading && !districts.data && (
+            <div className="stack" style={{ padding: 12 }}>
+              {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
+            </div>
+          )}
+          {list.map(d => (
+            <button key={d.slug} className="list-item" aria-pressed={selected === d.slug} onClick={() => onChoose(d)}>
+              <span className="grow" style={{ fontWeight: 650 }}>{d.name}</span>
+              <span className="t-caption">{count(d.placeCount)}</span>
+              {selected === d.slug && <Check size={18} color="var(--brand)" />}
+            </button>
+          ))}
+          {districts.data && search.trim() && list.length === 0 && (
+            <p className="t-caption" style={{ padding: 16 }}>{t('Bu isimde bir ilçe yok.', 'No district with that name.')}</p>
+          )}
+        </div>
+      </div>
+    </Sheet>
+  )
+}
+
+// Bottom sheet: search field and all 81 cities; cities without places yet are shown as "coming soon"
+function CitySheet({ open, onClose, selected, state, onChoose }: {
+  open: boolean
+  onClose: () => void
+  selected: string | null
+  state: ReturnType<typeof useCity>
+  onChoose: (city: City) => void
+}) {
+  const t = useT()
+  const [search, setSearch] = useState('')
+  useEffect(() => {
+    if (!open) setSearch('')
+  }, [open])
+
+  const list = filterByName(state.cities, search)
+  const count = (n: number) => `${n.toLocaleString(locale())} ${t('mekan', n === 1 ? 'place' : 'places')}`
+
+  return (
+    <Sheet open={open} onClose={onClose} label={t('Şehir seç', 'Choose city')}>
+      <div className="stack">
+        <label className="search">
+          <Search size={18} />
+          <input type="search" placeholder={t('Şehir ara', 'Search cities')} value={search} onChange={e => setSearch(e.target.value)}
+                 aria-label={t('Şehir ara', 'Search cities')} />
+        </label>
+
+        {state.error && <ErrorState message={state.error} onRetry={state.reload} />}
+
+        <div className="list-group district-list city-list">
+          {state.loading && !state.cities.length && (
+            <div className="stack" style={{ padding: 12 }}>
+              {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
+            </div>
+          )}
+          {list.map(c => {
+            const soon = c.placeCount === 0
+            return (
+              <button key={c.slug} className="list-item" aria-pressed={selected === c.slug} disabled={soon}
+                      onClick={() => onChoose(c)}>
+                <span className="grow" style={{ fontWeight: 650 }}>{c.name}</span>
+                {soon
+                  ? <span className="badge">{t('yakında', 'coming soon')}</span>
+                  : <span className="t-caption">{count(c.placeCount)}</span>}
+                {selected === c.slug && <Check size={18} color="var(--brand)" />}
+              </button>
+            )
+          })}
+          {state.cities.length > 0 && search.trim() && list.length === 0 && (
+            <p className="t-caption" style={{ padding: 16 }}>{t('Bu isimde bir şehir yok.', 'No city with that name.')}</p>
+          )}
+        </div>
+      </div>
+    </Sheet>
+  )
 }

@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.service;
 
+import com.nomi.wayfinder.area.DistrictService;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.repository.PlaceRepository;
@@ -17,7 +18,7 @@ import static org.mockito.Mockito.*;
 class PlacesInAreaTest {
 
     private final PlaceRepository repository = mock(PlaceRepository.class);
-    private final PlaceService service = new PlaceService(repository, new PlaceMapper(Clock.systemUTC()));
+    private final PlaceService service = new PlaceService(repository, new PlaceMapper(Clock.systemUTC()), mock(DistrictService.class), mock(com.nomi.wayfinder.area.CityService.class));
 
     @Test
     void rejectsTooLargeOrInvertedBoxesWith400() {

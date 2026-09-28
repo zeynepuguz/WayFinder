@@ -1,16 +1,19 @@
 import {
-  ArrowUp, ChevronRight, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Sparkles, UserRound, Waves, Wallet, Coffee, type LucideIcon,
+  ArrowUp, ChevronRight, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Route as RouteIcon, Sparkles, UserRound, Waves, Wallet, Coffee,
+  type LucideIcon,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import type { PlaceCategory } from '../api/types'
 import { useGate } from '../components/gate'
+import { HScroll } from '../components/HScroll'
 import { PlaceCard } from '../components/PlaceViews'
 import { ErrorState, Skeleton } from '../components/ui'
 import { BrandMark, CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
+import { useCity } from '../context/CityContext'
 import { locationLabel, useUserLocation } from '../context/LocationContext'
-import { CATEGORY_LABELS, STOP_TYPE_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, locativeTr, STOP_TYPE_LABELS } from '../lib/format'
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
@@ -55,6 +58,7 @@ const CATEGORIES: PlaceCategory[] = ['CAFE', 'RESTAURANT', 'DESSERT', 'MUSEUM', 
 export function HomePage() {
   const { user, hasAccess } = useAuth()
   const location = useUserLocation()
+  const { city, citySlug } = useCity()
   const navigate = useNavigate()
   const gate = useGate()
   const t = useT()
@@ -91,10 +95,14 @@ export function HomePage() {
         <div className="stack" style={{ gap: 8 }}>
           <button className="location-chip" onClick={location.refresh} style={{ alignSelf: 'flex-start' }}>
             <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
-            <Navigation size={13} /> {location.source === 'gps' ? t('Konumun · İstanbul', 'Your location · Istanbul') : locationLabel(location.source)}
+            <Navigation size={13} /> {locationLabel(location.source)}
           </button>
           <h1 className="t-display">
-            {user ? `${greeting}, ${user.displayName.split(' ')[0]}` : t('İstanbul’da bugün ne yapsak?', 'What shall we do in Istanbul today?')}
+            {user
+              ? `${greeting}, ${user.displayName.split(' ')[0]}`
+              : city
+                ? t(`${locativeTr(city.name)} bugün ne yapsak?`, `What shall we do in ${city.name} today?`)
+                : t('Bugün ne yapsak?', 'What shall we do today?')}
           </h1>
         </div>
 
@@ -151,12 +159,12 @@ export function HomePage() {
           </h2>
           <Link to="/explore" className="section-link">{t('Tümü', 'See all')} <ChevronRight size={16} /></Link>
         </div>
-        <div className="h-scroll">
+        <HScroll>
           {loading && [0, 1].map(i => <Skeleton key={i} width={240} height={220} radius={20} />)}
           {data?.suggestions.map(s => (
             <PlaceCard key={s.place.id} place={s.place} reason={s.reasons.find(r => r.startsWith('Hava') || r.startsWith('Indoor place')) ?? s.reasons[0]} />
           ))}
-        </div>
+        </HScroll>
         {data && data.suggestions.length === 0 && (
           <p className="t-caption">{t('Yakınında şu an açık bir öneri bulamadım.', 'I couldn’t find anything open near you right now.')}</p>
         )}
@@ -170,7 +178,7 @@ export function HomePage() {
           <h2 className="t-headline">{t('Rota fikirleri', 'Route ideas')}</h2>
           {!hasAccess && <span className="badge badge-premium"><Crown size={12} /> Premium</span>}
         </div>
-        <div className="h-scroll">
+        <HScroll>
           {ideas(t).map(({ title, text, prompt, icon: Icon, gradient }) => (
             <button key={title} className="idea-card" style={{ background: gradient }} onClick={() => ask(prompt)}>
               <span className="idea-icon"><Icon size={20} /></span>
@@ -180,7 +188,20 @@ export function HomePage() {
               </div>
             </button>
           ))}
-        </div>
+        </HScroll>
+        {/* Ready-made routes of the chosen city (free to look at; starting one needs Premium) */}
+        <Link to={`/explore?${citySlug ? `sehir=${citySlug}&` : ''}rotalar=1`} className="card card-press row" style={{ gap: 14 }}>
+          <span className="list-item-icon" style={{ background: 'var(--brand-50)', color: 'var(--brand)' }}><RouteIcon size={18} /></span>
+          <div className="grow">
+            <div className="t-headline" style={{ fontSize: 15 }}>{t('Popüler rotalar', 'Popular routes')}</div>
+            <div className="t-caption">
+              {city
+                ? t(`${city.name} için hazır rotalar: tarih, lezzet, kahve, parklar`, `Ready-made routes for ${city.name}: history, food, coffee, parks`)
+                : t('Hazır rotalar: tarih, lezzet, kahve, parklar', 'Ready-made routes: history, food, coffee, parks')}
+            </div>
+          </div>
+          <ChevronRight size={20} className="muted" />
+        </Link>
       </section>
 
       <section className="section">
@@ -200,7 +221,7 @@ export function HomePage() {
 
       {data && (
         <p className="t-caption" style={{ textAlign: 'center' }}>
-          <MapPin size={12} style={{ verticalAlign: -1 }} /> {t('Nomi İstanbul genelinde hizmet veriyor.', 'Nomi covers all of Istanbul.')}
+          <MapPin size={12} style={{ verticalAlign: -1 }} /> {t('Nomi Türkiye genelinde hizmet veriyor.', 'Nomi works across Türkiye.')}
         </p>
       )}
 

@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -16,8 +17,9 @@ import java.time.Duration;
 import java.util.List;
 
 /**
- * Downloads Istanbul's cafes, restaurants, dessert shops, museums, sights, parks and culture venues
- * from the Overpass API (OpenStreetMap). ~12k elements, ~3.3 MB.
+ * Downloads OpenStreetMap data from the Overpass API: Turkey's provinces (cities), and per city its districts,
+ * named neighbourhoods and the cafes, restaurants, dessert shops, museums, sights, parks and culture venues
+ * (Istanbul: ~12k elements, ~3.3 MB).
  * Overpass servers are often busy and then answer 200 with an HTML/XML error page, or JSON with a
  * runtime error in "remark": such answers are treated as failures and the next endpoint is tried.
  */
@@ -29,18 +31,53 @@ public class OverpassClient {
     // Overpass answers 406 without a User-Agent
     static final String USER_AGENT = "Nomi/1.0 (city guide app)";
 
-    // 3600223474 = the Istanbul province relation (223474) as an Overpass area
-    static final String ISTANBUL_QUERY = """
+    // An OSM relation as an Overpass area: 3600000000 + relation id
+    static final long AREA_ID_OFFSET = 3_600_000_000L;
+    // Turkey (relation 174737)
+    static final long TURKEY_RELATION_ID = 174737L;
+    // İstanbul province (relation 223474)
+    static final long ISTANBUL_RELATION_ID = 223474L;
+
+    // Places of one city; %d = the city's Overpass area id
+    static final String PLACES_QUERY = """
             [out:json][timeout:180];
-            area(id:3600223474)->.ist;
+            area(id:%d)->.city;
             (
-              nwr["amenity"~"^(cafe|restaurant|ice_cream|theatre|arts_centre)$"]["name"](area.ist);
-              nwr["shop"~"^(pastry|confectionery)$"]["name"](area.ist);
-              nwr["tourism"~"^(museum|attraction|viewpoint)$"]["name"](area.ist);
-              nwr["leisure"="park"]["name"](area.ist);
+              nwr["amenity"~"^(cafe|restaurant|ice_cream|theatre|arts_centre)$"]["name"](area.city);
+              nwr["shop"~"^(pastry|confectionery)$"]["name"](area.city);
+              nwr["tourism"~"^(museum|attraction|viewpoint)$"]["name"](area.city);
+              nwr["leisure"="park"]["name"](area.city);
             );
             out center tags;
             """;
+
+    // A city's districts (ilçe boundaries) with their member ways' geometry, to build polygons from
+    static final String DISTRICTS_QUERY = """
+            [out:json][timeout:180];
+            area(id:%d)->.city;
+            relation["boundary"="administrative"]["admin_level"="6"](area.city);
+            out geom;
+            """;
+
+    // A city's named neighbourhoods ("Moda", "Kuzguncuk", "Kızılay")
+    static final String AREAS_QUERY = """
+            [out:json][timeout:180];
+            area(id:%d)->.city;
+            node["place"~"^(suburb|quarter|neighbourhood)$"]["name"](area.city);
+            out;
+            """;
+
+    // Turkey's provinces (il boundaries, admin_level=4) with geometry. Relations of neighbouring countries that
+    // share a border way come back too; the importer keeps only ISO3166-2 "TR-.." ones
+    static final String PROVINCES_QUERY = """
+            [out:json][timeout:600];
+            area(id:%d)->.tr;
+            relation["boundary"="administrative"]["admin_level"="4"](area.tr);
+            out geom;
+            """.formatted(AREA_ID_OFFSET + TURKEY_RELATION_ID);
+
+    // The Istanbul place query as it always was (same filters, same area)
+    static final String ISTANBUL_QUERY = placesQuery(ISTANBUL_RELATION_ID);
 
     private final NomiProperties.Osm properties;
     private final JsonMapper jsonMapper;
@@ -60,8 +97,46 @@ public class OverpassClient {
                 .build();
     }
 
-    public List<OverpassResponse.Element> fetchIstanbulPlaces() {
-        String form = "data=" + URLEncoder.encode(ISTANBUL_QUERY, StandardCharsets.UTF_8);
+    public List<OverpassResponse.Element> fetchProvinces() {
+        return fetch(PROVINCES_QUERY, true);
+    }
+
+    /**
+     * @param relationId the city's (province's) OSM relation id, e.g. 223474 for İstanbul
+     */
+    public List<OverpassResponse.Element> fetchPlaces(long relationId) {
+        return fetch(placesQuery(relationId), true);
+    }
+
+    public List<OverpassResponse.Element> fetchDistricts(long relationId) {
+        return fetch(DISTRICTS_QUERY.formatted(areaId(relationId)), true);
+    }
+
+    public List<OverpassResponse.Element> fetchAreas(long relationId) {
+        // Every province has named neighbourhoods; "none" is a mirror with a missing / stale area index
+        return fetch(AREAS_QUERY.formatted(areaId(relationId)), true);
+    }
+
+    static String placesQuery(long relationId) {
+        return PLACES_QUERY.formatted(areaId(relationId));
+    }
+
+    static long areaId(long relationId) {
+        return AREA_ID_OFFSET + relationId;
+    }
+
+    List<OverpassResponse.Element> fetch(String query) {
+        return fetch(query, false);
+    }
+
+    /**
+     * Tries every endpoint, max-attempts rounds with a growing pause in between.
+     *
+     * @param requireElements an empty answer counts as a failure: a mirror whose area index is missing / stale
+     *                        answers "no elements" for area queries instead of an error
+     */
+    List<OverpassResponse.Element> fetch(String query, boolean requireElements) {
+        String form = "data=" + URLEncoder.encode(query, StandardCharsets.UTF_8);
         List<String> endpoints = properties.overpassEndpoints();
         int attempts = Math.max(1, properties.maxAttempts());
         RuntimeException last = null;
@@ -77,10 +152,20 @@ public class OverpassClient {
                             .body(form)
                             .retrieve()
                             .body(String.class);
-                    return parse(body, jsonMapper);
+                    List<OverpassResponse.Element> elements = parse(body, jsonMapper);
+                    if (requireElements && elements.isEmpty()) {
+                        throw new IllegalStateException("Overpass answered without elements");
+                    }
+                    return elements;
+                } catch (HttpClientErrorException.TooManyRequests e) {
+                    // This IP's quota on that server is used up for now: give it time before the next request
+                    last = e;
+                    log.warn("OSM import: {} is rate limiting us (429), waiting {} s", endpoint,
+                            properties.retryDelay().toSeconds());
+                    sleep(properties.retryDelay());
                 } catch (RuntimeException e) {
                     last = e;
-                    log.warn("OSM import: {} failed: {}", endpoint, e.getMessage());
+                    log.warn("OSM import: {} failed: {}", endpoint, shorten(e.getMessage()));
                 }
             }
             if (round < attempts) {
@@ -105,6 +190,15 @@ public class OverpassClient {
             throw new IllegalStateException("Overpass answer has no elements");
         }
         return response.elements();
+    }
+
+    // Busy-server answers are whole HTML pages
+    private static String shorten(String message) {
+        if (message == null) {
+            return null;
+        }
+        String flat = message.replaceAll("\\s+", " ");
+        return flat.length() <= 300 ? flat : flat.substring(0, 300) + "...";
     }
 
     private static void sleep(Duration duration) {

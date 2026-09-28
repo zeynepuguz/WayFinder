@@ -42,7 +42,8 @@ export function VerifiedBadge() {
 }
 
 // Compact row for lists
-export function PlaceRow({ place, reasons }: { place: Place; reasons?: string[] }) {
+// showDistrict: city-wide lists add the district ("Kafe · Üsküdar") so same-named places can be told apart
+export function PlaceRow({ place, reasons, showDistrict }: { place: Place; reasons?: string[]; showDistrict?: boolean }) {
   const t = useT()
   return (
     <div className="card" style={{ padding: 0 }}>
@@ -52,7 +53,7 @@ export function PlaceRow({ place, reasons }: { place: Place; reasons?: string[] 
           <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
           <div className="meta">
             <Rating value={place.rating} />
-            <span>{CATEGORY_LABELS[place.category]}</span>
+            <span>{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
             {place.distanceMeters != null && <span><MapPin size={12} />{formatDistance(place.distanceMeters)}</span>}
           </div>
           <div className="row" style={{ gap: 6 }}>

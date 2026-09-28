@@ -316,6 +316,49 @@ svg { flex-shrink: 0; }
 .h-scroll::-webkit-scrollbar { display: none; }
 .h-scroll > * { scroll-snap-align: start; flex-shrink: 0; }
 
+/* Wrapper from <HScroll>: holds the desktop arrow buttons */
+.hscroll { position: relative; min-width: 0; }
+.hscroll-arrow { display: none; }
+
+/* Mouse and trackpad: rows wrap or get arrows, drag scrolling and a thin scrollbar (touch keeps native swiping) */
+@media (hover: hover) and (pointer: fine) {
+  .h-scroll, .suggestions {
+    scroll-snap-type: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-3) transparent;
+  }
+  .h-scroll::-webkit-scrollbar, .suggestions::-webkit-scrollbar { display: block; height: 6px; }
+  .h-scroll::-webkit-scrollbar-thumb, .suggestions::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 999px; }
+  .h-scroll::-webkit-scrollbar-track, .suggestions::-webkit-scrollbar-track { background: transparent; }
+  .h-scroll.is-dragging, .suggestions.is-dragging { cursor: grabbing; user-select: none; }
+  .h-scroll.is-dragging *, .suggestions.is-dragging * { cursor: grabbing; }
+
+  /* Category chips: every chip visible, on as many lines as needed */
+  .chip-scroll { flex-wrap: wrap; overflow: visible; margin: 0; padding: 0; }
+
+  .hscroll-arrow {
+    position: absolute;
+    top: 50%;
+    z-index: 2;
+    width: 34px;
+    height: 34px;
+    margin-top: -17px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow-md);
+    place-items: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .hscroll-arrow { display: grid; }
+  .hscroll-arrow-left { left: -6px; }
+  .hscroll-arrow-right { right: -6px; }
+  .hscroll:hover .hscroll-arrow, .hscroll-arrow:focus-visible { opacity: 1; }
+}
+
 .chip {
   display: inline-flex;
   align-items: center;
@@ -1058,3 +1101,29 @@ details > .reasons { margin-top: 8px; }
 .farther-list { display: flex; flex-direction: column; gap: 8px; }
 .farther-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; }
 .farther-row .tile { width: 48px; height: 48px; border-radius: 14px; flex-shrink: 0; }
+
+/* Explore: district (ilçe) picker */
+.district-pill { max-width: 100%; }
+.district-pill.active { font-weight: 750; }
+.district-list .list-item { min-height: 48px; padding: 10px 16px; }
+
+/* Explore: city / district pickers and the "popular routes" toggle */
+.explore-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.city-pill { max-width: 100%; font-weight: 750; }
+.city-pill span, .district-pill span { overflow: hidden; text-overflow: ellipsis; }
+.city-list .list-item:disabled { opacity: 0.55; cursor: default; }
+
+/* Popular routes: card with a compact stop list; tapping the head opens the map */
+.popular-route { display: flex; flex-direction: column; gap: 12px; padding: 14px; }
+.popular-route-head { display: flex; align-items: flex-start; gap: 12px; text-align: left; width: 100%; color: inherit; background: none; border: 0; padding: 0; font: inherit; cursor: pointer; border-radius: 12px; }
+.popular-route-head:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
+.popular-route-icon { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; flex-shrink: 0; background: var(--brand-50); color: var(--brand); }
+.popular-route-chevron { flex-shrink: 0; color: var(--ink-3); transition: transform 0.2s; }
+.popular-route-chevron.open { transform: rotate(180deg); }
+.mini-timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.mini-stop { display: flex; align-items: center; gap: 10px; position: relative; }
+.mini-stop:not(:last-child)::before { content: ''; position: absolute; left: 17px; top: 38px; height: 8px; width: 2px; border-radius: 2px; background: var(--line); }
+.mini-stop-num { width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex-shrink: 0; background: var(--surface-2); color: var(--ink-2); font-size: 13px; font-weight: 800; }
+.mini-stop-photo.tile { width: 36px; height: 36px; border-radius: 11px; flex-shrink: 0; }
+.mini-stop-name { font-weight: 700; font-size: 15px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-stop-name:hover { text-decoration: underline; }

@@ -36,11 +36,15 @@ public class PlaceController {
             @RequestParam(required = false) Boolean indoor,
             @RequestParam(required = false) String q,
             @RequestParam(required = false) Boolean verified,
+            // City slug from GET /api/v1/cities; the list is then verified first, then with a photo, then by name
+            @RequestParam(required = false) String city,
+            // District slug from GET /api/v1/districts?city=, looked up in the city (istanbul when no city is given)
+            @RequestParam(required = false) String district,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Positive @Max(100) int size
     ) {
         return placeService.searchPlaces(
-                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q, verified), page, size);
+                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q, verified, district, city), page, size);
     }
 
     // lat/lon = user's current location (from device GPS), not a place's

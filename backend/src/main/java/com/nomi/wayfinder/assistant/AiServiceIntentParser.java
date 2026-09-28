@@ -13,7 +13,7 @@ import java.util.List;
  * Calls the Python FastAPI AI service: POST {AI_SERVICE_URL}/v1/intent
  *
  * Request:  { "message": "...", "context": { "hasRoute": true, "remainingStops": [...] } }
- * Response: an AssistantIntent JSON object
+ * Response: an AssistantIntent JSON object (date = "yyyy-MM-dd" or null, area = district / neighbourhood text or null)
  */
 @Component
 public class AiServiceIntentParser implements IntentParser {
@@ -69,7 +69,9 @@ public class AiServiceIntentParser implements IntentParser {
                 intent.plan(),
                 intent.edits() == null ? List.of() : intent.edits(),
                 intent.recommendType(),
-                "ai"
+                "ai",
+                intent.date(),
+                intent.area() == null || intent.area().isBlank() ? null : intent.area().trim()
         );
     }
 

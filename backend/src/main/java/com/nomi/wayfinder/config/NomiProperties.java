@@ -54,10 +54,14 @@ public record NomiProperties(
     }
 
     /**
-     * OpenStreetMap place import (all of Istanbul) through the Overpass API.
+     * OpenStreetMap import (Turkey's cities, their districts, neighbourhoods and places) through the Overpass API.
      *
-     * @param importOnStartup    import once in the background when the database has no OSM places yet
-     * @param refreshCron        Spring cron for the periodic refresh ("-" disables it)
+     * @param importOnStartup    in the background after startup: the provinces when they are missing, then every
+     *                           selected city that has never been imported
+     * @param refreshCron        Spring cron for the periodic refresh of all selected cities ("-" disables it)
+     * @param cities             "all", or a comma separated list of city slugs ("istanbul,ankara,izmir")
+     * @param callDelay          pause between two Overpass calls of the city-by-city import (be polite)
+     * @param refreshAfter       a city imported more recently than this is skipped unless the run is forced
      * @param overpassEndpoints  tried in order; the main server is often busy
      * @param maxAttempts        rounds over all endpoints before giving up
      * @param retryDelay         wait between rounds (grows with each round)
@@ -65,12 +69,29 @@ public record NomiProperties(
     public record Osm(
             boolean importOnStartup,
             String refreshCron,
+            String cities,
+            Duration callDelay,
+            Duration refreshAfter,
             List<String> overpassEndpoints,
             Duration connectTimeout,
             Duration readTimeout,
             int maxAttempts,
             Duration retryDelay
     ) {
+
+        // null = every city
+        public java.util.Set<String> selectedCities() {
+            if (cities == null || cities.isBlank() || "all".equalsIgnoreCase(cities.trim())) {
+                return null;
+            }
+            java.util.Set<String> slugs = new java.util.LinkedHashSet<>();
+            for (String slug : cities.split(",")) {
+                if (!slug.isBlank()) {
+                    slugs.add(slug.trim().toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+            return slugs.isEmpty() ? null : slugs;
+        }
     }
 
     /**

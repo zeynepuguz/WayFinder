@@ -3,6 +3,7 @@ package com.nomi.wayfinder.planning;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
+import com.nomi.wayfinder.entity.WalkingTolerance;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.repository.PlaceDistance;
 import com.nomi.wayfinder.repository.PlaceRepository;
@@ -11,6 +12,7 @@ import com.nomi.wayfinder.weather.WeatherService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.function.Function;
@@ -35,6 +37,10 @@ public class RoutePlanner {
     // How early before its target time a stop may start (a meal should not start hours early)
     static final int MEAL_FLEX_MINUTES = 30;
     static final int OTHER_FLEX_MINUTES = 90;
+    // Popular routes (planTheme): a day from 10:00 to 22:00 for one person
+    public static final LocalTime THEME_START = LocalTime.of(10, 0);
+    public static final LocalTime THEME_END = LocalTime.of(22, 0);
+    public static final int THEME_PARTY_SIZE = 1;
 
     private final PlaceRepository placeRepository;
     private final PlaceScorer scorer;
@@ -44,6 +50,23 @@ public class RoutePlanner {
         this.placeRepository = placeRepository;
         this.scorer = scorer;
         this.weatherService = weatherService;
+    }
+
+    /**
+     * A themed day (popular routes) from a start point, without a user or a saved route: the slots of the theme,
+     * from THEME_START to THEME_END, one person, no budget, MEDIUM walking. The same request is used when the
+     * user starts that route (RouteService), so the saved route matches the preview.
+     */
+    @Transactional(readOnly = true)
+    public PlanResult planTheme(List<PlanningSlot> slots, List<String> interests, double startLatitude,
+                                double startLongitude, LocalDate date) {
+        return plan(themeRequest(slots, interests, startLatitude, startLongitude, date));
+    }
+
+    public static PlanningRequest themeRequest(List<PlanningSlot> slots, List<String> interests,
+                                               double startLatitude, double startLongitude, LocalDate date) {
+        return new PlanningRequest(startLatitude, startLongitude, date, THEME_START, THEME_END, THEME_PARTY_SIZE,
+                null, WalkingTolerance.MEDIUM, List.copyOf(interests), List.copyOf(slots), Set.of(), false);
     }
 
     @Transactional(readOnly = true)
@@ -190,11 +213,10 @@ public class RoutePlanner {
             double searchRadius,
             double maxLegForScoring
     ) {
-        StopType type = slot.type();
-        List<String> categories = type.getCategories().stream().map(PlaceCategory::name).toList();
+        List<String> categories = slot.searchCategories().stream().map(PlaceCategory::name).sorted().toList();
 
         List<PlaceDistance> found = placeRepository.findCandidates(
-                leg.latitude(), leg.longitude(), searchRadius, categories, type.getMatchingTag(), CANDIDATE_LIMIT);
+                leg.latitude(), leg.longitude(), searchRadius, categories, slot.searchTag(), CANDIDATE_LIMIT);
 
         Map<Long, Place> places = loadPlaces(found);
 

@@ -11,7 +11,7 @@ import com.nomi.wayfinder.entity.Place;
  * @param license   short name, e.g. "CC BY-SA 4.0"
  * @param sourceUrl the Commons file description page
  */
-public record PlaceImage(String url, String author, String license, String sourceUrl) {
+public record PlaceImage(String url, String author, String license, String sourceUrl) implements java.io.Serializable {
 
     // null when the place has no image
     public static PlaceImage of(Place place) {

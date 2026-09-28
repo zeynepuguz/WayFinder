@@ -8,7 +8,7 @@ export const PHOTO: PlaceImage = {
 }
 
 export const place = (id: number, name: string, extra: Partial<Place> = {}): Place => ({
-  id, name, description: null, address: null, neighborhood: null, latitude: 40.99, longitude: 29.02,
+  id, name, description: null, address: null, neighborhood: null, district: null, city: null, latitude: 40.99, longitude: 29.02,
   category: 'CAFE', estimatedCost: null, rating: null, indoor: false, avgVisitMinutes: null, tags: [],
   openingHours: [], openNow: null, source: 'OSM', lastVerifiedAt: null, verified: false,
   sourceUrl: null, image: null, ...extra,

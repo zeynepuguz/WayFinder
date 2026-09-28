@@ -102,6 +102,30 @@ public class RouteService {
         return routeRepository.save(route);
     }
 
+    /**
+     * Saves a plan made from a ready planner request (a popular route the user starts): the same request as the
+     * preview, so the route has the same stops as long as places, opening hours and the forecast did not change.
+     */
+    @Transactional
+    public RouteResponse createPlannedRoute(Long userId, String title, PlanningRequest request) {
+        PlanResult result = planner.plan(request);
+
+        Route route = new Route();
+        route.setUserId(userId);
+        route.setTitle(title);
+        route.setDate(request.date());
+        route.setStartLocation(request.startLatitude(), request.startLongitude());
+        route.setStartTime(request.startTime());
+        route.setEndTime(request.endTime());
+        route.setPartySize(request.partySize());
+        route.setBudget(request.budget());
+        route.setWalkingTolerance(request.walkingTolerance());
+        route.setInterests(new ArrayList<>(request.interests()));
+        applyResult(route, result, List.of());
+
+        return routeMapper.toResponse(routeRepository.save(route));
+    }
+
     // ================= READ / UPDATE =================
 
     @Transactional(readOnly = true)
@@ -403,8 +427,13 @@ public class RouteService {
     // "27 Eylül Pazar Rotası" / "Sunday, 27 September route"
     public static String defaultTitle(LocalDate date) {
         return Texts.english()
-                ? date.format(TITLE_DATE_EN) + " route"
-                : date.format(TITLE_DATE) + " Rotası";
+                ? dayName(date) + " route"
+                : dayName(date) + " Rotası";
+    }
+
+    // "27 Eylül Pazar" / "Sunday, 27 September"
+    public static String dayName(LocalDate date) {
+        return Texts.english() ? date.format(TITLE_DATE_EN) : date.format(TITLE_DATE);
     }
 
     private LocalTime defaultStart(LocalDate date) {

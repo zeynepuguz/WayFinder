@@ -95,3 +95,10 @@ class AssistantIntent(BaseModel):
     edits: list[RouteEdit]
     recommendType: StopType | None
     source: str | None
+    # Added later: defaults keep older payloads valid; OpenAI's strict schema still lists them as required (nullable)
+    date: str | None = Field(
+        default=None,
+        description="The day the user means, YYYY-MM-DD, resolved from context.today; null = not said (today)")
+    area: str | None = Field(
+        default=None,
+        description="The city, district or neighbourhood in Turkey the user wants to be in / start from, as written; null if none")

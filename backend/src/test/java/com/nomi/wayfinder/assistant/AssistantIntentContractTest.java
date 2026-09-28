@@ -35,5 +35,21 @@ class AssistantIntentContractTest {
         assertThat(intent.plan().startTime()).isEqualTo(LocalTime.of(10, 30));
         assertThat(intent.edits().getFirst().type()).isEqualTo(ReplanType.REMOVE_STOP);
         assertThat(intent.edits().getFirst().targetStopType()).isEqualTo(StopType.DINNER);
+        // Older AI service versions send neither
+        assertThat(intent.date()).isNull();
+        assertThat(intent.area()).isNull();
+    }
+
+    @Test
+    void backendReadsDateAndArea() {
+        AssistantIntent intent = JsonMapper.builder().build().readValue("""
+                {"type":"PLAN_ROUTE","plan":{"partySize":2,"budget":700,"walkingTolerance":null,"stops":[],
+                "interests":[],"startTime":"13:00"},"edits":[],"recommendType":null,"source":"ai",
+                "date":"2026-09-28","area":"üsküdar"}
+                """, AssistantIntent.class);
+
+        assertThat(intent.date()).isEqualTo(java.time.LocalDate.of(2026, 9, 28));
+        assertThat(intent.area()).isEqualTo("üsküdar");
+        assertThat(intent.plan().startTime()).isEqualTo(LocalTime.of(13, 0));
     }
 }

@@ -139,3 +139,53 @@ export const CATEGORY_BY_SLUG: Record<string, PlaceCategory> = Object.fromEntrie
 export function httpUrl(url: string | null | undefined): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null
 }
+
+// "kadikoy" matches "Kadıköy": case- and diacritic-insensitive, so English keyboards work too
+export function fold(text: string): string {
+  return text.toLocaleLowerCase('tr').replace(/ı/g, 'i').normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+// Appends the next page of a list; the same place can move between pages while data changes, so ids stay unique
+export function appendUnique<T extends { id: number }>(current: T[], next: T[]): T[] {
+  const seen = new Set(current.map(item => item.id))
+  const added = next.filter(item => !seen.has(item.id) && (seen.add(item.id), true))
+  return added.length ? [...current, ...added] : current
+}
+
+const BACK_VOWELS = 'aıou'
+const FRONT_VOWELS = 'eiöü'
+// f, s, t, k, ç, ş, h, p ("FıSTıKÇı ŞaHaP") harden the suffix: -ta/-te
+const HARD_CONSONANTS = 'fstkçşhp'
+
+/**
+ * Turkish locative with the apostrophe used for proper names:
+ * İstanbul’da, İzmir’de, Muş’ta, Gaziantep’te. The last vowel picks a/e (vowel harmony),
+ * a hard final consonant turns d into t.
+ */
+export function locativeTr(name: string): string {
+  const word = name.trim()
+  const lower = word.toLocaleLowerCase('tr')
+  let vowel = 'a'
+  for (let i = lower.length - 1; i >= 0; i--) {
+    if (BACK_VOWELS.includes(lower[i])) break
+    if (FRONT_VOWELS.includes(lower[i])) {
+      vowel = 'e'
+      break
+    }
+  }
+  const consonant = HARD_CONSONANTS.includes(lower[lower.length - 1] ?? '') ? 't' : 'd'
+  return `${word}’${consonant}${vowel}`
+}
+
+/**
+ * Cost line of a ready-made route: the sum of the known prices, never a guess for the rest.
+ * No known price at all -> "Fiyat bilgisi yok"; some unknown -> the known sum plus how many are missing.
+ */
+export function popularRouteCost(cost: number | null, unknownPriceStops: number): string {
+  if (cost == null) return tr('Fiyat bilgisi yok', 'No price info')
+  const amount = `~${cost.toLocaleString(locale())} TL`
+  const known = cost === 0 ? tr('Ücretsiz', 'Free') : tr(`Kişi başı ${amount}`, `${amount} per person`)
+  if (unknownPriceStops <= 0) return known
+  return `${known} · ${tr(`${unknownPriceStops} durağın fiyatı bilinmiyor`,
+    `${unknownPriceStops === 1 ? '1 stop has' : `${unknownPriceStops} stops have`} no price info`)}`
+}

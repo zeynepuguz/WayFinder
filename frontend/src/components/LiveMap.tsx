@@ -5,10 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AttributionControl, Circle, MapContainer, Marker, TileLayer } from 'react-leaflet'
 import { Link } from 'react-router'
 import { api } from '../api'
-import type { NearbyPlace, Place, PlaceCategory, Recommendation } from '../api/types'
+import type { City, District, NearbyPlace, Place, PlaceCategory, Recommendation } from '../api/types'
 import { locationLabel, useLiveLocation, useUserLocation } from '../context/LocationContext'
 import { CATEGORY_LABELS, formatCost, formatDistance, haversineMeters } from '../lib/format'
-import { CATEGORY_PIN, isInIstanbul, latestRequest, MAX_MAP_PINS, placesQueryBox } from '../lib/geo'
+import { CATEGORY_PIN, inBox, isInTurkey, latestRequest, MAX_MAP_PINS, MIN_PLACES_ZOOM, placesQueryBox } from '../lib/geo'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 import { TILE_ATTRIBUTION, TILE_URL } from './mapTiles'
@@ -48,13 +48,20 @@ const liveIcon = L.divIcon({ className: '', html: '<div class="live-dot"></div>'
  * Full-height "around me" map: live position, places in the visible area and recommendations.
  * Places load for the map bounds after each move (debounced, stale answers ignored) when zoomed in enough.
  */
-export function LiveMap({ category }: { category: PlaceCategory | null }) {
+export function LiveMap({ category, focusArea = null, focusCity = null }: {
+  category: PlaceCategory | null
+  // A chosen district: the map moves there (and stops following the user)
+  focusArea?: District | null
+  // The chosen city (no district): the map flies to its centre when it changes,
+  // or on opening when the user is not in that city
+  focusCity?: City | null
+}) {
   const t = useT()
   const fallback = useUserLocation()
   const live = useLiveLocation(true)
 
   // The live fix counts only inside the service area; otherwise the app-wide (demo) location is used
-  const userPos = live.latitude != null && live.longitude != null && isInIstanbul(live.latitude, live.longitude)
+  const userPos = live.latitude != null && live.longitude != null && isInTurkey(live.latitude, live.longitude)
     ? { latitude: live.latitude, longitude: live.longitude }
     : null
   const origin = userPos ?? { latitude: fallback.latitude, longitude: fallback.longitude }
@@ -153,6 +160,31 @@ export function LiveMap({ category }: { category: PlaceCategory | null }) {
       map.panTo(here)
     }
   }, [map, follow, userPos?.latitude, userPos?.longitude])
+
+  // ---------- chosen district ----------
+  useEffect(() => {
+    if (!map || !focusArea) return
+    setFollow(false)
+    hadFix.current = true // a later GPS fix must not pull the map away from the district
+    const bounds = L.latLngBounds([focusArea.south, focusArea.west], [focusArea.north, focusArea.east])
+    // Big districts fit only below the zoom where places load: then show their centre close enough to see places
+    const fitZoom = map.getBoundsZoom(bounds)
+    if (fitZoom >= MIN_PLACES_ZOOM) map.flyToBounds(bounds, { duration: 0.8 })
+    else map.flyTo([focusArea.latitude, focusArea.longitude], MIN_PLACES_ZOOM, { duration: 0.8 })
+  }, [map, focusArea?.slug])
+
+  // ---------- chosen city ----------
+  const shownCity = useRef<string | null>(null)
+  useEffect(() => {
+    if (!map || !focusCity || focusArea) return
+    const first = shownCity.current == null
+    shownCity.current = focusCity.slug
+    // Opening the map in the user's own city keeps the "around me" view
+    if (first && inBox(focusCity, originRef.current.latitude, originRef.current.longitude)) return
+    setFollow(false)
+    hadFix.current = true // a later GPS fix must not pull the map away from the city
+    map.flyTo([focusCity.latitude, focusCity.longitude], MIN_PLACES_ZOOM, { duration: 0.8 })
+  }, [map, focusCity?.slug, focusArea?.slug])
 
   function centerOnMe() {
     if (!map) return

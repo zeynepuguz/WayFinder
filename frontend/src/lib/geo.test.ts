@@ -1,12 +1,21 @@
-import { clampBox, isInIstanbul, latestRequest, MAX_BOX_SPAN, placesQueryBox } from './geo'
+import { clampBox, inBox, isInTurkey, latestRequest, MAX_BOX_SPAN, placesQueryBox } from './geo'
 
 describe('geo helpers', () => {
-  it('knows the Istanbul service area', () => {
-    expect(isInIstanbul(40.991, 29.023)).toBe(true) // Kadıköy
-    expect(isInIstanbul(41.0082, 28.9784)).toBe(true) // Sultanahmet
-    expect(isInIstanbul(41.17, 29.61)).toBe(true) // Şile
-    expect(isInIstanbul(39.92, 32.85)).toBe(false) // Ankara
-    expect(isInIstanbul(40.77, 29.92)).toBe(false) // İzmit
+  it('knows the Türkiye service area', () => {
+    expect(isInTurkey(40.991, 29.023)).toBe(true) // Kadıköy
+    expect(isInTurkey(39.92, 32.85)).toBe(true) // Ankara
+    expect(isInTurkey(38.42, 27.14)).toBe(true) // İzmir
+    expect(isInTurkey(39.92, 44.04)).toBe(true) // Iğdır
+    expect(isInTurkey(36.2, 36.16)).toBe(true) // Antakya
+    expect(isInTurkey(48.85, 2.35)).toBe(false) // Paris
+    expect(isInTurkey(42.7, 23.32)).toBe(false) // Sofia
+    expect(isInTurkey(35.5, 33.9)).toBe(false) // south of the box
+  })
+
+  it('checks a point against a box', () => {
+    const box = { south: 39.5, west: 32.3, north: 40.3, east: 33.3 }
+    expect(inBox(box, 39.92, 32.85)).toBe(true)
+    expect(inBox(box, 41, 29)).toBe(false)
   })
 
   it('keeps a small box as it is', () => {

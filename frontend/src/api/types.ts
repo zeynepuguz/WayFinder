@@ -79,6 +79,10 @@ export interface Place {
   description: string | null
   address: string | null
   neighborhood: string | null
+  // District (ilçe) name; null when the place lies outside the known district borders
+  district: string | null
+  // City (il) name; null when unknown
+  city: string | null
   latitude: number
   longitude: number
   category: PlaceCategory
@@ -118,6 +122,26 @@ export interface MapBox {
   west: number
   north: number
   east: number
+}
+
+// One of a city's districts (GET /districts?city=, sorted by name); the box frames it on the map
+export interface District extends MapBox {
+  slug: string
+  name: string
+  latitude: number
+  longitude: number
+  placeCount: number
+}
+
+// One of Türkiye's 81 cities (GET /cities, sorted); placeCount 0 = not imported yet ("coming soon").
+// latitude/longitude is the city's label point (its centre on the map)
+export interface City extends MapBox {
+  slug: string
+  name: string
+  latitude: number
+  longitude: number
+  placeCount: number
+  districtCount: number
 }
 
 export interface Page<T> {
@@ -239,6 +263,45 @@ export interface RoutePlanRequest {
   stops?: StopType[]
   interests?: string[]
   title?: string
+}
+
+// Ready-made themed route for a city or district (GET /routes/popular)
+export type PopularRouteTheme = 'HISTORY' | 'FOOD' | 'COFFEE_DESSERT' | 'PARKS_VIEWS'
+
+export interface PopularRouteStop {
+  // "HH:mm"
+  time: string
+  type: StopType
+  typeLabel: string
+  walkingMinutes: number
+  distanceMeters: number
+  place: {
+    id: number
+    name: string
+    category: PlaceCategory
+    latitude: number
+    longitude: number
+    image: PlaceImage | null
+    estimatedCost: number | null
+    verified: boolean
+    district: string | null
+  }
+}
+
+export interface PopularRoute {
+  theme: PopularRouteTheme
+  title: string
+  description: string
+  startLabel: string
+  startLatitude: number
+  startLongitude: number
+  date: string
+  stops: PopularRouteStop[]
+  totalWalkingMinutes: number
+  // sum of the known prices per person; null when no stop has a known price
+  estimatedCostPerPerson: number | null
+  // stops whose price is unknown (not part of estimatedCostPerPerson)
+  unknownPriceStops: number
 }
 
 export interface ReplanRequest {

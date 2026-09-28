@@ -5,6 +5,7 @@ import { api } from '../api'
 import { ApiRequestError } from '../api/client'
 import type { Recommendation, Route } from '../api/types'
 import { Locked } from '../components/gate'
+import { HScroll } from '../components/HScroll'
 import { FartherPlaceRow, PlaceRow } from '../components/PlaceViews'
 import { Alert } from '../components/ui'
 import { STOP_ICON } from '../components/visuals'
@@ -27,7 +28,7 @@ interface Message {
 // Functions, not constants: the texts follow the language chosen at runtime
 const starters = () => [
   tr('2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz', 'We’re 2 people with 700 TL, we’d like breakfast and coffee'),
-  tr('İstanbul’a ilk defa geliyorum, bir günlük rota planla', 'It’s my first time in Istanbul, plan a day for me'),
+  tr('Bu şehre ilk defa geliyorum, bir günlük rota planla', 'It’s my first time in this city, plan a day for me'),
   tr('Yakında iyi bir kahveci öner', 'Suggest a good coffee place nearby'),
 ]
 const duringTrip = () => [
@@ -190,11 +191,11 @@ function Chat({ canSend }: { canSend: boolean }) {
         {canSend ? (
           <>
             {(hasRouteInChat || messages.length > 0) && (
-              <div className="suggestions">
+              <HScroll className="suggestions">
                 {duringTrip().map(q => (
                   <button key={q} className="chip" onClick={() => void send(q)} disabled={sending}>{q}</button>
                 ))}
-              </div>
+              </HScroll>
             )}
             <form className="composer-box" onSubmit={submit}>
               <input value={input} onChange={e => setInput(e.target.value)} placeholder={t('Nomi’ye yaz…', 'Message Nomi…')} maxLength={1000}

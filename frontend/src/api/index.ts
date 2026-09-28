@@ -1,7 +1,8 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, PlansResponse,
-  AssistantReply, AuthResponse, ChatMessage, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory, Preferences,
+  AssistantReply, AuthResponse, ChatMessage, City, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory,
+  PopularRoute, PopularRouteTheme, Preferences,
   Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
 
@@ -26,7 +27,7 @@ export const api = {
   home: (lat: number, lon: number) => http.get<HomeResponse>('/home', { lat, lon }),
 
   searchPlaces: (filter: {
-    category?: PlaceCategory; q?: string; maxCost?: number; indoor?: boolean; page?: number; size?: number
+    category?: PlaceCategory; city?: string; district?: string; q?: string; maxCost?: number; indoor?: boolean; page?: number; size?: number
   }) => http.get<Page<Place>>('/places', filter),
   nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50, category?: PlaceCategory) =>
     http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit, category }),
@@ -36,6 +37,10 @@ export const api = {
     http.get<NearbyPlace[]>('/places/in-area', {
       ...box, lat: options.lat, lon: options.lon, category: options.category, limit: options.limit ?? 300,
     }, signal),
+  cities: () => http.get<City[]>('/cities'),
+  // The city at a position; 404 when it is not inside one of Türkiye's cities
+  cityAt: (lat: number, lon: number) => http.get<City>('/cities/at', { lat, lon }),
+  districts: (city: string) => http.get<District[]>('/districts', { city }),
   place: (id: number) => http.get<Place>(`/places/${id}`),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
@@ -51,6 +56,10 @@ export const api = {
   deleteRoute: (id: number) => http.delete<void>(`/routes/${id}`),
   updateStop: (routeId: number, stopId: number, status: StopStatus) =>
     http.patch<Route>(`/routes/${routeId}/stops/${stopId}`, { status }),
+  // Ready-made themed routes (public); starting one creates a normal route (account + pass, 402 otherwise)
+  popularRoutes: (city: string, district?: string) => http.get<PopularRoute[]>('/routes/popular', { city, district }),
+  startPopularRoute: (request: { city: string; district?: string; theme: PopularRouteTheme }) =>
+    http.post<Route>('/routes/popular/start', request),
   replan: (routeId: number, request: ReplanRequest) => http.post<ReplanResponse>(`/routes/${routeId}/replan`, request),
 
   savedPlaces: () => http.get<Place[]>('/saved/places'),

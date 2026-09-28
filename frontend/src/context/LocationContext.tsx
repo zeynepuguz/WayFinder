@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { tr } from '../lib/i18n'
-import { isInIstanbul } from '../lib/geo'
+import { isInTurkey } from '../lib/geo'
 
-// Nomi covers Istanbul. Outside of it (or without a fix) we use a demo location in Kadıköy so the app still works.
+// Nomi covers Türkiye. Outside of it (or without a fix) we use a demo location in Kadıköy so the app still works.
 export const KADIKOY = { latitude: 40.991, longitude: 29.023 }
 
 // demo-denied: the user refused location; demo-unavailable: allowed but no fix (indoors, GPS off, timeout)
@@ -26,7 +26,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       return
     }
     const onPosition = ({ coords }: GeolocationPosition) => {
-      setPosition(isInIstanbul(coords.latitude, coords.longitude)
+      setPosition(isInTurkey(coords.latitude, coords.longitude)
         ? { latitude: coords.latitude, longitude: coords.longitude, source: 'gps' }
         : { ...KADIKOY, source: 'demo-outside' })
     }
@@ -65,7 +65,7 @@ export function locationLabel(source: LocationSource): string {
     case 'gps':
       return tr('Konumun kullanılıyor', 'Using your location')
     case 'demo-outside':
-      return tr('Nomi İstanbul’da hizmet veriyor: demo konum kullanılıyor', 'Nomi covers Istanbul: using a demo location')
+      return tr('Nomi Türkiye’de hizmet veriyor: demo konum kullanılıyor', 'Nomi covers Türkiye: using a demo location')
     case 'demo-denied':
       return tr('Konum izni yok: Kadıköy iskelesi kullanılıyor', 'No location permission: using Kadıköy pier')
     case 'demo-unavailable':

@@ -116,7 +116,7 @@ class EnglishTextsTest {
         assertThat(composer.recommendations(List.of(), StopType.COFFEE.getLabel()))
                 .isEqualTo("I could not find a suitable coffee place open near you right now.");
         assertThat(composer.noRoute()).startsWith("You don't have an active route right now.");
-        assertThat(composer.help()).startsWith("I can help you plan your day in the city.");
+        assertThat(composer.help()).startsWith("I can help you plan your day in cities all over Turkey.");
     }
 
     @Test

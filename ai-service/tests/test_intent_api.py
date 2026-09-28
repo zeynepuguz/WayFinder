@@ -1,7 +1,9 @@
+from datetime import date
+
 from fastapi.testclient import TestClient
 
 from app.config import Settings, get_settings
-from app.intent import sanitize
+from app.intent import OpenAIIntentExtractor, sanitize
 from app.main import app, get_extractor
 from app.schemas import (
     AssistantIntent, IntentContext, IntentRequest, IntentType, PlanParams, ReplanType, RouteEdit, StopType,
@@ -116,3 +118,76 @@ def test_sanitize_drops_incomplete_edits():
 def test_health():
     app.dependency_overrides[get_settings] = lambda: Settings(openai_api_key="", openai_model="m")
     assert TestClient(app).get("/health").json() == {"status": "UP", "llmConfigured": False, "model": "m"}
+
+
+def test_date_and_area_reach_the_backend():
+    intent = plan_intent(startTime="13:00")
+    intent.date = "2026-09-28"
+    intent.area = " üsküdar "
+    client = client_with(FakeExtractor(intent))
+
+    body = client.post("/v1/intent", json=BACKEND_BODY, headers={"X-API-Key": "secret"}).json()
+
+    # FakeExtractor sanitizes with the real "today"; 2026-09-28 may be past on the machine running the tests
+    assert body["area"] == "üsküdar"
+    assert "date" in body
+
+
+def test_older_payloads_without_date_and_area_still_validate():
+    intent = AssistantIntent.model_validate(
+        {"type": "UNKNOWN", "plan": None, "edits": [], "recommendType": None, "source": None})
+
+    assert intent.date is None
+    assert intent.area is None
+
+
+def test_sanitize_keeps_only_valid_dates_from_today_on():
+    today = date(2026, 9, 27)
+
+    def cleaned(value):
+        intent = plan_intent()
+        intent.date = value
+        return sanitize(intent, IntentRequest(message="x"), today).date
+
+    assert cleaned("2026-09-28") == "2026-09-28"
+    assert cleaned("2026-09-27") == "2026-09-27"
+    assert cleaned("2026-09-26") is None
+    assert cleaned("2026-13-01") is None
+    assert cleaned("yarın") is None
+    assert cleaned("2031-01-01") is None
+    assert cleaned(None) is None
+
+
+def test_sanitize_drops_blank_area():
+    intent = plan_intent()
+    intent.area = "   "
+
+    assert sanitize(intent, IntentRequest(message="x"), date(2026, 9, 27)).area is None
+
+
+def test_llm_input_contains_todays_date(monkeypatch):
+    captured = {}
+
+    class FakeResponses:
+        def parse(self, **kwargs):
+            captured.update(kwargs)
+            return type("R", (), {"output_parsed": plan_intent()})()
+
+    extractor = OpenAIIntentExtractor(Settings(openai_api_key="x"))
+    monkeypatch.setattr(extractor, "_client", type("C", (), {"responses": FakeResponses()})())
+    monkeypatch.setattr("app.intent.istanbul_today", lambda: date(2026, 9, 27))
+
+    extractor.extract(IntentRequest(message="yarın üsküdarda gezeceğiz"))
+
+    assert '"today": "2026-09-27 (Sunday)"' in captured["input"]
+    assert "yarın" in captured["instructions"]
+
+
+def test_prompt_covers_turkey_and_city_areas():
+    from app.intent import INSTRUCTIONS
+
+    assert "all 81 provinces" in INSTRUCTIONS
+    assert "all of Istanbul" not in INSTRUCTIONS
+    # A city alone, and a city with a neighbourhood inside it
+    assert '"Ankara\'da" -> "Ankara"' in INSTRUCTIONS
+    assert '"Ankara Kızılay"' in INSTRUCTIONS
