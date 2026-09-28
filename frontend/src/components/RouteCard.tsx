@@ -1,18 +1,20 @@
 import { ChevronRight, Route as RouteIcon } from 'lucide-react'
 import { Link } from 'react-router'
 import type { RouteSummary } from '../api/types'
-import { formatDate } from '../lib/format'
+import { formatDate, isPastRoute } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 
 const STATUS: Record<RouteSummary['status'], { label: [string, string]; tone: string }> = {
   DRAFT: { label: ['Planlandı', 'Planned'], tone: 'badge-sea' },
   ACTIVE: { label: ['Devam ediyor', 'In progress'], tone: 'badge-success' },
   COMPLETED: { label: ['Tamamlandı', 'Completed'], tone: '' },
+  EXPIRED: { label: ['Geçmiş', 'Past'], tone: '' },
 }
 
 export function RouteCard({ route }: { route: RouteSummary }) {
   const t = useT()
-  const status = STATUS[route.status]
+  // A planned route whose day is over is shown as past, even before the server marked it EXPIRED
+  const status = STATUS[route.status !== 'COMPLETED' && isPastRoute(route) ? 'EXPIRED' : route.status]
   return (
     <Link to={`/routes/${route.id}`} className="card route-card card-press">
       <div className="route-thumb"><RouteIcon size={26} /></div>

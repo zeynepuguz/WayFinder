@@ -255,7 +255,7 @@ public class UserPhotoRepository {
                 FROM places p
                 LEFT JOIN cities c ON c.id = p.city_id
                 LEFT JOIN districts d ON d.id = p.district_id
-                WHERE p.id = ?
+                WHERE p.id = ? AND NOT p.hidden
                 """, (rs, i) -> new PlaceTarget(
                 rs.getLong("id"),
                 rs.getString("name"),

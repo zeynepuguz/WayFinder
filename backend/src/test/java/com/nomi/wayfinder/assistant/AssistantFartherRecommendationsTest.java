@@ -39,7 +39,8 @@ class AssistantFartherRecommendationsTest {
         RouteService routeService = mock(RouteService.class);
         when(routeService.findCurrentRoute(anyLong())).thenReturn(Optional.empty());
         service = new AssistantService(intentParser, routeService, recommendationService, mock(WeatherService.class),
-                new ResponseComposer(), mock(AssistantMessageRepository.class), mock(AreaResolver.class), CLOCK);
+                new ResponseComposer(), mock(AssistantMessageRepository.class), AssistantConversationsTest.conversationRepository(),
+                mock(AreaResolver.class), CLOCK);
     }
 
     @Test

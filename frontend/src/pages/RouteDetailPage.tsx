@@ -1,6 +1,6 @@
 import {
   BatteryLow, Check, ChevronDown, CloudRain, Footprints, Heart, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
-  Clock, Ellipsis, SkipForward, X,
+  Clock, Ellipsis, History, SkipForward, X,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
@@ -11,7 +11,7 @@ import { RouteMap } from '../components/RouteMap'
 import { Alert, BackButton, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, STOP_TYPE_LABELS } from '../lib/format'
+import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, STOP_TYPE_LABELS } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -76,7 +76,9 @@ export function RouteDetailPage() {
     return <main className="screen"><BackButton to="/routes" /><ErrorState message={error ?? t('Rota bulunamadı', 'Route not found')} onRetry={reload} /></main>
   }
 
-  const finished = route.status === 'COMPLETED'
+  // A route of a day that is over is read-only: no replans, no stop changes (the server answers 409)
+  const past = isPastRoute(route)
+  const finished = route.status === 'COMPLETED' || past
   const WeatherIcon = WEATHER_ICON[route.weather.condition ?? ''] ?? CloudRain
   const nextStop = route.stops.find(s => s.status === 'PLANNED')
 
@@ -124,6 +126,12 @@ export function RouteDetailPage() {
           </Alert>
         )}
         {actionError && <Alert tone="danger"><span>{actionError}</span></Alert>}
+        {past && (
+          <Alert tone="info" icon={History}>
+            <span>{t('Bu rota geçmiş bir güne ait; artık değiştirilemez. Yeni bir rota oluşturabilir ya da asistana yazabilirsin.',
+              'This route belongs to a day that has passed and can no longer be changed. You can create a new route or ask the assistant.')}</span>
+          </Alert>
+        )}
 
         {route.weather.advice && (
           <Alert tone="info" icon={WeatherIcon}><span>{route.weather.advice}</span></Alert>

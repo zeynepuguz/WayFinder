@@ -1,10 +1,15 @@
 package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.area.CityService;
+import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.media.WikimediaImageResolver;
 import com.nomi.wayfinder.media.WikimediaImageResolver.ResolveResult;
 import com.nomi.wayfinder.osm.OsmCityImporter;
 import com.nomi.wayfinder.osm.OsmImportJobs;
 import com.nomi.wayfinder.osm.OsmImportJobs.ImportStatus;
+import com.nomi.wayfinder.osm.PlaceRealismCleanup;
+import com.nomi.wayfinder.popularity.PlacePopularityService;
+import com.nomi.wayfinder.popularity.PopularityJobs;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +21,20 @@ public class AdminController {
 
     private final OsmImportJobs importJobs;
     private final WikimediaImageResolver imageResolver;
+    private final PlaceRealismCleanup cleanup;
+    private final PlacePopularityService popularityService;
+    private final PopularityJobs popularityJobs;
+    private final CityService cityService;
 
-    public AdminController(OsmImportJobs importJobs, WikimediaImageResolver imageResolver) {
+    public AdminController(OsmImportJobs importJobs, WikimediaImageResolver imageResolver, PlaceRealismCleanup cleanup,
+                           PlacePopularityService popularityService, PopularityJobs popularityJobs,
+                           CityService cityService) {
         this.importJobs = importJobs;
         this.imageResolver = imageResolver;
+        this.cleanup = cleanup;
+        this.popularityService = popularityService;
+        this.popularityJobs = popularityJobs;
+        this.cityService = cityService;
     }
 
     /**
@@ -63,5 +78,36 @@ public class AdminController {
     @PostMapping("/places/resolve-images")
     public ResolveResult resolvePlaceImages() {
         return imageResolver.resolve();
+    }
+
+    // Removes / hides existing places whose name is not a realistic visitable place (school canteens, ...); 409 if running
+    @PostMapping("/places/cleanup")
+    public PlaceRealismCleanup.CleanupResult cleanupPlaces() {
+        return cleanup.run();
+    }
+
+    /**
+     * Wikipedia popularity (sitelinks + pageviews) of places with a Wikidata id that were not checked recently.
+     * - ?city=istanbul: that city now when no pass is running (takes minutes; 200 with the result), else queued (202)
+     * - no city: every city, queued in the background (202)
+     * GET /places/popularity-status tells whether a pass is still running.
+     */
+    @PostMapping("/places/update-popularity")
+    public ResponseEntity<?> updatePopularity(@RequestParam(required = false) String city) {
+        Long cityId = null;
+        if (city != null && !city.isBlank()) {
+            cityId = cityService.findBySlug(city)
+                    .orElseThrow(() -> new ResourceNotFoundException("City not found: " + city)).id();
+            if (!popularityJobs.isBusy()) {
+                return ResponseEntity.ok(popularityService.update(cityId));
+            }
+        }
+        popularityJobs.requestPass(cityId, "admin");
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(java.util.Map.of("queued", true));
+    }
+
+    @GetMapping("/places/popularity-status")
+    public java.util.Map<String, Boolean> popularityStatus() {
+        return java.util.Map.of("running", popularityJobs.isBusy());
     }
 }

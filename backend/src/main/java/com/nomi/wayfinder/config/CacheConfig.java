@@ -17,7 +17,7 @@ import java.time.Duration;
 public class CacheConfig implements CachingConfigurer {
 
     private static final Logger log = LoggerFactory.getLogger(CacheConfig.class);
-    // Popular routes are full planner runs (4 themes); the places behind them change monthly (imports clear it)
+    // Popular routes are full planner runs (up to 5 routes); imports, cleanups and popularity updates clear them
     static final Duration POPULAR_ROUTES_TTL = Duration.ofHours(3);
 
     // Per-cache time to live; other caches keep spring.cache.redis.time-to-live
@@ -25,7 +25,7 @@ public class CacheConfig implements CachingConfigurer {
     public RedisCacheManagerBuilderCustomizer popularRoutesCacheTtl() {
         // The app's class loader (like Spring Boot's own default): with the JVM default, cached DTOs could not
         // be cast back after a devtools restart ("Cannot cast X to X")
-        return builder -> builder.withCacheConfiguration("popularRoutes",
+        return builder -> builder.withCacheConfiguration(com.nomi.wayfinder.service.PopularRouteService.CACHE,
                 RedisCacheConfiguration.defaultCacheConfig(CacheConfig.class.getClassLoader()).entryTtl(POPULAR_ROUTES_TTL));
     }
 

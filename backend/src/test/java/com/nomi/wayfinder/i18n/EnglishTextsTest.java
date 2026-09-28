@@ -115,7 +115,7 @@ class EnglishTextsTest {
                 .contains("09:30 → Breakfast: Çiya (~200 TL per person) (visited)");
         assertThat(composer.recommendations(List.of(), StopType.COFFEE.getLabel()))
                 .isEqualTo("I could not find a suitable coffee place open near you right now.");
-        assertThat(composer.noRoute()).startsWith("You don't have an active route right now.");
+        assertThat(composer.noRoute()).startsWith("There is no route in this chat yet.");
         assertThat(composer.help()).startsWith("I can help you plan your day in cities all over Turkey.");
     }
 

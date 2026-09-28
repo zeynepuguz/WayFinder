@@ -91,8 +91,6 @@ class AssistantAreaDateRouteTest {
 
         RouteRepository routeRepository = mock(RouteRepository.class);
         when(routeRepository.save(any(Route.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(routeRepository.findFirstByUserIdAndStatusInOrderByUpdatedAtDesc(anyLong(), anyCollection()))
-                .thenReturn(Optional.empty());
         UserService userService = mock(UserService.class);
         when(userService.getPreferences(anyLong())).thenReturn(new UserPreferences(1L));
 
@@ -110,7 +108,8 @@ class AssistantAreaDateRouteTest {
         });
 
         service = new AssistantService(new RuleBasedIntentParser(CLOCK), routeService, mock(RecommendationService.class),
-                weatherService, new ResponseComposer(), mock(AssistantMessageRepository.class), areaResolver, CLOCK);
+                weatherService, new ResponseComposer(), mock(AssistantMessageRepository.class),
+                AssistantConversationsTest.conversationRepository(), areaResolver, CLOCK);
     }
 
     @Test

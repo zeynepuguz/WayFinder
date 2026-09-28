@@ -75,10 +75,13 @@ public class HomeController {
         // Nearby only; "better but farther" places are offered by the assistant when the user asks for suggestions
         List<Recommendation> suggestions = recommendationService.recommend(lat, lon, suggestedType, userId, 3);
 
+        // Only a route of today is "Aktif rotan"; past days never are. Without one, tomorrow's plan is shown instead
         RouteSummary currentRoute = userId == null ? null
                 : routeService.findCurrentRouteSummary(userId).orElse(null);
+        RouteSummary tomorrowRoute = userId == null || currentRoute != null ? null
+                : routeService.findTomorrowRouteSummary(userId).orElse(null);
 
-        return new HomeResponse(weather, suggestedType, suggestions, currentRoute,
+        return new HomeResponse(weather, suggestedType, suggestions, currentRoute, tomorrowRoute,
                 Texts.english() ? PROMPTS_EN : PROMPTS);
     }
 
@@ -108,7 +111,10 @@ public class HomeController {
             WeatherNow weather,
             StopType suggestedStopType,
             List<Recommendation> suggestions,
+            // Today's unfinished route ("Aktif rotan"), or null
             RouteSummary currentRoute,
+            // "Yarınki rotan": only when there is no route today
+            RouteSummary tomorrowRoute,
             List<String> prompts
     ) {
     }

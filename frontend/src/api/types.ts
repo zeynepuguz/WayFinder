@@ -4,7 +4,8 @@ export type PlaceCategory =
   | 'BREAKFAST' | 'RESTAURANT' | 'CAFE' | 'DESSERT' | 'ATTRACTION' | 'MUSEUM' | 'PARK' | 'CULTURE'
 export type StopType = 'BREAKFAST' | 'SIGHTSEEING' | 'LUNCH' | 'COFFEE' | 'DESSERT' | 'DINNER'
 export type WalkingTolerance = 'LOW' | 'MEDIUM' | 'HIGH'
-export type RouteStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED'
+// EXPIRED: the route's day is over and it was never finished (read-only, shown under "Geçmiş rotalar")
+export type RouteStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'EXPIRED'
 export type StopStatus = 'PLANNED' | 'VISITED' | 'SKIPPED'
 export type ReplanType =
   | 'TIRED' | 'WEATHER_CHANGED' | 'REMOVE_STOP' | 'REPLACE_STOP' | 'ADD_STOP' | 'ADD_INTEREST' | 'LESS_WALKING'
@@ -192,7 +193,10 @@ export interface HomeResponse {
   weather: WeatherNow | null
   suggestedStopType: StopType
   suggestions: Recommendation[]
+  // today's unfinished route ("Aktif rotan"); never a route of a past day
   currentRoute: RouteSummary | null
+  // "Yarınki rotan": only when there is no route today
+  tomorrowRoute?: RouteSummary | null
   prompts: string[]
 }
 
@@ -265,12 +269,12 @@ export interface RoutePlanRequest {
   title?: string
 }
 
-// Ready-made themed route for a city or district (GET /routes/popular)
-export type PopularRouteTheme = 'HISTORY' | 'FOOD' | 'COFFEE_DESSERT' | 'PARKS_VIEWS'
-
+// Ready-made route of a city or district (GET /routes/popular): the area's most popular sights that lie
+// close together, in walking order, with meals / coffee planned in between
 export interface PopularRouteStop {
   // "HH:mm"
   time: string
+  durationMinutes: number
   type: StopType
   typeLabel: string
   walkingMinutes: number
@@ -285,13 +289,20 @@ export interface PopularRouteStop {
     estimatedCost: number | null
     verified: boolean
     district: string | null
+    // Wikipedia-based popularity; null = unknown
+    popularity: number | null
   }
 }
 
 export interface PopularRoute {
-  theme: PopularRouteTheme
+  // stable id of the route; POST /routes/popular/start takes it
+  key: string
+  // real area name(s): "Sultanahmet ve çevresi", "Galata–Karaköy"
   title: string
   description: string
+  // why these places count as popular ("Wikipedia’da en çok okunan yerler")
+  popularityNote: string
+  // the first stop (the route starts there)
   startLabel: string
   startLatitude: number
   startLongitude: number
@@ -328,6 +339,8 @@ export interface AssistantReply {
   // 0–2 better fits that are not close to the user, shown below the main picks (empty for other intents)
   fartherRecommendations?: Recommendation[]
   changes: string[]
+  // The chat the message went to (a new one when none was given)
+  conversationId: number
 }
 
 export interface ChatMessage {
@@ -335,7 +348,20 @@ export interface ChatMessage {
   role: 'USER' | 'ASSISTANT'
   content: string
   routeId: number | null
+  conversationId?: number
   createdAt: string
+}
+
+// One assistant chat ("Sohbetler"). routeId = the route this chat planned: only that route is changed by its messages
+export interface ConversationSummary {
+  id: number
+  // null until the first message
+  title: string | null
+  routeId: number | null
+  routeTitle: string | null
+  lastMessageAt: string
+  // the newest message, shortened
+  preview: string | null
 }
 
 // ---------- user photos ("Kullanıcılarımızdan fotoğraflar") ----------

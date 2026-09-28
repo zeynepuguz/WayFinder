@@ -3,7 +3,11 @@ package com.nomi.wayfinder.repository;
 import com.nomi.wayfinder.entity.Route;
 import com.nomi.wayfinder.entity.RouteStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +20,20 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     List<Route> findByUserIdAndSavedTrueOrderByCreatedAtDesc(Long userId);
 
-    // The route the user is most likely talking about in the assistant
-    Optional<Route> findFirstByUserIdAndStatusInOrderByUpdatedAtDesc(Long userId, Collection<RouteStatus> statuses);
+    // The route of one day the user is most likely busy with (home screen: today, tomorrow)
+    Optional<Route> findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
+            Long userId, LocalDate date, Collection<RouteStatus> statuses);
+
+    // Unfinished routes of days that are over -> EXPIRED (all users: the daily job; one user: on read)
+    @Modifying
+    @Query("UPDATE Route r SET r.status = com.nomi.wayfinder.entity.RouteStatus.EXPIRED "
+            + "WHERE r.date < :today AND r.status IN (com.nomi.wayfinder.entity.RouteStatus.DRAFT, "
+            + "com.nomi.wayfinder.entity.RouteStatus.ACTIVE)")
+    int expireBefore(@Param("today") LocalDate today);
+
+    @Modifying
+    @Query("UPDATE Route r SET r.status = com.nomi.wayfinder.entity.RouteStatus.EXPIRED "
+            + "WHERE r.userId = :userId AND r.date < :today AND r.status IN ("
+            + "com.nomi.wayfinder.entity.RouteStatus.DRAFT, com.nomi.wayfinder.entity.RouteStatus.ACTIVE)")
+    int expireBefore(@Param("userId") Long userId, @Param("today") LocalDate today);
 }

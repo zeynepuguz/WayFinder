@@ -1,11 +1,8 @@
-import {
-  ChevronDown, Coffee, Crown, Footprints, Landmark, MapPin, Play, Route as RouteIcon, Trees, UtensilsCrossed, Wallet,
-  type LucideIcon,
-} from 'lucide-react'
+import { ChevronDown, Crown, Footprints, MapPin, Play, Route as RouteIcon, TrendingUp, Wallet } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
-import type { PopularRoute, PopularRouteTheme } from '../api/types'
+import type { PlaceCategory, PopularRoute, PopularRouteStop, StopType } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { popularRouteCost } from '../lib/format'
 import { useT } from '../lib/i18n'
@@ -13,20 +10,26 @@ import { useAsync } from '../lib/useAsync'
 import { useGate } from './gate'
 import { RouteMap } from './RouteMap'
 import { Alert, EmptyState, ErrorState, ListSkeleton, Spinner } from './ui'
-import { CategoryTile } from './visuals'
+import { STOP_ICON, usePlacePhoto } from './visuals'
 
-const THEME_ICON: Record<PopularRouteTheme, LucideIcon> = {
-  HISTORY: Landmark,
-  FOOD: UtensilsCrossed,
-  COFFEE_DESSERT: Coffee,
-  PARKS_VIEWS: Trees,
+// Tile colour of a stop without a photo: the colour of the kind of place that fills it
+const STOP_TILE: Record<StopType, PlaceCategory> = {
+  BREAKFAST: 'BREAKFAST',
+  SIGHTSEEING: 'ATTRACTION',
+  LUNCH: 'RESTAURANT',
+  COFFEE: 'CAFE',
+  DESSERT: 'DESSERT',
+  DINNER: 'RESTAURANT',
 }
 
-/** Ready-made themed routes of a city (or one of its districts); one card open at a time. */
+/**
+ * The most popular sights of a city (or one of its districts) that lie close together, in walking order, with
+ * meals and coffee in between; one card open at a time.
+ */
 export function PopularRoutes({ city, district }: { city: string; district: string | null }) {
   const t = useT()
   const { data, error, loading, reload } = useAsync(() => api.popularRoutes(city, district ?? undefined), [city, district])
-  const [open, setOpen] = useState<PopularRouteTheme | null>(null)
+  const [open, setOpen] = useState<string | null>(null)
   useEffect(() => setOpen(null), [city, district])
 
   if (loading) return <ListSkeleton rows={3} height={180} />
@@ -40,9 +43,9 @@ export function PopularRoutes({ city, district }: { city: string; district: stri
   return (
     <div className="stack">
       {data.map(route => (
-        <PopularRouteCard key={route.theme} route={route} city={city} district={district}
-                          expanded={open === route.theme}
-                          onToggle={() => setOpen(current => (current === route.theme ? null : route.theme))} />
+        <PopularRouteCard key={route.key} route={route} city={city} district={district}
+                          expanded={open === route.key}
+                          onToggle={() => setOpen(current => (current === route.key ? null : route.key))} />
       ))}
     </div>
   )
@@ -61,7 +64,6 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
   const { hasAccess } = useAuth()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const Icon = THEME_ICON[route.theme] ?? RouteIcon
   const stopCount = route.stops.length
 
   // Account + pass first (login or paywall, back here afterwards); 402 from the server opens the paywall too
@@ -70,7 +72,7 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
     setBusy(true)
     setError(null)
     try {
-      const created = await api.startPopularRoute({ city, district: district ?? undefined, theme: route.theme })
+      const created = await api.startPopularRoute({ city, district: district ?? undefined, key: route.key, date: route.date })
       navigate(`/routes/${created.id}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : t('Rota oluşturulamadı', 'Could not create the route'))
@@ -81,13 +83,15 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
   return (
     <article className="card popular-route">
       <button className="popular-route-head" onClick={onToggle} aria-expanded={expanded}>
-        <span className={`popular-route-icon theme-${route.theme}`}><Icon size={20} /></span>
+        <span className="popular-route-icon"><RouteIcon size={20} /></span>
         <span className="grow stack-sm" style={{ gap: 2 }}>
           <span className="t-headline">{route.title}</span>
           <span className="t-caption">{route.description}</span>
         </span>
         <ChevronDown size={20} className={`popular-route-chevron ${expanded ? 'open' : ''}`} aria-hidden />
       </button>
+
+      <span className="popular-route-note"><TrendingUp size={13} aria-hidden /> {route.popularityNote}</span>
 
       <div className="meta">
         <span><MapPin size={12} /> {stopCount} {t('durak', stopCount === 1 ? 'stop' : 'stops')}</span>
@@ -98,9 +102,7 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
       <ol className="mini-timeline" aria-label={t('Duraklar', 'Stops')}>
         {route.stops.map((stop, i) => (
           <li key={`${i}-${stop.place.id}`} className="mini-stop">
-            {stop.place.image
-              ? <CategoryTile category={stop.place.category} size={16} image={stop.place.image} alt={stop.place.name} className="mini-stop-photo" />
-              : <span className="mini-stop-num" aria-hidden>{i + 1}</span>}
+            <StopTile stop={stop} />
             <span className="grow stack-sm" style={{ gap: 0, minWidth: 0 }}>
               <span className="stop-time">{stop.time} · {stop.typeLabel}</span>
               <Link to={`/places/${stop.place.id}`} className="mini-stop-name">{stop.place.name}</Link>
@@ -131,5 +133,20 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
         </div>
       )}
     </article>
+  )
+}
+
+// The stop's kind as an icon (sight, lunch, coffee ...), covered by the place photo when there is one
+function StopTile({ stop }: { stop: PopularRouteStop }) {
+  const Icon = STOP_ICON[stop.type]
+  const photo = usePlacePhoto(stop.place.image)
+  return (
+    <span className={`tile tile-${STOP_TILE[stop.type]} mini-stop-photo`} data-stop-type={stop.type}
+          aria-hidden={photo.url ? undefined : true}>
+      <Icon size={16} strokeWidth={1.8} style={{ position: 'relative', zIndex: 1 }} />
+      {photo.url && (
+        <img className="tile-photo" src={photo.url} alt={stop.place.name} loading="lazy" decoding="async" onError={photo.onError} />
+      )}
+    </span>
   )
 }

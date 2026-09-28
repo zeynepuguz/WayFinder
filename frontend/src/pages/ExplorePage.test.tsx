@@ -147,16 +147,17 @@ describe('ExplorePage districts', () => {
   })
 })
 
-const route = (theme: PopularRoute['theme'], title: string): PopularRoute => ({
-  theme, title, description: 'Kalenin çevresinde tarih', startLabel: 'Ulus Meydanı', startLatitude: 39.94, startLongitude: 32.85,
+const route = (key: string, title: string): PopularRoute => ({
+  key, title, description: 'Bu bölgenin en çok ilgi gören yerleri, yürüme sırasıyla.',
+  popularityNote: 'Wikipedia’da en çok okunan yerler', startLabel: 'Ankara Kalesi', startLatitude: 39.94, startLongitude: 32.86,
   date: '2026-09-28', totalWalkingMinutes: 42, estimatedCostPerPerson: 150, unknownPriceStops: 1,
   stops: [
-    { time: '10:00', type: 'SIGHTSEEING', typeLabel: 'Gezi', walkingMinutes: 5, distanceMeters: 400,
+    { time: '09:30', durationMinutes: 45, type: 'SIGHTSEEING', typeLabel: 'Gezi', walkingMinutes: 0, distanceMeters: 0,
       place: { id: 11, name: 'Ankara Kalesi', category: 'ATTRACTION', latitude: 39.94, longitude: 32.86, image: null,
-        estimatedCost: 0, verified: false, district: 'Altındağ' } },
-    { time: '11:30', type: 'LUNCH', typeLabel: 'Öğle yemeği', walkingMinutes: 8, distanceMeters: 600,
+        estimatedCost: 0, verified: false, district: 'Altındağ', popularity: 14.2 } },
+    { time: '12:00', durationMinutes: 60, type: 'LUNCH', typeLabel: 'Öğle yemeği', walkingMinutes: 8, distanceMeters: 600,
       place: { id: 12, name: 'Kale Lokantası', category: 'RESTAURANT', latitude: 39.93, longitude: 32.85, image: null,
-        estimatedCost: null, verified: false, district: 'Altındağ' } },
+        estimatedCost: null, verified: false, district: 'Altındağ', popularity: null } },
   ],
 })
 
@@ -204,13 +205,13 @@ describe('ExplorePage cities', () => {
 
 describe('ExplorePage popular routes', () => {
   it('shows the ready-made routes of the city instead of the place list', async () => {
-    popularRoutes.mockResolvedValue([route('HISTORY', 'Tarihi Ankara')])
+    popularRoutes.mockResolvedValue([route('a1-3f', 'Ulus ve çevresi')])
     renderPage('/explore?sehir=ankara&category=CAFE')
     await userEvent.click(await screen.findByRole('button', { name: /Popüler rotalar/ }))
 
     expect(search).toContain('rotalar=1')
     expect(screen.getByRole('button', { name: /Popüler rotalar/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(await screen.findByText('Tarihi Ankara')).toBeInTheDocument()
+    expect(await screen.findByText('Ulus ve çevresi')).toBeInTheDocument()
     expect(popularRoutes).toHaveBeenCalledWith('ankara', undefined)
     // categories and the place tabs are about places
     expect(screen.queryByRole('button', { name: 'Tümü' })).not.toBeInTheDocument()
@@ -219,20 +220,24 @@ describe('ExplorePage popular routes', () => {
     expect(screen.getByText('2 durak')).toBeInTheDocument()
     expect(screen.getByText(/42 dk yürüyüş/)).toBeInTheDocument()
     expect(screen.getByText(/Kişi başı ~150 TL · 1 durağın fiyatı bilinmiyor/)).toBeInTheDocument()
-    expect(screen.getByText('11:30 · Öğle yemeği')).toBeInTheDocument()
+    expect(screen.getByText('12:00 · Öğle yemeği')).toBeInTheDocument()
+    // why these are popular, and each stop with its kind (sight, lunch ...) instead of one theme
+    expect(screen.getByText('Wikipedia’da en çok okunan yerler')).toBeInTheDocument()
+    expect(screen.getByText('09:30 · Gezi')).toBeInTheDocument()
+    expect(document.querySelector('[data-stop-type="LUNCH"]')).not.toBeNull()
     expect(screen.getByRole('link', { name: 'Ankara Kalesi' })).toHaveAttribute('href', '/places/11')
 
     // the map and the start button appear once the card is opened
     expect(screen.queryByTestId('route-map')).not.toBeInTheDocument()
-    await userEvent.click(screen.getByRole('button', { name: /Tarihi Ankara/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Ulus ve çevresi/ }))
     expect(screen.getByTestId('route-map')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Tarihi Ankara/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /Ulus ve çevresi/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
   it('sends guests to login before starting a route', async () => {
-    popularRoutes.mockResolvedValue([route('HISTORY', 'Tarihi Ankara')])
+    popularRoutes.mockResolvedValue([route('a1-3f', 'Ulus ve çevresi')])
     renderPage('/explore?sehir=ankara&rotalar=1')
-    await userEvent.click(await screen.findByRole('button', { name: /Tarihi Ankara/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Ulus ve çevresi/ }))
     await userEvent.click(screen.getByRole('button', { name: /Bu rotayı başlat/ }))
     expect(await screen.findByText('Giriş sayfası')).toBeInTheDocument()
     expect(startPopularRoute).not.toHaveBeenCalled()
@@ -240,13 +245,13 @@ describe('ExplorePage popular routes', () => {
 
   it('starts the route for premium users and opens it', async () => {
     auth = { user: { id: 1 }, hasAccess: true }
-    popularRoutes.mockResolvedValue([route('FOOD', 'Lezzet Turu')])
+    popularRoutes.mockResolvedValue([route('k9-11', 'Moda ve çevresi')])
     startPopularRoute.mockResolvedValue({ id: 77 })
     renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
-    await userEvent.click(await screen.findByRole('button', { name: /Lezzet Turu/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Moda ve çevresi/ }))
     expect(popularRoutes).toHaveBeenLastCalledWith('istanbul', 'kadikoy')
     await userEvent.click(screen.getByRole('button', { name: /Bu rotayı başlat/ }))
-    expect(startPopularRoute).toHaveBeenCalledWith({ city: 'istanbul', district: 'kadikoy', theme: 'FOOD' })
+    expect(startPopularRoute).toHaveBeenCalledWith({ city: 'istanbul', district: 'kadikoy', key: 'k9-11', date: '2026-09-28' })
     expect(await screen.findByText('Rota sayfası')).toBeInTheDocument()
   })
 

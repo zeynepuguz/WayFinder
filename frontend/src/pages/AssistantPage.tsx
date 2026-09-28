@@ -1,13 +1,13 @@
-import { ArrowUp, ChevronRight, Crown, Sparkles } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { ArrowUp, Check, ChevronRight, Crown, MessagesSquare, Pencil, Sparkles, SquarePen, Trash2, X } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { ApiRequestError } from '../api/client'
-import type { Recommendation, Route } from '../api/types'
+import type { ConversationSummary, Recommendation, Route } from '../api/types'
 import { Locked } from '../components/gate'
 import { HScroll } from '../components/HScroll'
 import { FartherPlaceRow, PlaceRow } from '../components/PlaceViews'
-import { Alert } from '../components/ui'
+import { Alert, Sheet } from '../components/ui'
 import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
@@ -39,6 +39,15 @@ const duringTrip = () => [
   tr('Hava nasıl?', 'How’s the weather?'),
 ]
 
+// A prompt from another screen (/assistant?new=1&q=…) is sent once, even when React StrictMode runs effects twice
+// or the page remounts: the same text is not auto-sent again within a few seconds
+let lastAutoSend: { text: string; at: number } | null = null
+
+/** For tests: forget the last auto-sent prompt */
+export function resetAutoSend() {
+  lastAutoSend = null
+}
+
 export function AssistantPage() {
   const { user, hasAccess } = useAuth()
   const t = useT()
@@ -55,39 +64,77 @@ export function AssistantPage() {
   return <Chat canSend={hasAccess} />
 }
 
+/**
+ * One assistant chat. /assistant?c=<id> shows chat <id>; /assistant alone is a new, empty chat that is created by
+ * its first message. Every chat has its own route, so "Çok yorulduk" etc. only change the route planned here.
+ */
 function Chat({ canSend }: { canSend: boolean }) {
   const t = useT()
   const location = useUserLocation()
   const navigate = useNavigate()
   const [params, setParams] = useSearchParams()
+  const conversationParam = Number(params.get('c'))
+  const conversationId = Number.isInteger(conversationParam) && conversationParam > 0 ? conversationParam : null
+
   const [messages, setMessages] = useState<Message[]>([])
+  const [conversations, setConversations] = useState<ConversationSummary[]>([])
+  const [listOpen, setListOpen] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [loadingChat, setLoadingChat] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
-  const autoSent = useRef(false)
+  // The chat the page just created by sending: its messages are already on screen, no reload needed
+  const createdHere = useRef<number | null>(null)
 
-  useEffect(() => {
-    api.messages()
-      .then(history => setMessages(history.map(m => ({ key: `h${m.id}`, role: m.role, content: m.content, routeId: m.routeId }))))
-      .catch(() => setMessages([]))
+  const loadConversations = useCallback(() => {
+    api.conversations().then(setConversations).catch(() => {})
   }, [])
 
-  // A prompt chosen elsewhere (/assistant?q=...) is sent once the location is known
+  useEffect(loadConversations, [loadConversations])
+
   useEffect(() => {
-    const q = params.get('q')
-    if (q && canSend && !autoSent.current && location.source !== 'loading') {
-      autoSent.current = true
-      setParams({}, { replace: true })
-      void send(q)
+    setError(null)
+    if (conversationId == null) {
+      setMessages([])
+      return
     }
+    if (createdHere.current === conversationId) {
+      createdHere.current = null
+      return
+    }
+    let cancelled = false
+    setMessages([])
+    setLoadingChat(true)
+    api.conversationMessages(conversationId)
+      .then(history => {
+        if (!cancelled) setMessages(history.map(m => ({ key: `h${m.id}`, role: m.role, content: m.content, routeId: m.routeId })))
+      })
+      .catch(e => {
+        if (!cancelled) setError(e instanceof Error ? e.message : t('Sohbet yüklenemedi', 'Could not load the chat'))
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingChat(false)
+      })
+    return () => { cancelled = true }
+  }, [conversationId])
+
+  // A prompt chosen elsewhere (/assistant?new=1&q=…) always starts a new chat, sent once the location is known
+  useEffect(() => {
+    const q = params.get('q')?.trim()
+    if (!q || !canSend || location.source === 'loading') return
+    setParams({}, { replace: true })
+    if (lastAutoSend && lastAutoSend.text === q && Date.now() - lastAutoSend.at < 5000) return
+    lastAutoSend = { text: q, at: Date.now() }
+    setMessages([])
+    void send(q, null)
   }, [params, location.source, canSend])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
+    bottomRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
   }, [messages, sending])
 
-  async function send(text: string) {
+  async function send(text: string, chatId: number | null = conversationId) {
     const message = text.trim()
     if (!message || sending) return
 
@@ -97,12 +144,17 @@ function Chat({ canSend }: { canSend: boolean }) {
     setMessages(current => [...current, { key: `u${Date.now()}`, role: 'USER', content: message }])
 
     try {
-      const reply = await api.sendMessage(message, location.latitude, location.longitude)
+      const reply = await api.sendMessage(message, location.latitude, location.longitude, chatId)
       setMessages(current => [...current, {
         key: `a${Date.now()}`, role: 'ASSISTANT', content: reply.reply,
         route: reply.route, routeId: reply.route?.id, recommendations: reply.recommendations,
         fartherRecommendations: reply.fartherRecommendations ?? [],
       }])
+      if (reply.conversationId && reply.conversationId !== chatId) {
+        createdHere.current = reply.conversationId
+        setParams({ c: String(reply.conversationId) }, { replace: true })
+      }
+      loadConversations()
     } catch (e) {
       if (!(e instanceof ApiRequestError && e.status === 402)) {
         setError(e instanceof Error ? e.message : t('Mesaj gönderilemedi', 'Message could not be sent'))
@@ -117,20 +169,35 @@ function Chat({ canSend }: { canSend: boolean }) {
     void send(input)
   }
 
-  const hasRouteInChat = messages.some(m => m.routeId)
+  function open(id: number | null) {
+    setListOpen(false)
+    navigate(id == null ? '/assistant' : `/assistant?c=${id}`)
+  }
+
+  const current = conversations.find(c => c.id === conversationId)
+  // Quick replies change a route, so they only make sense in a chat that has one
+  const hasRoute = current?.routeId != null || messages.some(m => m.routeId)
 
   return (
     <main className="screen chat-screen">
       <header className="chat-header">
         <span className="bot-avatar"><Sparkles size={20} /></span>
-        <div className="grow">
+        <div className="grow" style={{ minWidth: 0 }}>
           <h1 className="t-headline">{t('Nomi Asistan', 'Nomi Assistant')}</h1>
-          <p className="t-caption">{t('Gerçek mekan, saat ve hava verisiyle plan yapar', 'Plans with real places, opening hours and weather')}</p>
+          <p className="t-caption" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {current?.title ?? t('Gerçek mekan, saat ve hava verisiyle plan yapar', 'Plans with real places, opening hours and weather')}
+          </p>
         </div>
+        <button className="icon-btn" onClick={() => setListOpen(true)} aria-label={t('Sohbetler', 'Chats')} title={t('Sohbetler', 'Chats')}>
+          <MessagesSquare size={19} />
+        </button>
+        <button className="icon-btn" onClick={() => open(null)} aria-label={t('Yeni sohbet', 'New chat')} title={t('Yeni sohbet', 'New chat')}>
+          <SquarePen size={19} />
+        </button>
       </header>
 
       <div className="chat" aria-live="polite">
-        {messages.length === 0 && !sending && (
+        {messages.length === 0 && !sending && !loadingChat && conversationId == null && (
           <div className="card card-pad-lg stack">
             <h2 className="t-title">{t('Merhaba! Bugün nasıl bir gün istersin?', 'Hi! What kind of day would you like?')}</h2>
             <p className="ink-2">{t('Kaç kişi olduğunuzu, bütçeni ve ne yapmak istediğini yaz. Gezerken “çok yorulduk” ya da “yağmur başladı” dersen rotanı hemen güncellerim.',
@@ -190,7 +257,7 @@ function Chat({ canSend }: { canSend: boolean }) {
       <div className="composer">
         {canSend ? (
           <>
-            {(hasRouteInChat || messages.length > 0) && (
+            {hasRoute && (
               <HScroll className="suggestions">
                 {duringTrip().map(q => (
                   <button key={q} className="chip" onClick={() => void send(q)} disabled={sending}>{q}</button>
@@ -209,8 +276,140 @@ function Chat({ canSend }: { canSend: boolean }) {
           </button>
         )}
       </div>
+
+      <Sheet open={listOpen} onClose={() => setListOpen(false)} label={t('Sohbetler', 'Chats')}>
+        <ConversationList
+          conversations={conversations}
+          currentId={conversationId}
+          canEdit={canSend}
+          onOpen={open}
+          onChanged={updated => setConversations(list => list.map(c => (c.id === updated.id ? updated : c)))}
+          onDeleted={id => {
+            setConversations(list => list.filter(c => c.id !== id))
+            if (id === conversationId) open(null)
+          }}
+        />
+      </Sheet>
     </main>
   )
+}
+
+function ConversationList({ conversations, currentId, canEdit, onOpen, onChanged, onDeleted }: {
+  conversations: ConversationSummary[]
+  currentId: number | null
+  canEdit: boolean
+  onOpen: (id: number | null) => void
+  onChanged: (conversation: ConversationSummary) => void
+  onDeleted: (id: number) => void
+}) {
+  const t = useT()
+  const [editing, setEditing] = useState<number | null>(null)
+  const [title, setTitle] = useState('')
+  const [confirming, setConfirming] = useState<ConversationSummary | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function run(action: () => Promise<void>) {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('İşlem başarısız', 'Something went wrong'))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const rename = (event: FormEvent, id: number) => {
+    event.preventDefault()
+    if (!title.trim()) return
+    void run(async () => {
+      onChanged(await api.renameConversation(id, title.trim()))
+      setEditing(null)
+    })
+  }
+
+  if (confirming) {
+    return (
+      <div className="stack">
+        <p className="ink-2">
+          {t(`“${confirming.title ?? 'Yeni sohbet'}” sohbeti ve mesajları kalıcı olarak silinsin mi? Oluşturduğu rota Rotalarım’da kalır.`,
+            `Permanently delete the chat “${confirming.title ?? 'New chat'}” and its messages? Its route stays in My routes.`)}
+        </p>
+        {error && <Alert tone="danger"><span>{error}</span></Alert>}
+        <div className="row">
+          <button className="btn btn-secondary grow" onClick={() => setConfirming(null)} disabled={busy}>{t('Vazgeç', 'Cancel')}</button>
+          <button className="btn btn-danger grow" disabled={busy} onClick={() => void run(async () => {
+            await api.deleteConversation(confirming.id)
+            onDeleted(confirming.id)
+            setConfirming(null)
+          })}>{t('Sil', 'Delete')}</button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="stack">
+      <button className="btn btn-primary btn-block" onClick={() => onOpen(null)}>
+        <SquarePen size={18} /> {t('Yeni sohbet', 'New chat')}
+      </button>
+      {error && <Alert tone="danger"><span>{error}</span></Alert>}
+      {conversations.length === 0 ? (
+        <p className="t-caption" style={{ textAlign: 'center' }}>{t('Henüz bir sohbetin yok.', 'You have no chats yet.')}</p>
+      ) : (
+        <div className="list-group">
+          {conversations.map(c => editing === c.id ? (
+            <form key={c.id} className="list-item" onSubmit={e => rename(e, c.id)}>
+              <span className="input grow" style={{ minHeight: 44 }}>
+                <input value={title} onChange={e => setTitle(e.target.value)} maxLength={120} autoFocus
+                       aria-label={t('Sohbet adı', 'Chat name')} />
+              </span>
+              <button className="icon-btn icon-btn-plain" disabled={busy || !title.trim()} aria-label={t('Kaydet', 'Save')}><Check size={18} /></button>
+              <button type="button" className="icon-btn icon-btn-plain" onClick={() => setEditing(null)} aria-label={t('Vazgeç', 'Cancel')}><X size={18} /></button>
+            </form>
+          ) : (
+            <div key={c.id} className="list-item" style={c.id === currentId ? { background: 'var(--brand-50)' } : undefined}>
+              <button className="grow" style={{ minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', color: 'inherit' }}
+                      onClick={() => onOpen(c.id)} aria-current={c.id === currentId ? 'page' : undefined}>
+                <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.title ?? t('Yeni sohbet', 'New chat')}
+                </strong>
+                <span className="t-caption" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {c.routeTitle ? `${c.routeTitle} · ` : ''}{c.preview ?? ''}
+                </span>
+                <span className="t-caption muted">{formatWhen(c.lastMessageAt)}</span>
+              </button>
+              {canEdit && (
+                <>
+                  <button className="icon-btn icon-btn-plain" aria-label={t(`“${c.title ?? 'Yeni sohbet'}” adını değiştir`, `Rename “${c.title ?? 'New chat'}”`)}
+                          onClick={() => { setEditing(c.id); setTitle(c.title ?? '') }}>
+                    <Pencil size={17} />
+                  </button>
+                  <button className="icon-btn icon-btn-plain" style={{ color: 'var(--danger)' }}
+                          aria-label={t(`“${c.title ?? 'Yeni sohbet'}” sohbetini sil`, `Delete “${c.title ?? 'New chat'}”`)}
+                          onClick={() => setConfirming(c)}>
+                    <Trash2 size={17} />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// "Bugün 14:05" / "27 Eyl 18:30"
+function formatWhen(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const time = date.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+  return date.toDateString() === new Date().toDateString()
+    ? `${tr('Bugün', 'Today')} ${time}`
+    : `${date.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })} ${time}`
 }
 
 function RoutePreview({ route }: { route: Route }) {

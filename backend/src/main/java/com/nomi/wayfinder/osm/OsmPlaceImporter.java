@@ -36,6 +36,8 @@ public class OsmPlaceImporter {
 
     private static final Logger log = LoggerFactory.getLogger(OsmPlaceImporter.class);
     static final int CHUNK_SIZE = 500;
+    // Names of filtered elements kept for the import result / log
+    static final int MAX_EXAMPLES = 20;
 
     private static final String UPSERT = """
             INSERT INTO places (name, location, category, indoor, tags, source, source_url, osm_id,
@@ -57,6 +59,8 @@ public class OsmPlaceImporter {
                 source_url = EXCLUDED.source_url,
                 address = EXCLUDED.address,
                 neighborhood = EXCLUDED.neighborhood,
+                -- It passed the realism filter this time (PlaceRealismFilter)
+                hidden = FALSE,
                 updated_at = now()
             WHERE places.source = 'OSM'
             """;
@@ -67,12 +71,20 @@ public class OsmPlaceImporter {
             WHERE id = ? AND source <> 'OSM' AND wikidata IS NULL AND commons_file IS NULL
             """;
 
-    // Duplicate rows of earlier imports; kept when a route or a saved place points at them
-    private static final String DELETE_UNREFERENCED = """
+    // Rows of earlier imports; kept when a route, a saved place or a user photo points at them
+    // (user_photos would be deleted with the place: ON DELETE CASCADE)
+    static final String DELETE_UNREFERENCED = """
             DELETE FROM places p
             WHERE p.source = 'OSM' AND p.osm_id = ANY (?)
               AND NOT EXISTS (SELECT 1 FROM route_stops rs WHERE rs.place_id = p.id)
               AND NOT EXISTS (SELECT 1 FROM saved_places sp WHERE sp.place_id = p.id)
+              AND NOT EXISTS (SELECT 1 FROM user_photos up WHERE up.place_id = p.id)
+            """;
+
+    // Rows of earlier imports that are no longer realistic places but are still referenced: hidden, not deleted
+    private static final String HIDE = """
+            UPDATE places SET hidden = TRUE, updated_at = now()
+            WHERE source = 'OSM' AND osm_id = ANY (?) AND NOT hidden
             """;
 
     // Places inside the city polygon; the padded bounding box lets the geography GiST index pre-filter
@@ -177,6 +189,13 @@ public class OsmPlaceImporter {
                     ids.length, removed);
         }
 
+        RemovedRows unrealistic = removeOrHide(prepared.unrealisticIds());
+        if (!prepared.unrealisticIds().isEmpty()) {
+            log.info("OSM import ({}): {} elements are not realistic places (e.g. {}); {} rows of earlier imports "
+                            + "removed, {} hidden (still referenced)", city.slug(), prepared.unrealisticIds().size(),
+                    prepared.unrealisticExamples().stream().limit(5).toList(), unrealistic.removed(), unrealistic.hidden());
+        }
+
         String[] keptIds = places.stream().map(OsmPlace::osmId).toArray(String[]::new);
         transactions.executeWithoutResult(status -> {
             jdbc.update(ASSIGN_CITY, city.id());
@@ -192,7 +211,32 @@ public class OsmPlaceImporter {
 
         return new ImportResult(city.slug(), elements.size(), inserted, updated, prepared.skippedDuplicates(),
                 prepared.skippedUnusable(), skippedEdited, copied, prepared.osmDuplicateIds().size(), removed,
-                inCity, withDistrict, null);
+                inCity, withDistrict, prepared.unrealisticIds().size(), unrealistic.removed(), unrealistic.hidden(),
+                prepared.unrealisticExamples(), null);
+    }
+
+    // Deletes the OSM rows of these elements that nothing references and hides the others
+    RemovedRows removeOrHide(List<String> osmIds) {
+        if (osmIds.isEmpty()) {
+            return new RemovedRows(0, 0);
+        }
+        String[] ids = osmIds.toArray(String[]::new);
+        return transactions.execute(status -> {
+            int deleted = jdbc.update(con -> {
+                var ps = con.prepareStatement(DELETE_UNREFERENCED);
+                ps.setArray(1, con.createArrayOf("text", ids));
+                return ps;
+            });
+            int hidden = jdbc.update(con -> {
+                var ps = con.prepareStatement(HIDE);
+                ps.setArray(1, con.createArrayOf("text", ids));
+                return ps;
+            });
+            return new RemovedRows(deleted, hidden);
+        });
+    }
+
+    record RemovedRows(int removed, int hidden) {
     }
 
     // Maps elements to places, drops unusable ones and duplicates of verified places (no database writes)
@@ -202,10 +246,19 @@ public class OsmPlaceImporter {
         Map<Long, VerifiedMedia> media = new LinkedHashMap<>();
         int unusable = 0;
         int duplicates = 0;
+        Set<String> unrealisticIds = new LinkedHashSet<>();
+        List<String> unrealisticExamples = new ArrayList<>();
         for (OverpassResponse.Element element : elements) {
             OsmPlace place = OsmPlaceMapper.map(element);
+            String unrealistic = place == null ? null : PlaceRealismFilter.rejectElement(element, place);
             if (place == null) {
                 unusable++;
+            } else if (unrealistic != null) {
+                // A school canteen, a police club, a closed or private place, a generic "Kafe"
+                unrealisticIds.add(place.osmId());
+                if (unrealisticExamples.size() < MAX_EXAMPLES) {
+                    unrealisticExamples.add(place.name() + " (" + unrealistic + ")");
+                }
             } else {
                 Optional<OsmDeduplicator.ExistingPlace> verified = deduplicator.findDuplicateOf(place);
                 if (verified.isPresent()) {
@@ -224,7 +277,7 @@ public class OsmPlaceImporter {
         // The same park / cafe mapped twice in OSM becomes one place
         OsmDeduplicator.Deduped deduped = OsmDeduplicator.dedupeAmongThemselves(new ArrayList<>(places.values()));
         return new Prepared(new ArrayList<>(deduped.kept()), duplicates, unusable, new ArrayList<>(media.values()),
-                deduped.droppedOsmIds());
+                deduped.droppedOsmIds(), new ArrayList<>(unrealisticIds), unrealisticExamples);
     }
 
     private ChunkResult writeChunk(List<OsmPlace> chunk) {
@@ -302,7 +355,8 @@ public class OsmPlaceImporter {
      *                      places that have none yet
      */
     record Prepared(List<OsmPlace> places, int skippedDuplicates, int skippedUnusable,
-                    List<VerifiedMedia> verifiedMedia, List<String> osmDuplicateIds) {
+                    List<VerifiedMedia> verifiedMedia, List<String> osmDuplicateIds, List<String> unrealisticIds,
+                    List<String> unrealisticExamples) {
     }
 
     record VerifiedMedia(long placeId, String wikidata, String commonsFile) {
@@ -332,17 +386,23 @@ public class OsmPlaceImporter {
      * @param duplicateRowsRemoved rows of earlier imports for those elements that were deleted (unreferenced)
      * @param placesInCity         the city's places (verified + OSM) after the import
      * @param placesWithDistrict   the city's places with a district after the import
+     * @param unrealistic          elements dropped by PlaceRealismFilter (school canteens, private / closed places, ...)
+     * @param unrealisticRemoved   rows of earlier imports for them that were deleted (unreferenced)
+     * @param unrealisticHidden    rows of earlier imports for them that were hidden (a route / saved place / photo uses them)
+     * @param unrealisticExamples  up to MAX_EXAMPLES of them: "name (reason)"
      * @param areas                the district / neighbourhood import that ran first; null if it failed
      */
     public record ImportResult(String city, int fetched, int inserted, int updated, int skippedDuplicates,
                                int skippedUnusable, int skippedEdited, int verifiedMediaCopied,
                                int osmDuplicatesMerged, int duplicateRowsRemoved, int placesInCity,
-                               int placesWithDistrict, OsmAreaImporter.AreaImportResult areas) {
+                               int placesWithDistrict, int unrealistic, int unrealisticRemoved,
+                               int unrealisticHidden, List<String> unrealisticExamples,
+                               OsmAreaImporter.AreaImportResult areas) {
 
         ImportResult withAreas(OsmAreaImporter.AreaImportResult areas) {
             return new ImportResult(city, fetched, inserted, updated, skippedDuplicates, skippedUnusable,
                     skippedEdited, verifiedMediaCopied, osmDuplicatesMerged, duplicateRowsRemoved, placesInCity,
-                    placesWithDistrict, areas);
+                    placesWithDistrict, unrealistic, unrealisticRemoved, unrealisticHidden, unrealisticExamples, areas);
         }
     }
 }

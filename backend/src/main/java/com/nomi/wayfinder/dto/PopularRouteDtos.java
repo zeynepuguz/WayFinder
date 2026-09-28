@@ -2,9 +2,7 @@ package com.nomi.wayfinder.dto;
 
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
-import com.nomi.wayfinder.planning.PopularTheme;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.io.Serializable;
@@ -18,16 +16,20 @@ public final class PopularRouteDtos {
     }
 
     /**
-     * One themed day planned from real places.
+     * The most popular sights of one walkable area in walking order, with meals where the day needs them.
      *
-     * @param startLabel             the district or city the route starts in ("Üsküdar", "Ankara")
+     * @param key                    stable id of the route (its area and sights); POST /start takes it
+     * @param title                  real area name(s): "Sultanahmet ve çevresi", "Galata–Karaköy"
+     * @param popularityNote         why these places count as popular ("Wikipedia’da en çok okunan yerler")
+     * @param startLabel             the first stop's name (the route starts there)
      * @param estimatedCostPerPerson sum of the known prices only; null when no stop has a known price
      * @param unknownPriceStops      stops without price info (not in estimatedCostPerPerson)
      */
     public record PopularRouteResponse(
-            PopularTheme theme,
+            String key,
             String title,
             String description,
+            String popularityNote,
             String startLabel,
             double startLatitude,
             double startLongitude,
@@ -40,11 +42,13 @@ public final class PopularRouteDtos {
     }
 
     /**
-     * @param time           planned arrival, "HH:mm"
-     * @param walkingMinutes from the previous stop (the first: from the start point)
+     * @param time            planned arrival, "HH:mm"
+     * @param durationMinutes planned length of the stop
+     * @param walkingMinutes  from the previous stop (the first: 0, the route starts there)
      */
     public record PopularStop(
             String time,
+            int durationMinutes,
             StopType type,
             String typeLabel,
             int walkingMinutes,
@@ -53,7 +57,11 @@ public final class PopularRouteDtos {
     ) implements Serializable {
     }
 
-    // The place fields a route card needs (details via /places/{id})
+    /**
+     * The place fields a route card needs (details via /places/{id}).
+     *
+     * @param popularity Wikipedia-based popularity (popularity/PlacePopularity); null = unknown
+     */
     public record PopularPlace(
             Long id,
             String name,
@@ -63,19 +71,21 @@ public final class PopularRouteDtos {
             PlaceImage image,
             Integer estimatedCost,
             boolean verified,
-            String district
+            String district,
+            Double popularity
     ) implements Serializable {
     }
 
     /**
      * @param city     city slug from GET /api/v1/cities
-     * @param district district slug of that city (optional)
+     * @param district district slug of that city (optional; the same as for the list the key came from)
+     * @param key      PopularRouteResponse.key
      * @param date     null = today (Istanbul time)
      */
     public record PopularRouteStartRequest(
             @NotBlank @Size(max = 100) String city,
             @Size(max = 100) String district,
-            @NotNull PopularTheme theme,
+            @NotBlank @Size(max = 60) String key,
             LocalDate date
     ) {
     }

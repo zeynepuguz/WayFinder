@@ -49,7 +49,8 @@ public class PlaceService {
     // Explore screen: filter + paginate
     @Transactional(readOnly = true)
     public PageResponse<PlaceResponse> searchPlaces(PlaceSearchFilter filter, int page, int size) {
-        Specification<Place> spec = (root, query, cb) -> cb.conjunction();
+        // Hidden places (not realistic, kept only because a route / saved place / photo uses them) are never listed
+        Specification<Place> spec = (root, query, cb) -> cb.isFalse(root.get("hidden"));
 
         if (filter.category() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category"), filter.category()));

@@ -35,7 +35,7 @@ public class DistrictService {
         long cityId = cityService.requireBySlugOrDefault(citySlug).id();
         List<DistrictResponse> districts = jdbc.query("""
                         SELECT d.slug, d.name, d.label_lat, d.label_lon, d.south, d.west, d.north, d.east,
-                               (SELECT count(*) FROM places p WHERE p.district_id = d.id) AS place_count
+                               (SELECT count(*) FROM places p WHERE p.district_id = d.id AND NOT p.hidden) AS place_count
                         FROM districts d
                         WHERE d.city_id = ?
                         """,

@@ -18,6 +18,8 @@ import java.util.Set;
  *                        museums, attractions, culture but no parks); null = the stop type's
  * @param matchingTag     with categories: a place of another category may still fill the slot if it has this tag
  *                        (e.g. "view" for viewpoints); ignored when categories is null
+ * @param keepInRain      a pinned outdoor place stays even when rain is expected (a popular route's famous sights
+ *                        are the point of the route; the plan gets a rain note instead)
  */
 public record PlanningSlot(
         StopType type,
@@ -26,12 +28,18 @@ public record PlanningSlot(
         Integer durationMinutes,
         boolean exactTime,
         Set<PlaceCategory> categories,
-        String matchingTag
+        String matchingTag,
+        boolean keepInRain
 ) {
 
     public PlanningSlot(StopType type, LocalTime targetTime, Long pinnedPlaceId, Integer durationMinutes,
                         boolean exactTime) {
-        this(type, targetTime, pinnedPlaceId, durationMinutes, exactTime, null, null);
+        this(type, targetTime, pinnedPlaceId, durationMinutes, exactTime, null, null, false);
+    }
+
+    // A popular route's sight: pinned with its visit length, kept in the rain
+    public static PlanningSlot popularSight(Long placeId, LocalTime targetTime, int minutes, boolean exactTime) {
+        return new PlanningSlot(StopType.SIGHTSEEING, targetTime, placeId, minutes, exactTime, null, null, true);
     }
 
     public static PlanningSlot of(StopType type) {
@@ -49,7 +57,7 @@ public record PlanningSlot(
     // A stop filled only from these categories (or places with the tag), at targetTime (null = after the previous)
     public static PlanningSlot restricted(StopType type, LocalTime targetTime, Set<PlaceCategory> categories,
                                           String matchingTag) {
-        return new PlanningSlot(type, targetTime, null, null, false, Set.copyOf(categories), matchingTag);
+        return new PlanningSlot(type, targetTime, null, null, false, Set.copyOf(categories), matchingTag, false);
     }
 
     // A stop that already exists in a route: keep its place and time if still possible
@@ -58,7 +66,7 @@ public record PlanningSlot(
     }
 
     public PlanningSlot unpinned() {
-        return new PlanningSlot(type, targetTime, null, durationMinutes, exactTime, categories, matchingTag);
+        return new PlanningSlot(type, targetTime, null, durationMinutes, exactTime, categories, matchingTag, false);
     }
 
     // The categories the planner searches

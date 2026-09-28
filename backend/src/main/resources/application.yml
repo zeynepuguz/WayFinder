@@ -149,6 +149,23 @@ nomi:
     # query service lag (often > 5 s for hours), which would block these read-only requests, so it is not sent there
     wikidata-maxlag: 0
     commons-maxlag: 5
+  popularity:
+    # Real-world interest per place from open Wikimedia signals (Wikidata sitelinks + Wikipedia pageviews)
+    update-after-import: ${POPULARITY_UPDATE_AFTER_IMPORT:true}
+    # Monthly pass over every city at 05:45 on the 2nd (Istanbul time). "-" disables it
+    cron: ${POPULARITY_CRON:0 45 5 2 * *}
+    recheck-after: 25d
+    max-places-per-run: 20000
+    # Days of Wikipedia pageviews summed (the API allows at most 60)
+    pageview-days: 60
+    wikidata-api-url: https://www.wikidata.org/w/api.php
+    # {lang} = tr / en; query&prop=pageviews answers for 50 articles per request
+    wikipedia-api-url: https://{lang}.wikipedia.org/w/api.php
+    connect-timeout: 10s
+    read-timeout: 30s
+    batch-delay: 1s
+    max-attempts: 3
+    retry-delay: 30s
   photos:
     # User photos of places / districts, re-encoded JPEGs without metadata (production: a Docker volume that
     # Caddy serves under /media/photos; development: served by Spring under /media/photos)

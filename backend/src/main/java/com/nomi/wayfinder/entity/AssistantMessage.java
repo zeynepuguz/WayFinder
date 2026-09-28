@@ -15,6 +15,10 @@ public class AssistantMessage {
     @Column(nullable = false)
     private Long userId;
 
+    // The chat (AssistantConversation) this message belongs to
+    @Column(nullable = false)
+    private Long conversationId;
+
     private Long routeId;
 
     @Enumerated(EnumType.STRING)
@@ -30,8 +34,9 @@ public class AssistantMessage {
     public AssistantMessage() {
     }
 
-    public AssistantMessage(Long userId, Long routeId, MessageRole role, String content) {
+    public AssistantMessage(Long userId, Long conversationId, Long routeId, MessageRole role, String content) {
         this.userId = userId;
+        this.conversationId = conversationId;
         this.routeId = routeId;
         this.role = role;
         this.content = content;
@@ -48,6 +53,10 @@ public class AssistantMessage {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public Long getConversationId() {
+        return conversationId;
     }
 
     public Long getRouteId() {

@@ -128,15 +128,17 @@ public class RouteService {
 
     // ================= READ / UPDATE =================
 
-    @Transactional(readOnly = true)
+    // Not read-only: unfinished routes of past days are moved to EXPIRED first
+    @Transactional
     public List<RouteSummary> listRoutes(Long userId, boolean savedOnly) {
+        routeRepository.expireBefore(userId, LocalDate.now(clock));
         List<Route> routes = savedOnly
                 ? routeRepository.findByUserIdAndSavedTrueOrderByCreatedAtDesc(userId)
                 : routeRepository.findByUserIdOrderByCreatedAtDesc(userId);
         return routes.stream().map(routeMapper::toSummary).toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public RouteResponse getRoute(Long userId, Long routeId) {
         return routeMapper.toResponse(findRoute(userId, routeId));
     }
@@ -145,7 +147,11 @@ public class RouteService {
     public RouteResponse updateRoute(Long userId, Long routeId, RouteUpdateRequest request) {
         Route route = findRoute(userId, routeId);
 
-        if (request.status() != null) {
+        if (request.status() != null && request.status() != route.getStatus()) {
+            // A past day's route cannot be started again; saving / renaming it stays possible
+            if (isPast(route) || request.status() == RouteStatus.EXPIRED) {
+                throw pastRoute();
+            }
             route.setStatus(request.status());
         }
         if (request.saved() != null) {
@@ -166,6 +172,7 @@ public class RouteService {
     @Transactional
     public RouteResponse updateStopStatus(Long userId, Long routeId, Long stopId, StopStatus status) {
         Route route = findRoute(userId, routeId);
+        ensureNotPast(route);
         findStop(route, stopId).setStatus(status);
 
         // First visited stop means the trip has started
@@ -180,16 +187,59 @@ public class RouteService {
         return routeMapper.toResponse(route);
     }
 
-    // The route the user is most likely talking about (assistant, home screen)
-    @Transactional(readOnly = true)
+    /**
+     * The route the user is out with today (home screen "Aktif rotan"): an unfinished route dated today, never one of
+     * a past day. The assistant does not use this; each chat changes only its own route.
+     */
+    @Transactional
     public Optional<Route> findCurrentRoute(Long userId) {
-        return routeRepository.findFirstByUserIdAndStatusInOrderByUpdatedAtDesc(
-                userId, List.of(RouteStatus.ACTIVE, RouteStatus.DRAFT));
+        return findRouteForDay(userId, LocalDate.now(clock));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<RouteSummary> findCurrentRouteSummary(Long userId) {
         return findCurrentRoute(userId).map(routeMapper::toSummary);
+    }
+
+    // "Yarınki rotan": an unfinished route planned for tomorrow
+    @Transactional
+    public Optional<RouteSummary> findTomorrowRouteSummary(Long userId) {
+        return findRouteForDay(userId, LocalDate.now(clock).plusDays(1)).map(routeMapper::toSummary);
+    }
+
+    private Optional<Route> findRouteForDay(Long userId, LocalDate date) {
+        routeRepository.expireBefore(userId, LocalDate.now(clock));
+        return routeRepository.findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
+                userId, date, List.of(RouteStatus.ACTIVE, RouteStatus.DRAFT));
+    }
+
+    // ================= LIFECYCLE =================
+
+    // Daily job (RouteExpiryJob): unfinished routes of past days -> EXPIRED
+    @Transactional
+    public int expirePastRoutes() {
+        return routeRepository.expireBefore(LocalDate.now(clock));
+    }
+
+    // The route's day is over (Istanbul time): read-only from now on
+    public boolean isPast(Route route) {
+        return route.getDate().isBefore(LocalDate.now(clock));
+    }
+
+    // 409 for changes to a past day's route (replan, stop status)
+    public void ensureNotPast(Route route) {
+        if (isPast(route)) {
+            throw pastRoute();
+        }
+    }
+
+    public static String pastRouteMessage() {
+        return Texts.t("Bu rota geçmiş bir güne ait; yeni bir rota oluşturabilirsin.",
+                "This route belongs to a day that has passed; you can create a new route.");
+    }
+
+    private static BusinessException pastRoute() {
+        return new BusinessException(HttpStatus.CONFLICT, pastRouteMessage());
     }
 
     // ================= REPLAN =================
@@ -207,6 +257,8 @@ public class RouteService {
      */
     @Transactional
     public List<String> replanRoute(Route route, ReplanRequest request) {
+        // The forecast and opening hours are those of the route's own day, so a past day cannot be re-planned
+        ensureNotPast(route);
         if (route.getStatus() == RouteStatus.COMPLETED) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Route is already completed");
         }
@@ -402,9 +454,15 @@ public class RouteService {
                         "Stop " + stopId + " is not a remaining stop of this route"));
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public Route getRouteEntity(Long userId, Long routeId) {
         return findRoute(userId, routeId);
+    }
+
+    // A chat's route; empty when it was deleted meanwhile
+    @Transactional
+    public Optional<Route> findRouteEntity(Long userId, Long routeId) {
+        return routeRepository.findByIdAndUserId(routeId, userId).map(this::expireIfPast);
     }
 
     public RouteResponse toResponse(Route route) {
@@ -414,7 +472,16 @@ public class RouteService {
     private Route findRoute(Long userId, Long routeId) {
         // Filtering by user id means other users' routes look like they do not exist
         return routeRepository.findByIdAndUserId(routeId, userId)
+                .map(this::expireIfPast)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found with id: " + routeId));
+    }
+
+    // On read: the daily job may not have run yet (e.g. just after midnight)
+    private Route expireIfPast(Route route) {
+        if (isPast(route) && (route.getStatus() == RouteStatus.DRAFT || route.getStatus() == RouteStatus.ACTIVE)) {
+            route.setStatus(RouteStatus.EXPIRED);
+        }
+        return route;
     }
 
     private static RouteStop findStop(Route route, Long stopId) {

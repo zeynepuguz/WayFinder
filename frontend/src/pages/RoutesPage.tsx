@@ -9,7 +9,7 @@ import { Alert, EmptyState, ErrorState, ListSkeleton, Segmented, Sheet, Spinner,
 import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
-import { INTEREST_LABELS, STOP_TYPE_LABELS, todayIso, WALKING_LABELS } from '../lib/format'
+import { INTEREST_LABELS, isPastRoute, STOP_TYPE_LABELS, todayIso, WALKING_LABELS } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -37,6 +37,8 @@ function RouteList() {
   const { data, error, loading, reload } = useAsync(() => api.routes(tab === 'saved'), [tab])
 
   const openCreate = () => gate('/routes') && setCreating(true)
+  const current = data?.filter(route => !isPastRoute(route)) ?? []
+  const past = data?.filter(route => isPastRoute(route)) ?? []
 
   return (
     <main className="screen">
@@ -57,9 +59,20 @@ function RouteList() {
           action={tab === 'all' && <button className="btn btn-primary" onClick={openCreate}><Plus size={18} /> {t('Rota oluştur', 'Create route')}</button>}
         />
       )}
-      <div className="stack">
-        {data?.map(route => <RouteCard key={route.id} route={route} />)}
-      </div>
+      {current.length > 0 && (
+        <div className="stack">
+          {current.map(route => <RouteCard key={route.id} route={route} />)}
+        </div>
+      )}
+      {/* Routes of days that are over: read-only, never "active" */}
+      {past.length > 0 && (
+        <section className="section" aria-label={t('Geçmiş rotalar', 'Past routes')}>
+          <h2 className="t-headline">{t('Geçmiş rotalar', 'Past routes')}</h2>
+          <div className="stack">
+            {past.map(route => <RouteCard key={route.id} route={route} />)}
+          </div>
+        </section>
+      )}
 
       <Sheet open={creating} onClose={() => setCreating(false)} label={t('Yeni rota', 'New route')}>
         <NewRouteForm />

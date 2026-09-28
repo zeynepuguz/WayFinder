@@ -100,15 +100,26 @@ class OsmCityImportTest {
     }
 
     @Test
-    void perCityQueriesUseTheCityAreaAndIstanbulKeepsItsQuery() {
+    void perCityQueriesUseTheCityAreaInTwoQueries() {
         assertThat(OverpassClient.areaId(223474)).isEqualTo(3600223474L);
-        assertThat(OverpassClient.ISTANBUL_QUERY).contains("area(id:3600223474)->.city;")
-                .contains("nwr[\"amenity\"~\"^(cafe|restaurant|ice_cream|theatre|arts_centre)$\"][\"name\"](area.city);")
-                .contains("nwr[\"shop\"~\"^(pastry|confectionery)$\"][\"name\"](area.city);")
-                .contains("nwr[\"tourism\"~\"^(museum|attraction|viewpoint)$\"][\"name\"](area.city);")
-                .contains("nwr[\"leisure\"=\"park\"][\"name\"](area.city);")
+        List<String> istanbul = OverpassClient.placesQueries(223474);
+        assertThat(istanbul).hasSize(2);
+        assertThat(istanbul.get(0)).contains("area(id:3600223474)->.city;")
+                .contains("nwr[\"amenity\"~\"^(cafe|restaurant|fast_food|food_court|ice_cream)$\"][\"name\"](area.city);")
+                .contains("nwr[\"shop\"~\"^(pastry|confectionery|bakery|coffee)$\"][\"name\"](area.city);")
                 .contains("out center tags;");
-        assertThat(OverpassClient.placesQuery(223422)).contains("area(id:3600223422)");
+        assertThat(istanbul.get(1)).contains("area(id:3600223474)->.city;")
+                .contains("nwr[\"tourism\"~\"^(museum|gallery|attraction|viewpoint|zoo|aquarium|theme_park)$\"][\"name\"](area.city);")
+                .contains("nwr[\"leisure\"~\"^(park|garden|nature_reserve)$\"][\"name\"](area.city);")
+                .contains("nwr[\"historic\"][\"name\"](area.city);")
+                .contains("nwr[\"amenity\"~\"^(theatre|arts_centre|place_of_worship|marketplace)$\"][\"name\"](area.city);")
+                .contains("out center tags;");
+        assertThat(OverpassClient.placesQueries(223422)).allMatch(q -> q.contains("area(id:3600223422)"));
+
+        // An element both queries return (a historic café) is kept once
+        OverpassResponse.Element cafe = new OverpassResponse.Element("node", 1, 41.0, 29.0, null, Map.of());
+        OverpassResponse.Element park = new OverpassResponse.Element("way", 1, 41.0, 29.0, null, Map.of());
+        assertThat(OverpassClient.merge(List.of(cafe), List.of(cafe, park))).containsExactly(cafe, park);
         assertThat(OverpassClient.PROVINCES_QUERY).contains("area(id:3600174737)->.tr;")
                 .contains("[\"admin_level\"=\"4\"](area.tr);").contains("out geom;");
     }

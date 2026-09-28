@@ -11,8 +11,10 @@ import com.nomi.wayfinder.dto.RouteDtos.RoutePlanRequest;
 import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
+import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.ReplanType;
+import com.nomi.wayfinder.repository.AssistantConversationRepository;
 import com.nomi.wayfinder.repository.AssistantMessageRepository;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
@@ -24,6 +26,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
@@ -31,12 +34,18 @@ import java.util.*;
 /**
  * The assistant flow:
  * message -> intent (AI or rules) -> backend executes it with real data -> answer built from the results.
+ * <p>
+ * Every message belongs to one chat (AssistantConversation). A message without a chat id starts a new chat; it never
+ * continues an older one. Route changes ("çok yorulduk", "yağmur başladı", "burayı çıkar") apply only to the route
+ * that chat planned, never to another chat's route.
  */
 @Service
 public class AssistantService {
 
     private static final Locale TR = Locale.forLanguageTag("tr-TR");
     static final int MAX_FARTHER = 2;
+    static final int TITLE_LENGTH = 40;
+    private static final int PREVIEW_LENGTH = 90;
 
     private final IntentParser intentParser;
     private final RouteService routeService;
@@ -44,6 +53,7 @@ public class AssistantService {
     private final WeatherService weatherService;
     private final ResponseComposer composer;
     private final AssistantMessageRepository messageRepository;
+    private final AssistantConversationRepository conversationRepository;
     private final AreaResolver areaResolver;
     private final Clock clock;
 
@@ -54,6 +64,7 @@ public class AssistantService {
             WeatherService weatherService,
             ResponseComposer composer,
             AssistantMessageRepository messageRepository,
+            AssistantConversationRepository conversationRepository,
             AreaResolver areaResolver,
             Clock clock
     ) {
@@ -63,24 +74,29 @@ public class AssistantService {
         this.weatherService = weatherService;
         this.composer = composer;
         this.messageRepository = messageRepository;
+        this.conversationRepository = conversationRepository;
         this.areaResolver = areaResolver;
         this.clock = clock;
     }
 
     @Transactional
     public AssistantReply handle(Long userId, AssistantRequest request) {
-        Route route = request.routeId() != null
-                ? routeService.getRouteEntity(userId, request.routeId())
-                : routeService.findCurrentRoute(userId).orElse(null);
+        AssistantConversation conversation = request.conversationId() != null
+                ? findConversation(userId, request.conversationId())
+                : conversationRepository.save(new AssistantConversation(userId));
+        Route route = conversationRoute(userId, conversation, request.routeId());
 
-        messageRepository.save(new AssistantMessage(userId, route == null ? null : route.getId(),
+        messageRepository.save(new AssistantMessage(userId, conversation.getId(), route == null ? null : route.getId(),
                 MessageRole.USER, request.message()));
 
         AssistantIntent intent = intentParser.parse(request.message(), context(route));
 
         AssistantReply reply = switch (intent.type()) {
             case PLAN_ROUTE -> planRoute(userId, request, intent);
-            case REPLAN -> route == null ? text(intent, composer.noRoute()) : replan(route, request, intent);
+            // Only this chat's route; a past day's route is read-only
+            case REPLAN -> route == null ? text(intent, composer.noRoute())
+                    : routeService.isPast(route) ? text(intent, RouteService.pastRouteMessage())
+                    : replan(route, request, intent);
             case RECOMMEND -> recommend(userId, request, intent);
             case WEATHER -> weather(request, intent.withDateAndArea(day(intent, request.message()), intent.area()));
             case SHOW_ROUTE -> route == null ? text(intent, composer.noRoute())
@@ -88,20 +104,139 @@ public class AssistantService {
             case UNKNOWN -> text(intent, composer.help());
         };
 
+        // A route planned in this chat becomes the chat's route (a later plan in the same chat replaces it)
+        if (intent.type() == AssistantIntent.IntentType.PLAN_ROUTE && reply.route() != null) {
+            conversation.setRouteId(reply.route().id());
+        }
         Long replyRouteId = reply.route() != null ? reply.route().id() : route == null ? null : route.getId();
-        messageRepository.save(new AssistantMessage(userId, replyRouteId, MessageRole.ASSISTANT, reply.reply()));
+        messageRepository.save(new AssistantMessage(userId, conversation.getId(), replyRouteId,
+                MessageRole.ASSISTANT, reply.reply()));
 
-        return reply;
+        if (conversation.getTitle() == null) {
+            conversation.setTitle(titleFrom(request.message()));
+        }
+        conversation.setLastMessageAt(clock.instant());
+        conversationRepository.save(conversation);
+
+        return reply.withConversationId(conversation.getId());
+    }
+
+    // Latest messages of the user across all chats (the app's old single chat screen)
+    @Transactional(readOnly = true)
+    public List<MessageResponse> history(Long userId, int limit) {
+        return toResponses(messageRepository.findByUserIdOrderByCreatedAtDescIdDesc(userId, PageRequest.of(0, limit)));
+    }
+
+    // ============ conversations ============
+
+    // Not read-only: reading a chat's route may expire it (past day)
+    @Transactional
+    public List<ConversationSummary> conversations(Long userId, int limit) {
+        List<AssistantConversation> conversations =
+                conversationRepository.findByUserIdOrderByLastMessageAtDescIdDesc(userId, PageRequest.of(0, limit));
+        if (conversations.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> previews = new HashMap<>();
+        messageRepository.findLatestByConversationIds(conversations.stream().map(AssistantConversation::getId).toList())
+                .forEach(m -> previews.put(m.getConversationId(), shorten(m.getContent(), PREVIEW_LENGTH)));
+
+        Map<Long, String> routeTitles = new HashMap<>();
+        conversations.stream()
+                .map(AssistantConversation::getRouteId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .forEach(routeId -> routeService.findRouteEntity(userId, routeId)
+                        .ifPresent(r -> routeTitles.put(routeId, r.getTitle())));
+
+        return conversations.stream()
+                .map(c -> summary(c, routeTitles.get(c.getRouteId()), previews.get(c.getId())))
+                .toList();
+    }
+
+    @Transactional
+    public ConversationSummary createConversation(Long userId) {
+        return summary(conversationRepository.save(new AssistantConversation(userId)), null, null);
     }
 
     @Transactional(readOnly = true)
-    public List<MessageResponse> history(Long userId, int limit) {
-        List<AssistantMessage> messages = new ArrayList<>(
-                messageRepository.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(0, limit)));
+    public List<MessageResponse> conversationMessages(Long userId, Long conversationId, int limit) {
+        AssistantConversation conversation = findConversation(userId, conversationId);
+        return toResponses(messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(
+                conversation.getId(), PageRequest.of(0, limit)));
+    }
+
+    @Transactional
+    public ConversationSummary renameConversation(Long userId, Long conversationId, String title) {
+        AssistantConversation conversation = findConversation(userId, conversationId);
+        conversation.setTitle(shorten(title, 120));
+        String routeTitle = conversation.getRouteId() == null ? null
+                : routeService.findRouteEntity(userId, conversation.getRouteId()).map(Route::getTitle).orElse(null);
+        String preview = messageRepository.findLatestByConversationIds(List.of(conversation.getId())).stream()
+                .findFirst().map(m -> shorten(m.getContent(), PREVIEW_LENGTH)).orElse(null);
+        return summary(conversation, routeTitle, preview);
+    }
+
+    // Deletes the chat and its messages; the route it planned stays in "Rotalarım"
+    @Transactional
+    public void deleteConversation(Long userId, Long conversationId) {
+        conversationRepository.delete(findConversation(userId, conversationId));
+    }
+
+    private AssistantConversation findConversation(Long userId, Long conversationId) {
+        // Filtering by user id means other users' chats look like they do not exist
+        return conversationRepository.findByIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Conversation not found with id: " + conversationId));
+    }
+
+    /**
+     * The only route this chat's messages may change: the one it planned. An explicit routeId (e.g. "ask about this
+     * route") links a route to a chat that has none yet; it never replaces the chat's own route.
+     */
+    private Route conversationRoute(Long userId, AssistantConversation conversation, Long requestedRouteId) {
+        if (conversation.getRouteId() != null) {
+            return routeService.findRouteEntity(userId, conversation.getRouteId()).orElse(null);
+        }
+        if (requestedRouteId != null) {
+            Route route = routeService.getRouteEntity(userId, requestedRouteId);
+            conversation.setRouteId(route.getId());
+            return route;
+        }
+        return null;
+    }
+
+    private static ConversationSummary summary(AssistantConversation c, String routeTitle, String preview) {
+        return new ConversationSummary(c.getId(), c.getTitle(), c.getRouteId(), routeTitle, c.getLastMessageAt(), preview);
+    }
+
+    private static List<MessageResponse> toResponses(List<AssistantMessage> newestFirst) {
+        List<AssistantMessage> messages = new ArrayList<>(newestFirst);
         Collections.reverse(messages);
         return messages.stream()
-                .map(m -> new MessageResponse(m.getId(), m.getRole(), m.getContent(), m.getRouteId(), m.getCreatedAt()))
+                .map(m -> new MessageResponse(m.getId(), m.getRole(), m.getContent(), m.getRouteId(),
+                        m.getConversationId(), m.getCreatedAt()))
                 .toList();
+    }
+
+    // "2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz" -> "2 kişiyiz, 700 TL bütçemiz var,…"
+    static String titleFrom(String message) {
+        return shorten(message, TITLE_LENGTH);
+    }
+
+    // One line of at most max characters, cut at a word boundary when there is one in the second half
+    static String shorten(String text, int max) {
+        String flat = text.strip().replaceAll("\\s+", " ");
+        if (flat.length() <= max) {
+            return flat;
+        }
+        // max - 1 characters leave room for "…"; the cut is at a word boundary when the next character is a space
+        String cut = flat.substring(0, max - 1);
+        int space = cut.lastIndexOf(' ');
+        if (flat.charAt(max - 1) != ' ' && space >= max / 2) {
+            cut = cut.substring(0, space);
+        }
+        return cut.replaceAll("[\\s,.;:!?-]+$", "") + "…";
     }
 
     // ============ intent handlers ============
@@ -262,7 +397,15 @@ public class AssistantService {
 
     // ============ DTOs ============
 
-    public record AssistantRequest(String message, Double latitude, Double longitude, Long routeId) {
+    /**
+     * @param conversationId the chat to continue; null starts a new chat
+     * @param routeId        optional: links this route to a chat that has none yet
+     */
+    public record AssistantRequest(String message, Double latitude, Double longitude, Long routeId, Long conversationId) {
+
+        public AssistantRequest(String message, Double latitude, Double longitude, Long routeId) {
+            this(message, latitude, longitude, routeId, null);
+        }
     }
 
     public record AssistantReply(
@@ -273,10 +416,27 @@ public class AssistantService {
             // "Daha uygun ama sana yakın değil": RECOMMEND only (max 2, otherwise empty), ranked below
             // recommendations. Each starts its reasons with a distance line and has whyBetter
             List<Recommendation> fartherRecommendations,
-            List<String> changes
+            List<String> changes,
+            // The chat this message was added to (a new one when the request had none)
+            Long conversationId
     ) {
+
+        public AssistantReply(String reply, AssistantIntent intent, RouteResponse route, List<Recommendation> recommendations,
+                              List<Recommendation> fartherRecommendations, List<String> changes) {
+            this(reply, intent, route, recommendations, fartherRecommendations, changes, null);
+        }
+
+        AssistantReply withConversationId(Long id) {
+            return new AssistantReply(reply, intent, route, recommendations, fartherRecommendations, changes, id);
+        }
     }
 
-    public record MessageResponse(Long id, MessageRole role, String content, Long routeId, java.time.Instant createdAt) {
+    public record MessageResponse(Long id, MessageRole role, String content, Long routeId, Long conversationId,
+                                  Instant createdAt) {
+    }
+
+    // One row of "Sohbetler". title is null until the first message; preview = the newest message, shortened
+    public record ConversationSummary(Long id, String title, Long routeId, String routeTitle, Instant lastMessageAt,
+                                      String preview) {
     }
 }

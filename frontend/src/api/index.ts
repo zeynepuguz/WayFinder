@@ -1,8 +1,8 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, City, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory,
-  PopularRoute, PopularRouteTheme, Preferences,
+  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory,
+  PopularRoute, Preferences,
   Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
 
@@ -72,9 +72,10 @@ export const api = {
   deleteRoute: (id: number) => http.delete<void>(`/routes/${id}`),
   updateStop: (routeId: number, stopId: number, status: StopStatus) =>
     http.patch<Route>(`/routes/${routeId}/stops/${stopId}`, { status }),
-  // Ready-made themed routes (public); starting one creates a normal route (account + pass, 402 otherwise)
+  // Popular routes of an area (public); starting one creates a normal route (account + pass, 402 otherwise)
   popularRoutes: (city: string, district?: string) => http.get<PopularRoute[]>('/routes/popular', { city, district }),
-  startPopularRoute: (request: { city: string; district?: string; theme: PopularRouteTheme }) =>
+  // key: PopularRoute.key of the list shown for this city / district and day (date: null = today)
+  startPopularRoute: (request: { city: string; district?: string; key: string; date?: string }) =>
     http.post<Route>('/routes/popular/start', request),
   replan: (routeId: number, request: ReplanRequest) => http.post<ReplanResponse>(`/routes/${routeId}/replan`, request),
 
@@ -89,7 +90,14 @@ export const api = {
   myPhotos: () => http.get<MyPhoto[]>('/me/photos'),
   deletePhoto: (id: number) => http.delete<void>(`/photos/${id}`),
 
-  sendMessage: (message: string, latitude: number, longitude: number, routeId?: number) =>
-    http.post<AssistantReply>('/assistant/messages', { message, latitude, longitude, routeId }),
+  // Without conversationId the backend starts a new chat; the reply carries its id
+  sendMessage: (message: string, latitude: number, longitude: number, conversationId?: number | null) =>
+    http.post<AssistantReply>('/assistant/messages', { message, latitude, longitude, conversationId: conversationId ?? undefined }),
+  // Latest messages across all chats (older app versions)
   messages: () => http.get<ChatMessage[]>('/assistant/messages', { limit: 50 }),
+  conversations: () => http.get<ConversationSummary[]>('/assistant/conversations'),
+  createConversation: () => http.post<ConversationSummary>('/assistant/conversations'),
+  conversationMessages: (id: number) => http.get<ChatMessage[]>(`/assistant/conversations/${id}/messages`),
+  renameConversation: (id: number, title: string) => http.patch<ConversationSummary>(`/assistant/conversations/${id}`, { title }),
+  deleteConversation: (id: number) => http.delete<void>(`/assistant/conversations/${id}`),
 }

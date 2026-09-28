@@ -25,7 +25,7 @@ public class CityService {
 
     private static final String SELECT_RESPONSE = """
             SELECT c.slug, c.name, c.label_lat, c.label_lon, c.south, c.west, c.north, c.east,
-                   (SELECT count(*) FROM places p WHERE p.city_id = c.id) AS place_count,
+                   (SELECT count(*) FROM places p WHERE p.city_id = c.id AND NOT p.hidden) AS place_count,
                    (SELECT count(*) FROM districts d WHERE d.city_id = c.id) AS district_count
             FROM cities c
             """;

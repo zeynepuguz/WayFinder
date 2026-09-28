@@ -91,6 +91,15 @@ public class Place {
     @Column(insertable = false, updatable = false)
     private Instant imageCheckedAt;
 
+    // Not a realistic visitable place (osm/PlaceRealismFilter) but still used by a route / saved place / photo:
+    // left out of every list, search and plan. Written by JDBC only
+    @Column(insertable = false, updatable = false)
+    private boolean hidden;
+
+    // Real-world interest from Wikipedia (popularity/PlacePopularityService); null = unknown
+    @Column(insertable = false, updatable = false)
+    private Double popularity;
+
     // District (districts table) the place lies in; written by OsmAreaImporter from the district polygons
     @Column(insertable = false, updatable = false)
     private Long districtId;
@@ -337,6 +346,14 @@ public class Place {
 
     public String getCommonsFile() {
         return commonsFile;
+    }
+
+    public boolean isHidden() {
+        return hidden;
+    }
+
+    public Double getPopularity() {
+        return popularity;
     }
 
     public Long getDistrictId() {

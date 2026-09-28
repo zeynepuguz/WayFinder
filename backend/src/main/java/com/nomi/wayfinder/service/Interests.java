@@ -32,7 +32,11 @@ public final class Interests {
             Map.entry("walk", "yürüyüş"),
             Map.entry("shopping", "alışveriş"),
             Map.entry("music", "müzik"),
-            Map.entry("sports", "spor")
+            Map.entry("sports", "spor"),
+            Map.entry("quick", "hızlı yemek"),
+            Map.entry("bakery", "fırın"),
+            Map.entry("tea", "çay"),
+            Map.entry("religious", "ibadethane")
     );
 
     private static final Map<String, String> LABELS_EN = Map.ofEntries(
@@ -55,7 +59,11 @@ public final class Interests {
             Map.entry("walk", "walking"),
             Map.entry("shopping", "shopping"),
             Map.entry("music", "music"),
-            Map.entry("sports", "sports")
+            Map.entry("sports", "sports"),
+            Map.entry("quick", "quick bites"),
+            Map.entry("bakery", "bakery"),
+            Map.entry("tea", "tea"),
+            Map.entry("religious", "place of worship")
     );
 
     private Interests() {

@@ -6,43 +6,66 @@ import com.nomi.wayfinder.dto.PlaceImage;
 import com.nomi.wayfinder.dto.PopularRouteDtos.PopularPlace;
 import com.nomi.wayfinder.dto.PopularRouteDtos.PopularRouteResponse;
 import com.nomi.wayfinder.dto.PopularRouteDtos.PopularRouteStartRequest;
-import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.dto.PopularRouteDtos.PopularStop;
+import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.entity.Place;
+import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.osm.OsmImportFinishedEvent;
+import com.nomi.wayfinder.osm.PlacesChangedEvent;
 import com.nomi.wayfinder.planning.PlanResult;
 import com.nomi.wayfinder.planning.PlannedStop;
 import com.nomi.wayfinder.planning.PlanningRequest;
-import com.nomi.wayfinder.planning.PopularTheme;
+import com.nomi.wayfinder.planning.PopularRouteBuilder;
+import com.nomi.wayfinder.planning.PopularRouteBuilder.Area;
+import com.nomi.wayfinder.planning.PopularRouteBuilder.Cluster;
+import com.nomi.wayfinder.planning.PopularRouteBuilder.Itinerary;
+import com.nomi.wayfinder.planning.PopularRouteBuilder.PlannedStopRef;
+import com.nomi.wayfinder.planning.PopularRouteBuilder.Sight;
 import com.nomi.wayfinder.planning.RoutePlanner;
+import com.nomi.wayfinder.repository.PlaceRepository;
+import com.nomi.wayfinder.repository.PopularSightRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * "Popüler rotalar" of a city or district: every PopularTheme planned by the real RoutePlanner from the district's
- * label point (else the city's: its admin centre in OSM), for one person from 10:00, no budget, MEDIUM walking,
- * with opening hours and the day's weather like any plan. Themes with fewer than PopularTheme.MIN_STOPS real stops
- * are left out. Nothing is saved; POST /routes/popular/start saves the same plan for the user (RouteService).
+ * "Popüler rotalar" of a city or district: the routes people really walk. Nobody spends a day on "only historic
+ * places" or "only parks"; they visit the famous places that are near each other, in order, and eat in between.
+ * So each route is one walkable group of the area's most popular sights (Wikipedia sitelinks + pageviews, see
+ * popularity/PlacePopularity) in walking order, with lunch / coffee / dessert chosen by the real RoutePlanner
+ * (open at that time, same side of the Bosphorus, scored like any plan) - see planning/PopularRouteBuilder.
+ * From 09:30, one person, no budget, MEDIUM walking, today's opening hours and weather. At most MAX_ROUTES routes;
+ * a route needs PopularRouteBuilder.MIN_SIGHTS real sights and at most MAX_WALKING_MINUTES of walking.
+ * Nothing is saved; POST /routes/popular/start saves exactly the previewed route for the user (RouteService).
  */
 @Service
 public class PopularRouteService {
 
-    public static final String CACHE = "popularRoutes";
+    public static final String CACHE = "popularRoutes2";
+    static final int MAX_ROUTES = 5;
+    static final int MAX_CLUSTERS_TRIED = 15;
+    static final int MAX_WALKING_MINUTES = 90;
+    static final int CITY_SEEDS = 250;
+    static final int DISTRICT_SEEDS = 120;
+
     private static final Logger log = LoggerFactory.getLogger(PopularRouteService.class);
     private static final DateTimeFormatter HH_MM = DateTimeFormatter.ofPattern("HH:mm", Locale.ROOT);
 
@@ -50,27 +73,48 @@ public class PopularRouteService {
     private final CityService cityService;
     private final DistrictService districtService;
     private final RouteService routeService;
+    private final PlaceRepository placeRepository;
+    private final PopularSightRepository sightRepository;
     private final Clock clock;
+    // Through the proxy, so start() reuses the cached preview
+    private final PopularRouteService self;
 
     public PopularRouteService(RoutePlanner planner, CityService cityService, DistrictService districtService,
-                               RouteService routeService, Clock clock) {
+                               RouteService routeService, PlaceRepository placeRepository, PopularSightRepository sightRepository,
+                               Clock clock, @Lazy PopularRouteService self) {
         this.planner = planner;
         this.cityService = cityService;
         this.districtService = districtService;
         this.routeService = routeService;
+        this.placeRepository = placeRepository;
+        this.sightRepository = sightRepository;
         this.clock = clock;
+        this.self = self;
     }
 
     /**
-     * Saves a popular route for the user: the same planner request as the preview (same start, day, theme, 10:00,
-     * one person, no budget, MEDIUM walking). Title: "Üsküdar: Tarihi yerler".
+     * Saves a previewed popular route for the user: the same stops, times and lengths (every stop pinned);
+     * the planner only replaces a stop that became impossible (closed, rain on an outdoor place).
+     * 404 when the key is not among the area's popular routes for that day.
      */
     @Transactional
     public RouteResponse start(Long userId, PopularRouteStartRequest request) {
         LocalDate date = dayOrToday(request.date());
-        Start start = resolveStart(request.city(), request.district());
-        return routeService.createPlannedRoute(userId, request.theme().titleFor(start.label()),
-                request(request.theme(), start, date));
+        PopularRouteService routes = self != null ? self : this;
+        PopularRouteResponse route = routes.popularRoutes(request.city(), request.district(), date).stream()
+                .filter(r -> r.key().equals(request.key()))
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("Popular route not found: " + request.key()));
+        return routeService.createPlannedRoute(userId, route.title(), replayRequest(route));
+    }
+
+    // The planner input that reproduces a previewed route
+    static PlanningRequest replayRequest(PopularRouteResponse route) {
+        List<PlannedStopRef> stops = route.stops().stream()
+                .map(s -> new PlannedStopRef(s.type(), s.place().id(), LocalTime.parse(s.time(), HH_MM),
+                        s.durationMinutes()))
+                .toList();
+        return PopularRouteBuilder.replay(stops, route.startLatitude(), route.startLongitude(), route.date());
     }
 
     /**
@@ -81,45 +125,106 @@ public class PopularRouteService {
     @Transactional(readOnly = true)
     public List<PopularRouteResponse> popularRoutes(String city, String district, LocalDate date) {
         requireNotPast(date);
-        Start start = resolveStart(city, district);
+        Scope scope = resolveScope(city, district);
 
+        List<Sight> seeds = seeds(scope);
+        List<Cluster> clusters = PopularRouteBuilder.clusters(seeds);
         List<PopularRouteResponse> routes = new ArrayList<>();
-        for (PopularTheme theme : PopularTheme.values()) {
-            PlanResult result = planner.plan(request(theme, start, date));
-            if (result.stops().size() >= PopularTheme.MIN_STOPS) {
-                routes.add(toResponse(theme, start, date, result));
-            } else {
-                log.debug("Popular routes {}/{}: {} has only {} stops", city, district, theme, result.stops().size());
+        Set<String> usedTitles = new HashSet<>();
+        for (Cluster cluster : clusters.subList(0, Math.min(MAX_CLUSTERS_TRIED, clusters.size()))) {
+            if (routes.size() >= MAX_ROUTES) {
+                break;
             }
+            Optional<Itinerary> itinerary = PopularRouteBuilder.itinerary(cluster, date);
+            if (itinerary.isEmpty()) {
+                continue;
+            }
+            PlanResult result = planner.plan(PopularRouteBuilder.request(itinerary.get(), date));
+            // The planner replaces a pinned sight that turned out impossible (closed, outdoors in the rain); the
+            // route is only "popular" while at least MIN_SIGHTS of the group's own sights are still in it
+            Set<Long> popularIds = new HashSet<>();
+            itinerary.get().sights().forEach(s -> popularIds.add(s.place().getId()));
+            long kept = result.stops().stream()
+                    .filter(s -> s.type() == StopType.SIGHTSEEING && popularIds.contains(s.place().getId()))
+                    .count();
+            int walking = result.stops().stream().mapToInt(PlannedStop::walkingMinutes).sum();
+            if (kept < PopularRouteBuilder.MIN_SIGHTS || walking > MAX_WALKING_MINUTES) {
+                log.debug("Popular routes {}/{}: group of {} skipped ({} of its sights kept, {} min walking)", city,
+                        district, cluster.centre().place().getName(), kept, walking);
+                continue;
+            }
+            String title = title(scope, itinerary.get().sights(), usedTitles);
+            usedTitles.add(title);
+            routes.add(toResponse(PopularRouteBuilder.key(cluster, itinerary.get()), title, date, result,
+                    itinerary.get().sights()));
         }
         return routes;
     }
 
-    // Plans are cached for hours; after an import the city may have new places
+    // Plans are cached for hours; after an import, a cleanup or new popularity data the area may look different
     @EventListener
     @CacheEvict(cacheNames = CACHE, allEntries = true)
     public void onImport(OsmImportFinishedEvent event) {
         log.debug("Popular routes cache cleared after the import of {}", event.result() == null ? "?" : event.result().city());
     }
 
-    // The planner input for a theme; RouteService uses the very same one when the user starts the route
-    public PlanningRequest request(PopularTheme theme, Start start, LocalDate date) {
-        return RoutePlanner.themeRequest(theme.slots(), theme.interests(), start.latitude(), start.longitude(), date);
+    @EventListener
+    @CacheEvict(cacheNames = CACHE, allEntries = true)
+    public void onPlacesChanged(PlacesChangedEvent event) {
+        log.debug("Popular routes cache cleared ({})", event.reason());
+    }
+
+    List<Sight> seeds(Scope scope) {
+        Map<Long, Double> scores = sightRepository.seedScores(scope.cityId(), scope.districtId(),
+                scope.districtId() == null ? CITY_SEEDS : DISTRICT_SEEDS);
+        if (scores.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, Place> places = placeRepository.findByIdIn(scores.keySet()).stream()
+                .collect(Collectors.toMap(Place::getId, Function.identity()));
+        return scores.entrySet().stream()
+                .filter(e -> places.containsKey(e.getKey()))
+                .map(e -> new Sight(places.get(e.getKey()), e.getValue()))
+                .toList();
+    }
+
+    // "Sultanahmet ve çevresi", "Galata–Karaköy"; the district, else the first sight when no area name is near
+    String title(Scope scope, List<Sight> sights, Set<String> used) {
+        double south = sights.stream().mapToDouble(s -> s.place().getLatitude()).min().orElse(0) - 0.012;
+        double north = sights.stream().mapToDouble(s -> s.place().getLatitude()).max().orElse(0) + 0.012;
+        double west = sights.stream().mapToDouble(s -> s.place().getLongitude()).min().orElse(0) - 0.016;
+        double east = sights.stream().mapToDouble(s -> s.place().getLongitude()).max().orElse(0) + 0.016;
+        List<Area> areas = sightRepository.areas(scope.cityId(), south, west, north, east);
+        // Places in and just around the group (the area box is wider)
+        List<String> nearbyNames = sightRepository.placeNames(south + 0.006, west + 0.008, north - 0.006, east - 0.008);
+
+        Set<String> usedAreas = new HashSet<>();
+        used.forEach(t -> usedAreas.add(t.replace(" ve çevresi", "").replace(" and around", "")));
+        String area = PopularRouteBuilder.areaTitle(sights, areas, nearbyNames, usedAreas);
+        if (area == null) {
+            area = sights.stream().map(s -> s.place().getDistrictName()).filter(Objects::nonNull)
+                    .collect(Collectors.groupingBy(Function.identity(), LinkedHashMap::new, Collectors.counting()))
+                    .entrySet().stream().max(Map.Entry.comparingByValue()).map(Map.Entry::getKey)
+                    .orElse(sights.getFirst().place().getName());
+        }
+        if (area.contains("–")) {
+            return area;
+        }
+        return Texts.t(area + " ve çevresi", area + " and around");
     }
 
     /**
-     * Where the route starts: the district's label point when a district is given, else the city's.
-     * 404 for an unknown city or a district that is not in the city.
+     * The city (and district) the routes are for; 404 for an unknown city or a district that is not in the city.
      */
-    public Start resolveStart(String citySlug, String districtSlug) {
+    Scope resolveScope(String citySlug, String districtSlug) {
         CityService.City city = cityService.findBySlug(citySlug)
                 .orElseThrow(() -> new ResourceNotFoundException("City not found: " + citySlug));
         if (districtSlug == null || districtSlug.isBlank()) {
-            return new Start(city.name(), city.labelLatitude(), city.labelLongitude());
+            return new Scope(city.id(), null);
         }
-        DistrictService.District district = districtService.findBySlug(city.id(), districtSlug)
+        long districtId = districtService.findIdBySlug(city.id(), districtSlug)
                 .orElseThrow(() -> new ResourceNotFoundException("District not found: " + districtSlug));
-        return new Start(district.name(), district.labelLatitude(), district.labelLongitude());
+        return new Scope(city.id(), districtId);
     }
 
     public LocalDate dayOrToday(LocalDate date) {
@@ -134,20 +239,24 @@ public class PopularRouteService {
         }
     }
 
-    static PopularRouteResponse toResponse(PopularTheme theme, Start start, LocalDate date, PlanResult result) {
+    static PopularRouteResponse toResponse(String key, String title, LocalDate date, PlanResult result,
+                                           List<Sight> seeds) {
         List<PopularStop> stops = result.stops().stream().map(PopularRouteService::toStop).toList();
         List<Integer> knownPrices = result.stops().stream()
                 .map(s -> s.place().getEstimatedCost())
-                .filter(java.util.Objects::nonNull)
+                .filter(Objects::nonNull)
                 .toList();
         Integer cost = knownPrices.isEmpty() ? null : knownPrices.stream().mapToInt(Integer::intValue).sum();
+        Place first = result.stops().getFirst().place();
         return new PopularRouteResponse(
-                theme,
-                theme.title(),
-                theme.description(),
-                start.label(),
-                start.latitude(),
-                start.longitude(),
+                key,
+                title,
+                Texts.t("Bu bölgenin en çok ilgi gören yerleri, yürüme sırasıyla.",
+                        "The most popular places of this area, in walking order."),
+                popularityNote(seeds),
+                first.getName(),
+                first.getLatitude(),
+                first.getLongitude(),
                 date,
                 stops,
                 result.stops().stream().mapToInt(PlannedStop::walkingMinutes).sum(),
@@ -155,10 +264,22 @@ public class PopularRouteService {
                 result.stops().size() - knownPrices.size());
     }
 
+    // Why these places count as popular: Wikipedia data for most sights, else our own verified / rated / photo data
+    static String popularityNote(List<Sight> sights) {
+        long withWikipedia = sights.stream()
+                .filter(s -> s.place().getPopularity() != null && s.place().getPopularity() > 0).count();
+        return withWikipedia * 2 >= sights.size()
+                ? Texts.t("Wikipedia’da en çok okunan yerler", "The most-read places on Wikipedia")
+                : Texts.t("Nomi’de doğrulanmış, puanlı ya da fotoğraflı yerler",
+                "Places verified, rated or photographed on Nomi");
+    }
+
     private static PopularStop toStop(PlannedStop stop) {
         Place place = stop.place();
+        int minutes = (int) Duration.between(stop.start(), stop.end()).toMinutes();
         return new PopularStop(
                 stop.start().format(HH_MM),
+                minutes < 0 ? minutes + 1440 : minutes,
                 stop.type(),
                 stop.type().getLabel(),
                 stop.walkingMinutes(),
@@ -172,12 +293,13 @@ public class PopularRouteService {
                         PlaceImage.of(place),
                         place.getEstimatedCost(),
                         place.isVerified(),
-                        place.getDistrictName()));
+                        place.getDistrictName(),
+                        place.getPopularity()));
     }
 
     /**
-     * @param label the district or city name ("Üsküdar", "Ankara")
+     * @param districtId null = the whole city
      */
-    public record Start(String label, double latitude, double longitude) {
+    record Scope(long cityId, Long districtId) {
     }
 }

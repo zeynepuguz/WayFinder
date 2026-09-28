@@ -3,7 +3,6 @@ package com.nomi.wayfinder.planning;
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
-import com.nomi.wayfinder.entity.WalkingTolerance;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.repository.PlaceDistance;
 import com.nomi.wayfinder.repository.PlaceRepository;
@@ -12,7 +11,6 @@ import com.nomi.wayfinder.weather.WeatherService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.function.Function;
@@ -37,10 +35,6 @@ public class RoutePlanner {
     // How early before its target time a stop may start (a meal should not start hours early)
     static final int MEAL_FLEX_MINUTES = 30;
     static final int OTHER_FLEX_MINUTES = 90;
-    // Popular routes (planTheme): a day from 10:00 to 22:00 for one person
-    public static final LocalTime THEME_START = LocalTime.of(10, 0);
-    public static final LocalTime THEME_END = LocalTime.of(22, 0);
-    public static final int THEME_PARTY_SIZE = 1;
 
     private final PlaceRepository placeRepository;
     private final PlaceScorer scorer;
@@ -50,23 +44,6 @@ public class RoutePlanner {
         this.placeRepository = placeRepository;
         this.scorer = scorer;
         this.weatherService = weatherService;
-    }
-
-    /**
-     * A themed day (popular routes) from a start point, without a user or a saved route: the slots of the theme,
-     * from THEME_START to THEME_END, one person, no budget, MEDIUM walking. The same request is used when the
-     * user starts that route (RouteService), so the saved route matches the preview.
-     */
-    @Transactional(readOnly = true)
-    public PlanResult planTheme(List<PlanningSlot> slots, List<String> interests, double startLatitude,
-                                double startLongitude, LocalDate date) {
-        return plan(themeRequest(slots, interests, startLatitude, startLongitude, date));
-    }
-
-    public static PlanningRequest themeRequest(List<PlanningSlot> slots, List<String> interests,
-                                               double startLatitude, double startLongitude, LocalDate date) {
-        return new PlanningRequest(startLatitude, startLongitude, date, THEME_START, THEME_END, THEME_PARTY_SIZE,
-                null, WalkingTolerance.MEDIUM, List.copyOf(interests), List.copyOf(slots), Set.of(), false);
     }
 
     @Transactional(readOnly = true)
@@ -295,6 +272,10 @@ public class RoutePlanner {
         }
 
         Place place = found.get();
+        // No longer a place we show (PlaceRealismFilter): look for another one
+        if (place.isHidden()) {
+            return Optional.empty();
+        }
         Double distance = placeRepository.distanceTo(place.getId(), leg.latitude(), leg.longitude());
         Timing timing = timing(slot, place, leg.clock(), distance == null ? 0 : distance);
 
@@ -315,7 +296,7 @@ public class RoutePlanner {
         }
 
         WeatherContext weather = WeatherContext.at(forecast, time(timing.arrival()), request.assumeWet());
-        if (weather.wet() && !place.isIndoor()) {
+        if (weather.wet() && !place.isIndoor() && !slot.keepInRain()) {
             notes.add(Texts.t(place.getName() + " açık alan olduğu ve yağış beklendiği için değiştirildi.",
                     place.getName() + " was replaced because it is outdoors and rain is expected."));
             return Optional.empty();

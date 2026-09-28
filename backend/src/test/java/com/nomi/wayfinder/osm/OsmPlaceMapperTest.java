@@ -111,6 +111,82 @@ class OsmPlaceMapperTest {
     }
 
     @Test
+    void mapsFastFoodBakeriesSightsAndNatureIntoTheExistingCategories() {
+        // Fast food with a name: a real (quick) meal
+        OsmPlace doner = map("amenity", "fast_food", "name", "Bereket Döner", "cuisine", "kebab");
+        assertThat(doner.category()).isEqualTo(PlaceCategory.RESTAURANT);
+        assertThat(doner.tags()).containsExactly("quick");
+        assertThat(map("amenity", "fast_food", "name", "Dondurmacı Ali", "cuisine", "ice_cream").category())
+                .isEqualTo(PlaceCategory.DESSERT);
+        assertThat(map("amenity", "food_court", "name", "Kanyon Yemek Katı").category()).isEqualTo(PlaceCategory.RESTAURANT);
+        // Tea gardens are cafes tagged "tea"
+        assertThat(map("amenity", "cafe", "name", "Emirgan Çay Bahçesi").tags()).containsExactly("tea");
+        assertThat(map("amenity", "cafe", "name", "Ada Çay", "cuisine", "tea").tags()).containsExactly("tea");
+        assertThat(map("shop", "coffee", "name", "Kurukahveci Mehmet Efendi").category()).isEqualTo(PlaceCategory.CAFE);
+
+        // Bakeries: pastry shops are desserts, börek / simit shops cafes, bread ovens are not places to go
+        assertThat(map("shop", "bakery", "name", "Divan Pastanesi").category()).isEqualTo(PlaceCategory.DESSERT);
+        OsmPlace borek = map("shop", "bakery", "name", "Meşhur Sarıyer Börekçisi");
+        assertThat(borek.category()).isEqualTo(PlaceCategory.CAFE);
+        assertThat(borek.tags()).containsExactly("bakery");
+        assertThat(map("shop", "bakery", "name", "Yıldız Ekmek Fırını")).isNull();
+
+        // Places of worship only when notable (Wikidata) or historic
+        OsmPlace mosque = map("amenity", "place_of_worship", "religion", "muslim", "name", "Süleymaniye Camii",
+                "wikidata", "Q193617");
+        assertThat(mosque.category()).isEqualTo(PlaceCategory.ATTRACTION);
+        assertThat(mosque.indoor()).isTrue();
+        assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious");
+        assertThat(map("amenity", "place_of_worship", "name", "Tarihi Kilise", "heritage", "2").category())
+                .isEqualTo(PlaceCategory.ATTRACTION);
+        assertThat(map("amenity", "place_of_worship", "religion", "muslim", "name", "Yeni Mahalle Camii")).isNull();
+
+        // Historic sites; memorials / tombs only with Wikidata
+        assertThat(map("historic", "castle", "name", "Rumeli Hisarı").category()).isEqualTo(PlaceCategory.ATTRACTION);
+        assertThat(map("historic", "archaeological_site", "name", "Yenikapı Kazısı").tags()).containsExactly("history");
+        assertThat(map("historic", "memorial", "name", "Şehitler Anıtı Plaketi")).isNull();
+        assertThat(map("historic", "tomb", "name", "Barbaros Hayrettin Paşa Türbesi", "wikidata", "Q6519390").category())
+                .isEqualTo(PlaceCategory.ATTRACTION);
+
+        assertThat(map("tourism", "gallery", "name", "Galata Rum Okulu Sanat").category()).isEqualTo(PlaceCategory.CULTURE);
+        assertThat(map("tourism", "zoo", "name", "Darıca Hayvanat Bahçesi").category()).isEqualTo(PlaceCategory.ATTRACTION);
+        assertThat(map("tourism", "aquarium", "name", "İstanbul Akvaryum").indoor()).isTrue();
+        assertThat(map("leisure", "garden", "name", "Gülhane Gül Bahçesi").category()).isEqualTo(PlaceCategory.PARK);
+        assertThat(map("leisure", "garden", "name", "Villa Bahçesi", "garden:type", "residential")).isNull();
+        assertThat(map("leisure", "nature_reserve", "name", "Belgrad Ormanı").category()).isEqualTo(PlaceCategory.PARK);
+        OsmPlace beach = map("natural", "beach", "name", "Kilyos Plajı");
+        assertThat(beach.category()).isEqualTo(PlaceCategory.PARK);
+        assertThat(beach.tags()).contains("sea", "nature");
+        assertThat(map("man_made", "lighthouse", "name", "Ahırkapı Feneri", "wikidata", "Q4696188").tags())
+                .containsExactlyInAnyOrder("sea", "view");
+        assertThat(map("man_made", "lighthouse", "name", "Mendirek Feneri")).isNull();
+        OsmPlace bazaar = map("amenity", "marketplace", "name", "Kadıköy Salı Pazarı");
+        assertThat(bazaar.category()).isEqualTo(PlaceCategory.ATTRACTION);
+        assertThat(bazaar.tags()).contains("shopping");
+    }
+
+    @Test
+    void impossibleCoordinatesAreSkipped() {
+        assertThat(OsmPlaceMapper.map(new OverpassResponse.Element("node", 30, 0.0, 0.0, null,
+                Map.of("amenity", "cafe", "name", "Sıfır Kafe")))).isNull();
+        // Swapped lat / lon
+        assertThat(OsmPlaceMapper.map(new OverpassResponse.Element("node", 31, 29.02, 40.99, null,
+                Map.of("amenity", "cafe", "name", "Ters Kafe")))).isNull();
+        // Ways and relations use their center
+        assertThat(OsmPlaceMapper.map(new OverpassResponse.Element("way", 32, null, null,
+                new OverpassResponse.Center(41.0115, 28.9833), Map.of("tourism", "museum", "name", "Topkapı Sarayı")))
+                .latitude()).isEqualTo(41.0115);
+    }
+
+    private static OsmPlace map(String... keyValues) {
+        Map<String, String> tags = new java.util.HashMap<>();
+        for (int i = 0; i < keyValues.length; i += 2) {
+            tags.put(keyValues[i], keyValues[i + 1]);
+        }
+        return OsmPlaceMapper.map(new OverpassResponse.Element("node", 40, 41.0, 29.0, null, tags));
+    }
+
+    @Test
     void busyServerPagesAndRuntimeErrorsAreRejected() {
         assertThatThrownBy(() -> OverpassClient.parse("<?xml version=\"1.0\"?><osm><remark>busy</remark></osm>", jsonMapper))
                 .isInstanceOf(IllegalStateException.class);

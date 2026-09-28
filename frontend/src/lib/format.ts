@@ -1,4 +1,4 @@
-import type { PlaceCategory, StopType, WalkingTolerance } from '../api/types'
+import type { PlaceCategory, RouteStatus, StopType, WalkingTolerance } from '../api/types'
 import { bilingual, locale, tr } from './i18n'
 
 export const CATEGORY_LABELS: Record<PlaceCategory, string> = bilingual({
@@ -53,6 +53,8 @@ export const TAG_LABELS: Record<string, string> = bilingual<string>({
   dessert: ['Tatlı', 'Dessert'],
   breakfast: ['Kahvaltı', 'Breakfast'],
   tea: ['Çay', 'Tea'],
+  quick: ['Hızlı yemek', 'Quick bites'],
+  bakery: ['Fırın', 'Bakery'],
   walk: ['Yürüyüş', 'Walk'],
   shopping: ['Alışveriş', 'Shopping'],
   music: ['Müzik', 'Music'],
@@ -108,6 +110,17 @@ export function todayIso(): string {
   const now = new Date()
   const offset = now.getTimezoneOffset() * 60000
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
+}
+
+// A route that can still be walked and changed (planned or in progress)
+export function isOpenRoute(status: RouteStatus): boolean {
+  return status === 'DRAFT' || status === 'ACTIVE'
+}
+
+// The route's day is over: read-only ("Geçmiş rotalar"). The backend marks such routes EXPIRED; the date check
+// also covers a route read just after midnight
+export function isPastRoute(route: { date: string; status: RouteStatus }): boolean {
+  return route.status === 'EXPIRED' || route.date < todayIso()
 }
 
 // Great-circle distance on the client (live map: distance to a pin, when to refresh suggestions)

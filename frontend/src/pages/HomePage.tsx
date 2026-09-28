@@ -13,7 +13,7 @@ import { BrandMark, CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useCity } from '../context/CityContext'
 import { locationLabel, useUserLocation } from '../context/LocationContext'
-import { CATEGORY_LABELS, locativeTr, STOP_TYPE_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, isOpenRoute, locativeTr, STOP_TYPE_LABELS, todayIso } from '../lib/format'
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
@@ -72,9 +72,17 @@ export function HomePage() {
   const greeting = hour < 5 ? t('İyi geceler', 'Good night') : hour < 12 ? t('Günaydın', 'Good morning') : hour < 18 ? t('İyi günler', 'Good afternoon') : t('İyi akşamlar', 'Good evening')
 
   function ask(prompt?: string) {
-    const target = prompt ? `/assistant?q=${encodeURIComponent(prompt)}` : '/assistant'
+    // Always a new chat: /assistant alone is an empty chat, ?new=1&q= starts one with this prompt
+    const target = prompt ? `/assistant?new=1&q=${encodeURIComponent(prompt)}` : '/assistant'
     if (gate(target)) navigate(target)
   }
+
+  // Only today's route is "active"; a route of a past day never is (the backend already filters, this guards old servers)
+  const today = todayIso()
+  const activeRoute = data?.currentRoute && data.currentRoute.date >= today && isOpenRoute(data.currentRoute.status)
+    ? data.currentRoute : null
+  const tomorrowRoute = data?.tomorrowRoute && data.tomorrowRoute.date >= today && isOpenRoute(data.tomorrowRoute.status)
+    ? data.tomorrowRoute : null
 
   const weather = data?.weather
   const WeatherIcon = weather ? WEATHER_ICON[weather.condition] ?? Sparkles : Sparkles
@@ -140,13 +148,23 @@ export function HomePage() {
         </section>
       )}
 
-      {data?.currentRoute && (
-        <Link to={`/routes/${data.currentRoute.id}`} className="active-route card-press">
+      {activeRoute ? (
+        <Link to={`/routes/${activeRoute.id}`} className="active-route card-press">
           <span className="pulse"><Navigation size={22} /></span>
           <div className="grow">
             <div className="t-overline" style={{ color: 'inherit', opacity: 0.6 }}>{t('Aktif rotan', 'Your active route')}</div>
-            <div className="t-headline">{data.currentRoute.title}</div>
-            <div style={{ fontSize: 13, opacity: 0.7 }}>{data.currentRoute.stopCount} {t('durak · devam etmek için dokun', 'stops · tap to continue')}</div>
+            <div className="t-headline">{activeRoute.title}</div>
+            <div style={{ fontSize: 13, opacity: 0.7 }}>{activeRoute.stopCount} {t('durak · devam etmek için dokun', 'stops · tap to continue')}</div>
+          </div>
+          <ChevronRight size={20} />
+        </Link>
+      ) : tomorrowRoute && (
+        <Link to={`/routes/${tomorrowRoute.id}`} className="active-route card-press">
+          <span className="pulse"><RouteIcon size={22} /></span>
+          <div className="grow">
+            <div className="t-overline" style={{ color: 'inherit', opacity: 0.6 }}>{t('Yarınki rotan', 'Tomorrow’s route')}</div>
+            <div className="t-headline">{tomorrowRoute.title}</div>
+            <div style={{ fontSize: 13, opacity: 0.7 }}>{tomorrowRoute.stopCount} {t('durak · görmek için dokun', 'stops · tap to view')}</div>
           </div>
           <ChevronRight size={20} />
         </Link>

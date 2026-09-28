@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -39,40 +40,45 @@ public final class OsmPlaceMapper {
     private OsmPlaceMapper() {
     }
 
+    // Turkey (35.8-42.1 N, 25.6-44.8 E) padded: coordinates outside are mapping errors (0/0, swapped lat/lon)
+    static final double MIN_LATITUDE = 35.0;
+    static final double MAX_LATITUDE = 42.8;
+    static final double MIN_LONGITUDE = 25.0;
+    static final double MAX_LONGITUDE = 45.5;
+
     /**
-     * @return null when the element is not a place we can show (no name, no coordinates, unknown kind)
+     * @return null when the element is not a place we can show (no name, no or impossible coordinates, unknown kind)
      */
     public static OsmPlace map(OverpassResponse.Element element) {
         String name = trimToNull(element.tag("name"));
         Double latitude = element.latitude();
         Double longitude = element.longitude();
-        if (name == null || latitude == null || longitude == null || element.type() == null) {
+        if (name == null || latitude == null || longitude == null || element.type() == null
+                || !plausibleCoordinates(latitude, longitude)) {
             return null;
         }
 
-        String amenity = element.tag("amenity");
-        String shop = element.tag("shop");
-        String tourism = element.tag("tourism");
-        String leisure = element.tag("leisure");
         // OSM values are lowercase ASCII keys like "coffee_shop;breakfast"
         String cuisine = element.tag("cuisine") == null ? "" : element.tag("cuisine").toLowerCase(Locale.ROOT);
-        List<String> cuisines = Arrays.asList(cuisine.split(";"));
+        List<String> cuisines = Arrays.stream(cuisine.split(";")).map(String::trim).toList();
+        String foldedName = fold(name);
 
-        PlaceCategory category = category(amenity, shop, tourism, leisure);
-        if (category == null) {
+        Kind kind = classify(element, foldedName, cuisines);
+        if (kind == null) {
             return null;
         }
-        String foldedName = fold(name);
+        PlaceCategory category = kind.category();
         if ((category == PlaceCategory.CAFE || category == PlaceCategory.RESTAURANT)
-                && (cuisine.contains("breakfast") || foldedName.contains("kahvalti"))) {
+                && (cuisines.contains("breakfast") || foldedName.contains("kahvalti"))) {
             category = PlaceCategory.BREAKFAST;
         }
 
-        List<String> tags = new ArrayList<>();
-        if (cuisines.stream().anyMatch(c -> c.trim().equals("coffee_shop"))) {
+        String tourism = element.tag("tourism");
+        List<String> tags = new ArrayList<>(kind.tags());
+        if (cuisines.contains("coffee_shop")) {
             tags.add("coffee");
         }
-        if (cuisines.stream().anyMatch(c -> c.trim().equals("seafood") || c.trim().equals("fish"))) {
+        if (cuisines.contains("seafood") || cuisines.contains("fish")) {
             tags.add("seafood");
         }
         if (category == PlaceCategory.BREAKFAST) {
@@ -91,7 +97,7 @@ public final class OsmPlaceMapper {
             tags.add("nature");
             tags.add("walk");
         }
-        if ("arts_centre".equals(amenity)) {
+        if ("arts_centre".equals(element.tag("amenity"))) {
             tags.add("art");
         }
         if (category == PlaceCategory.DESSERT) {
@@ -108,7 +114,7 @@ public final class OsmPlaceMapper {
                 latitude,
                 longitude,
                 category,
-                indoor(category),
+                kind.indoor() != null ? kind.indoor() : indoor(category),
                 tags.stream().distinct().toList(),
                 truncate(address(element), MAX_ADDRESS),
                 truncate(neighborhood(element), MAX_NEIGHBORHOOD),
@@ -116,6 +122,128 @@ public final class OsmPlaceMapper {
                 wikidata(element.tag("wikidata")),
                 commonsFile(element.tag("wikimedia_commons"), element.tag("image"))
         );
+    }
+
+    static boolean plausibleCoordinates(double latitude, double longitude) {
+        return latitude >= MIN_LATITUDE && latitude <= MAX_LATITUDE
+                && longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE;
+    }
+
+    // historic=* values that are sights by themselves; any other historic=* (memorial plaques, milestones,
+    // boundary stones, "yes") only counts when it has a Wikidata item, i.e. it is notable
+    static final Set<String> HISTORIC_SIGHTS = Set.of("castle", "fort", "monument", "ruins", "archaeological_site",
+            "city_gate", "tower", "citywalls", "aqueduct", "palace", "mosque", "church", "monastery", "caravanserai",
+            "bath");
+    // Named gardens of houses / roofs / community plots are not public places
+    private static final Set<String> PRIVATE_GARDEN_TYPES = Set.of("residential", "private", "roof_garden", "community");
+    // shop=bakery: a pastry shop (sit-down pastane) vs a börek / simit / poğaça bakery vs a bread oven
+    private static final List<String> PASTRY_WORDS = List.of("pastane", "pastahane", "patisserie", "patiseri",
+            "pasta", "tatli", "baklava", "kunefe", "muhallebi", "cikolata", "chocolate", "cake", "dessert");
+    private static final List<String> SAVOURY_BAKERY_WORDS = List.of("borek", "simit", "pogaca", "gevrek", "acma",
+            "katmer", "bakery", "cafe", "kafe");
+
+    /**
+     * The category (and extra tags) of an element; null when it is nothing we show. Keys are checked in order
+     * amenity, shop, tourism, leisure, historic, natural, man_made: a cafe that is also tagged tourism=attraction
+     * is still a cafe; a place of worship without Wikidata / heritage / historic tags falls through to the next key.
+     */
+    static Kind classify(OverpassResponse.Element element, String foldedName, List<String> cuisines) {
+        String amenity = element.tag("amenity");
+        boolean notable = wikidata(element.tag("wikidata")) != null;
+        if ("cafe".equals(amenity)) {
+            // Tea gardens (çay bahçesi) are cafes where people mostly drink tea
+            boolean tea = cuisines.contains("tea") || foldedName.contains("caybahce") || foldedName.contains("cayevi");
+            return new Kind(PlaceCategory.CAFE, tea ? List.of("tea") : List.of(), null);
+        }
+        if ("restaurant".equals(amenity) || "food_court".equals(amenity)) {
+            return new Kind(PlaceCategory.RESTAURANT, List.of(), null);
+        }
+        if ("fast_food".equals(amenity)) {
+            // Döner, köfte, pide, lahmacun places: real meals, served quickly
+            return cuisines.contains("ice_cream")
+                    ? new Kind(PlaceCategory.DESSERT, List.of(), null)
+                    : new Kind(PlaceCategory.RESTAURANT, List.of("quick"), null);
+        }
+        if ("ice_cream".equals(amenity)) {
+            return new Kind(PlaceCategory.DESSERT, List.of(), null);
+        }
+        if ("theatre".equals(amenity) || "arts_centre".equals(amenity)) {
+            return new Kind(PlaceCategory.CULTURE, List.of(), null);
+        }
+        if ("place_of_worship".equals(amenity)
+                && (notable || trimToNull(element.tag("historic")) != null || trimToNull(element.tag("heritage")) != null)) {
+            // Only famous / historic mosques, churches and synagogues, not every neighbourhood mescit
+            return new Kind(PlaceCategory.ATTRACTION, List.of("history", "religious"), true);
+        }
+        if ("marketplace".equals(amenity)) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of("shopping", "local"), false);
+        }
+
+        String shop = element.tag("shop");
+        if ("pastry".equals(shop) || "confectionery".equals(shop)) {
+            return new Kind(PlaceCategory.DESSERT, List.of(), null);
+        }
+        if ("coffee".equals(shop)) {
+            return new Kind(PlaceCategory.CAFE, List.of("coffee"), null);
+        }
+        if ("bakery".equals(shop)) {
+            if (cuisines.contains("pastry") || cuisines.contains("cake") || containsAny(foldedName, PASTRY_WORDS)) {
+                return new Kind(PlaceCategory.DESSERT, List.of(), null);
+            }
+            if (containsAny(foldedName, SAVOURY_BAKERY_WORDS)) {
+                return new Kind(PlaceCategory.CAFE, List.of("bakery"), null);
+            }
+            // A plain bread oven ("Yıldız Ekmek Fırını") is a shop, not a place to go to
+            return null;
+        }
+
+        String tourism = element.tag("tourism");
+        if ("museum".equals(tourism)) {
+            return new Kind(PlaceCategory.MUSEUM, List.of(), null);
+        }
+        if ("gallery".equals(tourism)) {
+            return new Kind(PlaceCategory.CULTURE, List.of("art"), null);
+        }
+        if ("attraction".equals(tourism) || "viewpoint".equals(tourism) || "zoo".equals(tourism)
+                || "theme_park".equals(tourism)) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of(), null);
+        }
+        if ("aquarium".equals(tourism)) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of("sea"), true);
+        }
+
+        String leisure = element.tag("leisure");
+        if ("park".equals(leisure) || "nature_reserve".equals(leisure)) {
+            return new Kind(PlaceCategory.PARK, List.of(), null);
+        }
+        if ("garden".equals(leisure)) {
+            String gardenType = element.tag("garden:type");
+            return gardenType != null && PRIVATE_GARDEN_TYPES.contains(gardenType)
+                    ? null : new Kind(PlaceCategory.PARK, List.of(), null);
+        }
+
+        String historic = trimToNull(element.tag("historic"));
+        if (historic != null && (HISTORIC_SIGHTS.contains(historic) || notable)) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of("history"), null);
+        }
+
+        if ("beach".equals(element.tag("natural"))) {
+            return new Kind(PlaceCategory.PARK, List.of("sea"), false);
+        }
+        if ("lighthouse".equals(element.tag("man_made")) && notable) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of("sea", "view"), false);
+        }
+        return null;
+    }
+
+    private static boolean containsAny(String folded, List<String> words) {
+        return words.stream().anyMatch(folded::contains);
+    }
+
+    /**
+     * @param indoor null = the category's default (see indoor(PlaceCategory))
+     */
+    record Kind(PlaceCategory category, List<String> tags, Boolean indoor) {
     }
 
     // "Q12506"; anything else (lists like "Q1;Q2", typos) -> null
@@ -172,37 +300,6 @@ public final class OsmPlaceMapper {
         }
         // Wiki titles start with a capital letter (Character.toUpperCase ignores the JVM's Turkish locale)
         return Character.toUpperCase(title.charAt(0)) + title.substring(1);
-    }
-
-    // amenity first: a cafe that is also tagged tourism=attraction is still a cafe
-    static PlaceCategory category(String amenity, String shop, String tourism, String leisure) {
-        if (amenity != null) {
-            switch (amenity) {
-                case "cafe":
-                    return PlaceCategory.CAFE;
-                case "restaurant":
-                    return PlaceCategory.RESTAURANT;
-                case "ice_cream":
-                    return PlaceCategory.DESSERT;
-                case "theatre", "arts_centre":
-                    return PlaceCategory.CULTURE;
-                default:
-                    break;
-            }
-        }
-        if ("pastry".equals(shop) || "confectionery".equals(shop)) {
-            return PlaceCategory.DESSERT;
-        }
-        if ("museum".equals(tourism)) {
-            return PlaceCategory.MUSEUM;
-        }
-        if ("attraction".equals(tourism) || "viewpoint".equals(tourism)) {
-            return PlaceCategory.ATTRACTION;
-        }
-        if ("park".equals(leisure)) {
-            return PlaceCategory.PARK;
-        }
-        return null;
     }
 
     // Parks, viewpoints and attractions are treated as outdoors (worse in rain / heat)

@@ -19,7 +19,7 @@ import java.util.List;
 /**
  * Downloads OpenStreetMap data from the Overpass API: Turkey's provinces (cities), and per city its districts,
  * named neighbourhoods and the cafes, restaurants, dessert shops, museums, sights, parks and culture venues
- * (Istanbul: ~12k elements, ~3.3 MB).
+ * (Istanbul: ~26k elements in two queries).
  * Overpass servers are often busy and then answer 200 with an HTML/XML error page, or JSON with a
  * runtime error in "remark": such answers are treated as failures and the next endpoint is tried.
  */
@@ -38,19 +38,38 @@ public class OverpassClient {
     // İstanbul province (relation 223474)
     static final long ISTANBUL_RELATION_ID = 223474L;
 
-    // Places of one city; %d = the city's Overpass area id
-    static final String PLACES_QUERY = """
-            [out:json][timeout:180];
+    /*
+     * Places of one city, in two queries (each ~13k elements / ~4 MB for İstanbul; one query with everything runs
+     * into Overpass' time limit on busy servers); %d = the city's Overpass area id. Few statements with broad
+     * filters are much faster than many narrow ones: OsmPlaceMapper picks what to keep (e.g. only notable or
+     * historic places of worship, bakeries that are pastry / börek shops).
+     */
+    // Food and drink: cafes, restaurants, fast food (döner, köfte, pide), dessert shops, bakeries, coffee shops
+    static final String FOOD_QUERY = """
+            [out:json][timeout:300];
             area(id:%d)->.city;
             (
-              nwr["amenity"~"^(cafe|restaurant|ice_cream|theatre|arts_centre)$"]["name"](area.city);
-              nwr["shop"~"^(pastry|confectionery)$"]["name"](area.city);
-              nwr["tourism"~"^(museum|attraction|viewpoint)$"]["name"](area.city);
-              nwr["leisure"="park"]["name"](area.city);
+              nwr["amenity"~"^(cafe|restaurant|fast_food|food_court|ice_cream)$"]["name"](area.city);
+              nwr["shop"~"^(pastry|confectionery|bakery|coffee)$"]["name"](area.city);
             );
             out center tags;
             """;
 
+    // Sights, culture and nature: museums, galleries, attractions, parks, gardens, historic sites, places of worship,
+    // bazaars, beaches, lighthouses, theatres
+    static final String SIGHTS_QUERY = """
+            [out:json][timeout:300];
+            area(id:%d)->.city;
+            (
+              nwr["tourism"~"^(museum|gallery|attraction|viewpoint|zoo|aquarium|theme_park)$"]["name"](area.city);
+              nwr["leisure"~"^(park|garden|nature_reserve)$"]["name"](area.city);
+              nwr["historic"]["name"](area.city);
+              nwr["amenity"~"^(theatre|arts_centre|place_of_worship|marketplace)$"]["name"](area.city);
+              nwr["natural"="beach"]["name"](area.city);
+              nwr["man_made"="lighthouse"]["name"](area.city);
+            );
+            out center tags;
+            """;
     // A city's districts (ilçe boundaries) with their member ways' geometry, to build polygons from
     static final String DISTRICTS_QUERY = """
             [out:json][timeout:180];
@@ -76,9 +95,6 @@ public class OverpassClient {
             out geom;
             """.formatted(AREA_ID_OFFSET + TURKEY_RELATION_ID);
 
-    // The Istanbul place query as it always was (same filters, same area)
-    static final String ISTANBUL_QUERY = placesQuery(ISTANBUL_RELATION_ID);
-
     private final NomiProperties.Osm properties;
     private final JsonMapper jsonMapper;
     private final RestClient restClient;
@@ -102,10 +118,24 @@ public class OverpassClient {
     }
 
     /**
+     * Food / drink and sights of a city (two Overpass queries with properties' callDelay in between), merged:
+     * an element both queries return (a historic cafe) is kept once.
+     *
      * @param relationId the city's (province's) OSM relation id, e.g. 223474 for İstanbul
      */
     public List<OverpassResponse.Element> fetchPlaces(long relationId) {
-        return fetch(placesQuery(relationId), true);
+        List<OverpassResponse.Element> food = fetch(placesQueries(relationId).get(0), true);
+        sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
+        List<OverpassResponse.Element> sights = fetch(placesQueries(relationId).get(1), true);
+        return merge(food, sights);
+    }
+
+    static List<OverpassResponse.Element> merge(List<OverpassResponse.Element> first, List<OverpassResponse.Element> second) {
+        java.util.Map<String, OverpassResponse.Element> byId = new java.util.LinkedHashMap<>();
+        for (List<OverpassResponse.Element> list : List.of(first, second)) {
+            list.forEach(e -> byId.putIfAbsent(e.type() + "/" + e.id(), e));
+        }
+        return new java.util.ArrayList<>(byId.values());
     }
 
     public List<OverpassResponse.Element> fetchDistricts(long relationId) {
@@ -117,8 +147,10 @@ public class OverpassClient {
         return fetch(AREAS_QUERY.formatted(areaId(relationId)), true);
     }
 
-    static String placesQuery(long relationId) {
-        return PLACES_QUERY.formatted(areaId(relationId));
+    // The food / drink query and the sights query of a city
+    static List<String> placesQueries(long relationId) {
+        long area = areaId(relationId);
+        return List.of(FOOD_QUERY.formatted(area), SIGHTS_QUERY.formatted(area));
     }
 
     static long areaId(long relationId) {

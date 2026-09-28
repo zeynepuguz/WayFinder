@@ -138,9 +138,10 @@ public class ResponseComposer {
     }
 
     public String noRoute() {
-        return Texts.t("Şu an aktif bir rotan yok. İstersen hemen bir tane oluşturalım: "
+        // Each chat changes only its own route; a chat that has not planned one yet has none
+        return Texts.t("Bu sohbette henüz bir rota yok. İstersen hemen bir tane oluşturalım: "
                         + "örneğin \"2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz\" yazabilirsin.",
-                "You don't have an active route right now. Let's create one: "
+                "There is no route in this chat yet. Let's create one: "
                         + "for example, write \"We are 2 people, our budget is 700 TL, we want breakfast and coffee\".");
     }
 

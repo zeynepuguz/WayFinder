@@ -26,8 +26,8 @@ public class PopularRouteController {
     }
 
     /**
-     * Public: themed days (history, food, coffee & dessert, parks & views) planned from real places, starting at the
-     * district's (else the city's) centre at 10:00. Only themes with at least 3 real stops. Cached for a few hours.
+     * Public: up to 5 routes of the area's most popular sights (Wikipedia popularity) that lie close together, in
+     * walking order from 09:30, with lunch / coffee / dessert planned in between. Cached for a few hours.
      */
     @GetMapping
     public List<PopularRouteResponse> popularRoutes(
@@ -38,7 +38,7 @@ public class PopularRouteController {
         return popularRouteService.popularRoutes(city, district, popularRouteService.dayOrToday(date));
     }
 
-    // Paid like every route creation (AccessInterceptor: /api/v1/routes/**); returns the normal route
+    // Saves the previewed route (by its key); paid like every route creation (AccessInterceptor: /api/v1/routes/**)
     @PostMapping("/start")
     @ResponseStatus(HttpStatus.CREATED)
     public RouteResponse start(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody PopularRouteStartRequest request) {
