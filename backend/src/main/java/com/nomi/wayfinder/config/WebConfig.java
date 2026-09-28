@@ -1,25 +1,35 @@
 package com.nomi.wayfinder.config;
 
 import com.nomi.wayfinder.i18n.Texts;
+import com.nomi.wayfinder.photo.PhotoStorage;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.CacheControl;
 import org.springframework.web.servlet.LocaleResolver;
 import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
     private final RateLimitInterceptor rateLimitInterceptor;
     private final AccessInterceptor accessInterceptor;
+    private final PhotoStorage photoStorage;
 
-    public WebConfig(RateLimitInterceptor rateLimitInterceptor, AccessInterceptor accessInterceptor) {
+    // Where Spring serves stored user photos in development (nomi.photos.public-base should point here)
+    public static final String PHOTOS_PATH = "/media/photos";
+
+    public WebConfig(RateLimitInterceptor rateLimitInterceptor, AccessInterceptor accessInterceptor,
+                     PhotoStorage photoStorage) {
         this.rateLimitInterceptor = rateLimitInterceptor;
         this.accessInterceptor = accessInterceptor;
+        this.photoStorage = photoStorage;
     }
 
     /**
@@ -44,5 +54,16 @@ public class WebConfig implements WebMvcConfigurer {
         // Paid features
         registry.addInterceptor(accessInterceptor)
                 .addPathPatterns("/api/v1/routes", "/api/v1/routes/**", "/api/v1/assistant/**", "/api/v1/saved/**");
+    }
+
+    /**
+     * Development: stored user photos under /media/photos/** (production: Caddy serves the same volume).
+     * File names are random and never change, so browsers may cache them for a year.
+     */
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        registry.addResourceHandler(PHOTOS_PATH + "/**")
+                .addResourceLocations(photoStorage.rootLocation())
+                .setCacheControl(CacheControl.maxAge(365, TimeUnit.DAYS).cachePublic().immutable());
     }
 }

@@ -337,3 +337,51 @@ export interface ChatMessage {
   routeId: number | null
   createdAt: string
 }
+
+// ---------- user photos ("Kullanıcılarımızdan fotoğraflar") ----------
+
+// An approved user photo of a place or district (GET …/photos: at most 10, newest first).
+// url / thumbUrl are backend paths ("/media/photos/…"): render them through mediaUrl().
+export interface UserPhoto {
+  id: number
+  url: string
+  thumbUrl: string
+  width: number
+  height: number
+  createdAt: string
+  uploader: string
+}
+
+export type PhotoStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+
+// Where a photo is added: a place, or a district of a city (slugs)
+export type PhotoTarget = { type: 'PLACE'; id: number } | { type: 'DISTRICT'; city: string; district: string }
+
+// Device position at upload time, used by the backend only to check the photo was taken there
+export interface DevicePosition {
+  latitude: number
+  longitude: number
+  accuracy: number
+}
+
+// 202 answer: the photo waits for the automatic check
+export interface PhotoUploadResult {
+  id: number
+  status: PhotoStatus
+  // The location check runs at upload: a photo can come back REJECTED right away
+  rejectReason?: string | null
+  rejectMessage?: string | null
+}
+
+// One of my own uploads (GET /me/photos)
+export interface MyPhoto {
+  id: number
+  url: string
+  thumbUrl: string
+  status: PhotoStatus
+  rejectReason: string | null
+  // Localized reason shown to the user when the photo was not published
+  rejectMessage: string | null
+  target: { type: 'PLACE' | 'DISTRICT'; id?: number; name: string; city?: string; district?: string }
+  createdAt: string
+}

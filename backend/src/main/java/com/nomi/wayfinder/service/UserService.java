@@ -7,6 +7,7 @@ import com.nomi.wayfinder.entity.UserPreferences;
 import com.nomi.wayfinder.entity.UserRole;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.photo.PhotoService;
 import com.nomi.wayfinder.repository.UserPreferencesRepository;
 import com.nomi.wayfinder.repository.UserRepository;
 import com.nomi.wayfinder.security.JwtService;
@@ -25,19 +26,22 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final BillingService billingService;
+    private final PhotoService photoService;
 
     public UserService(
             UserRepository userRepository,
             UserPreferencesRepository preferencesRepository,
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
-            BillingService billingService
+            BillingService billingService,
+            PhotoService photoService
     ) {
         this.userRepository = userRepository;
         this.preferencesRepository = preferencesRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.billingService = billingService;
+        this.photoService = photoService;
     }
 
     @Transactional
@@ -92,10 +96,13 @@ public class UserService {
         return toPreferencesResponse(preferencesRepository.save(preferences));
     }
 
-    // Google Play requires in-app account deletion. Routes, messages, saved places and passes cascade.
+    // Google Play requires in-app account deletion. Routes, messages, saved places, passes and photo rows
+    // cascade; the photo files are removed first
     @Transactional
     public void deleteAccount(Long userId) {
-        userRepository.delete(getUser(userId));
+        User user = getUser(userId);
+        photoService.deleteFilesOfUser(userId);
+        userRepository.delete(user);
     }
 
     @Transactional

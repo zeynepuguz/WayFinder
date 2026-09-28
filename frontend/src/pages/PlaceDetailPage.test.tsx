@@ -5,7 +5,7 @@ import { PHOTO, place } from '../test/fixtures'
 import { PlaceDetailPage } from './PlaceDetailPage'
 
 let current: Place
-vi.mock('../api', () => ({ api: { place: () => Promise.resolve(current) } }))
+vi.mock('../api', () => ({ api: { place: () => Promise.resolve(current), photos: () => Promise.resolve([]) } }))
 vi.mock('../components/RouteMap', () => ({ RouteMap: () => null }))
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: null, hasAccess: false }) }))
 vi.mock('../context/SavedPlacesContext', () => ({ useSavedPlaces: () => ({ isSaved: () => false, toggle: vi.fn() }) }))

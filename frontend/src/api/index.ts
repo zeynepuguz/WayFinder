@@ -1,10 +1,26 @@
 import { http } from './client'
 import type {
-  AccessPlan, AccessStatus, PlansResponse,
+  AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
   AssistantReply, AuthResponse, ChatMessage, City, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory,
   PopularRoute, PopularRouteTheme, Preferences,
   Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
+
+// Multipart body of a photo upload: the original file (EXIF intact) plus the device position when known
+export function photoForm(file: File, position?: DevicePosition | null): FormData {
+  const form = new FormData()
+  form.append('file', file)
+  if (position) {
+    form.append('latitude', String(position.latitude))
+    form.append('longitude', String(position.longitude))
+    form.append('accuracy', String(position.accuracy))
+  }
+  return form
+}
+
+const photosPath = (target: PhotoTarget) => (target.type === 'PLACE'
+  ? `/places/${target.id}/photos`
+  : `/cities/${encodeURIComponent(target.city)}/districts/${encodeURIComponent(target.district)}/photos`)
 
 // One function per backend endpoint, so pages never build URLs themselves
 export const api = {
@@ -65,6 +81,13 @@ export const api = {
   savedPlaces: () => http.get<Place[]>('/saved/places'),
   savePlace: (id: number) => http.put<void>(`/saved/places/${id}`),
   unsavePlace: (id: number) => http.delete<void>(`/saved/places/${id}`),
+
+  // User photos: approved ones are public; adding, listing my own and deleting need an account
+  photos: (target: PhotoTarget) => http.get<UserPhoto[]>(photosPath(target)),
+  uploadPhoto: (target: PhotoTarget, file: File, position?: DevicePosition | null) =>
+    http.post<PhotoUploadResult>(photosPath(target), photoForm(file, position)),
+  myPhotos: () => http.get<MyPhoto[]>('/me/photos'),
+  deletePhoto: (id: number) => http.delete<void>(`/photos/${id}`),
 
   sendMessage: (message: string, latitude: number, longitude: number, routeId?: number) =>
     http.post<AssistantReply>('/assistant/messages', { message, latitude, longitude, routeId }),

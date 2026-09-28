@@ -41,6 +41,19 @@ export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
 }
 
+/**
+ * Absolute address of a file the backend serves itself (user photos: "/media/photos/…").
+ * Web: same origin (Vite dev proxy / the server forwards /media). App: the host of VITE_API_BASE_URL.
+ * Anything that is not a backend path or an http(s) URL gives null, so it is never rendered.
+ */
+export function mediaUrl(path: string | null | undefined, base: string = BASE): string | null {
+  if (!path) return null
+  if (/^https?:\/\//i.test(path)) return path
+  if (!path.startsWith('/') || path.startsWith('//')) return null
+  if (/^https?:\/\//i.test(base)) return new URL(base).origin + path
+  return path
+}
+
 type Query = Record<string, string | number | boolean | undefined | null>
 
 export function buildQuery(query?: Query): string {
@@ -58,14 +71,16 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': currentLang() }
   const token = tokenStore.get()
   if (token) headers.Authorization = `Bearer ${token}`
-  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  // FormData (photo upload): the browser sets multipart/form-data with its boundary itself
+  const isForm = typeof FormData !== 'undefined' && body instanceof FormData
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json'
 
   let response: Response
   try {
     response = await fetch(BASE + path + buildQuery(query), {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
       signal,
     })
   } catch (e) {

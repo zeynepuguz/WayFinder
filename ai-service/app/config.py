@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4.1-mini"
     openai_timeout_seconds: float = 8.0
 
+    # User photo check (/v1/photos/verify). Empty = openai_model (must read images; gpt-4.1-mini does)
+    photo_verify_model: str = ""
+    moderation_model: str = "omni-moderation-latest"
+    # Moderation + vision call; the backend waits up to 60 s
+    photo_verify_timeout_seconds: float = 30.0
+
     # Shared secret with the Spring backend (X-API-Key header). Empty = no check (local dev only).
     ai_service_api_key: str = ""
 

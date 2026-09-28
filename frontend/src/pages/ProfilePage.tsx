@@ -7,6 +7,7 @@ import { api } from '../api'
 import type { WalkingTolerance } from '../api/types'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 import { Alert, BackButton, Segmented, Sheet, Spinner, Stepper, useToast } from '../components/ui'
+import { MyPhotos } from '../components/UserPhotos'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
 import { formatDateTime, INTEREST_LABELS, WALKING_LABELS } from '../lib/format'
@@ -113,6 +114,8 @@ export function ProfilePage() {
           </a>
         )}
       </div>
+
+      <MyPhotos />
 
       <LegalLinks />
 

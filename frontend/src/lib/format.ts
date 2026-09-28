@@ -164,6 +164,17 @@ const HARD_CONSONANTS = 'fstkçşhp'
  */
 export function locativeTr(name: string): string {
   const word = name.trim()
+  return `${word}’${caseSuffix(word)}`
+}
+
+/** Turkish ablative for proper names, same harmony: Kadıköy’den, Beşiktaş’tan, Çankaya’dan, Gaziantep’ten. */
+export function ablativeTr(name: string): string {
+  const word = name.trim()
+  return `${word}’${caseSuffix(word)}n`
+}
+
+// "da/de/ta/te": the last vowel picks a/e, a hard final consonant turns d into t
+function caseSuffix(word: string): string {
   const lower = word.toLocaleLowerCase('tr')
   let vowel = 'a'
   for (let i = lower.length - 1; i >= 0; i--) {
@@ -174,7 +185,14 @@ export function locativeTr(name: string): string {
     }
   }
   const consonant = HARD_CONSONANTS.includes(lower[lower.length - 1] ?? '') ? 't' : 'd'
-  return `${word}’${consonant}${vowel}`
+  return consonant + vowel
+}
+
+/** Google Maps search for a place or an area ("Moda Kahve, Kadıköy İstanbul"); empty parts are left out. */
+export function googleMapsSearchUrl(name: string, ...area: (string | null | undefined)[]): string {
+  const where = area.map(part => part?.trim()).filter(Boolean).join(' ')
+  const query = [name.trim(), where].filter(Boolean).join(', ')
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
 /**

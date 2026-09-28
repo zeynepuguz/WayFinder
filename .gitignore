@@ -32,3 +32,6 @@ Thumbs.db
 
 # Production secrets
 deploy/secrets/
+
+# User photos (backend dev storage)
+**/data/photos/

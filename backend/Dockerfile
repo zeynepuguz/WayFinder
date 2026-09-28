@@ -9,7 +9,9 @@ RUN ./mvnw -q -B package -DskipTests && cp target/*.jar app.jar
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN useradd --system --uid 10001 nomi
+# /data/photos: user photos. A named volume mounted there takes over this owner, so the non-root user can write
+RUN useradd --system --uid 10001 nomi \
+    && mkdir -p /data/photos && chown nomi /data/photos
 COPY --from=build /app/app.jar app.jar
 USER nomi
 EXPOSE 8080

@@ -34,6 +34,12 @@ spring:
     redis:
       time-to-live: 15m
 
+  # User photo uploads (photo/PhotoService): one file of at most 12 MB per request
+  servlet:
+    multipart:
+      max-file-size: 12MB
+      max-request-size: 13MB
+
   # SMTP for password reset e-mails. Empty MAIL_HOST = e-mails are not sent (see nomi.mail.dev-log-codes)
   mail:
     host: ${MAIL_HOST:}
@@ -143,3 +149,19 @@ nomi:
     # query service lag (often > 5 s for hours), which would block these read-only requests, so it is not sent there
     wikidata-maxlag: 0
     commons-maxlag: 5
+  photos:
+    # User photos of places / districts, re-encoded JPEGs without metadata (production: a Docker volume that
+    # Caddy serves under /media/photos; development: served by Spring under /media/photos)
+    storage-dir: ${PHOTOS_STORAGE_DIR:./data/photos}
+    # URL prefix in API answers. Production: the absolute URL (https://DOMAIN/media/photos) so the app can load them
+    public-base: ${PHOTOS_PUBLIC_BASE:/media/photos}
+    # Approved photos kept per place / district; older ones are deleted
+    keep-per-target: 10
+    daily-uploads-per-user: ${PHOTOS_DAILY_UPLOADS_PER_USER:10}
+    daily-uploads-per-target: 3
+    # Moderation + vision model in the AI service
+    ai-read-timeout: 60s
+    # Photos still PENDING after 10 minutes are checked again this often (AI service down, restart, ...)
+    retry-interval: PT5M
+    # Nightly: files of rejected photos after 7 days, their rows after 30 days, orphan files. "-" disables it
+    cleanup-cron: ${PHOTOS_CLEANUP_CRON:0 40 3 * * *}

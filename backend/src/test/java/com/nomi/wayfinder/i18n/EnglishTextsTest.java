@@ -43,7 +43,7 @@ class EnglishTextsTest {
 
     @Test
     void acceptLanguageSelectsEnglishAndEverythingElseIsTurkish() {
-        LocaleResolver resolver = new WebConfig(null, null).localeResolver();
+        LocaleResolver resolver = new WebConfig(null, null, null).localeResolver();
 
         assertThat(resolver.resolveLocale(new MockHttpServletRequest()).getLanguage()).isEqualTo("tr");
         assertThat(resolver.resolveLocale(withLanguage("en")).getLanguage()).isEqualTo("en");

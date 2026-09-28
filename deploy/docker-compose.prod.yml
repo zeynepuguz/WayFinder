@@ -48,10 +48,14 @@ services:
       REDIS_PORT: "6379"
       AI_SERVICE_URL: http://ai-service:8000
       GOOGLE_PLAY_SERVICE_ACCOUNT_FILE: /run/secrets/play-service-account.json
+      # User photos: written here, served by Caddy from the same volume under https://DOMAIN/media/photos
+      PHOTOS_STORAGE_DIR: /data/photos
+      PHOTOS_PUBLIC_BASE: https://${DOMAIN}/media/photos
       # Real client IPs from Caddy (rate limiting per IP)
       SERVER_FORWARD_HEADERS_STRATEGY: framework
     volumes:
       - ./secrets/play-service-account.json:/run/secrets/play-service-account.json:ro
+      - photos:/data/photos
     depends_on:
       db:
         condition: service_healthy
@@ -90,6 +94,7 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./site:/srv/site:ro
       - web-root:/srv/app:ro
+      - photos:/srv/photos:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:
@@ -101,3 +106,5 @@ volumes:
   caddy-data:
   caddy-config:
   web-root:
+  # Verified user photos (re-encoded JPEGs, at most 10 per place / district). Back it up with the database
+  photos:

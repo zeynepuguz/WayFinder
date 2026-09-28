@@ -7,12 +7,13 @@ import { HScroll } from '../components/HScroll'
 import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
 import { PopularRoutes } from '../components/PopularRoutes'
+import { UserPhotosSection } from '../components/UserPhotos'
 import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet, Skeleton } from '../components/ui'
 import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { filterByName, filterDistricts, useDistricts } from '../lib/districts'
-import { appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, withinBudget } from '../lib/format'
+import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, withinBudget } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
@@ -244,6 +245,13 @@ export function ExplorePage() {
                        { value: 'nearby', label: t('Yakınımda', 'Near me') },
                        { value: 'all', label: areaLabel },
                      ]} />
+
+          {/* Snapshots of the chosen district from our users */}
+          {mode === 'all' && district && citySlug && (
+            <UserPhotosSection variant="strip" target={{ type: 'DISTRICT', city: citySlug, district: district.slug }} name={district.name}
+                               title={t(`${ablativeTr(district.name)} kareler`, `Snapshots from ${district.name}`)}
+                               mapsUrl={googleMapsSearchUrl(district.name, cityName)} />
+          )}
 
           {error && <ErrorState message={error} onRetry={() => void load(0)} />}
 

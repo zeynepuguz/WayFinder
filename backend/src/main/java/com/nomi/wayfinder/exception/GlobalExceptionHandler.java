@@ -1,6 +1,9 @@
 package com.nomi.wayfinder.exception;
 
 import com.nomi.wayfinder.dto.ErrorResponse;
+import com.nomi.wayfinder.i18n.Texts;
+import com.nomi.wayfinder.photo.PhotoRejectedException;
+import com.nomi.wayfinder.photo.PhotoTargetType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSourceResolvable;
@@ -14,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -116,6 +120,28 @@ public class GlobalExceptionHandler {
                 HttpStatus.NOT_FOUND.value(),
                 exception.getMessage(),
                 Map.of()
+        );
+    }
+
+    // A photo refused at the upload (HEIC, not an image, too small); errors.file = the RejectReason
+    @ExceptionHandler(PhotoRejectedException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ErrorResponse handlePhotoRejected(PhotoRejectedException exception) {
+        return new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                exception.getReason().message(PhotoTargetType.PLACE, false),
+                Map.of("file", exception.getReason().name())
+        );
+    }
+
+    // Multipart upload over spring.servlet.multipart.max-file-size (12 MB)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+    public ErrorResponse handleUploadTooLarge(MaxUploadSizeExceededException exception) {
+        return new ErrorResponse(
+                HttpStatus.PAYLOAD_TOO_LARGE.value(),
+                Texts.t("Fotoğraf en fazla 12 MB olabilir.", "The photo can be at most 12 MB."),
+                Map.of("file", "TOO_LARGE")
         );
     }
 

@@ -4,9 +4,12 @@ import time
 import uuid
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from .config import Settings, get_settings
 from .intent import IntentExtractor, OpenAIIntentExtractor
+from .photos import OpenAIPhotoVerifier, PhotoVerdict, PhotoVerifier, PhotoVerifyRequest
 from .schemas import AssistantIntent, IntentRequest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
@@ -64,3 +67,35 @@ def parse_intent(request: IntentRequest, extractor: IntentExtractor = Depends(ge
     except Exception as e:  # LLM timeout, rate limit, invalid output...
         log.warning("Intent extraction failed: %s", e)
         raise HTTPException(status_code=502, detail="Intent extraction failed") from e
+
+
+_photo_verifier: PhotoVerifier | None = None
+
+
+def get_photo_verifier(settings: Settings = Depends(get_settings)) -> PhotoVerifier:
+    global _photo_verifier
+    if not settings.openai_api_key:
+        # The backend keeps the photo PENDING and retries later
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+    if _photo_verifier is None:
+        _photo_verifier = OpenAIPhotoVerifier(settings)
+    return _photo_verifier
+
+
+@app.post("/v1/photos/verify", response_model=PhotoVerdict, dependencies=[Depends(require_api_key)])
+def verify_photo(request: PhotoVerifyRequest, verifier: PhotoVerifier = Depends(get_photo_verifier)) -> PhotoVerdict:
+    try:
+        return verifier.verify(request)
+    except HTTPException:
+        raise
+    except Exception as e:  # moderation / LLM timeout, rate limit, invalid output...
+        # Never log the image; the target name is enough to follow it
+        log.warning("Photo verification failed for %s '%s': %s", request.target_type, request.name, e)
+        raise HTTPException(status_code=502, detail="Photo verification failed") from e
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
+    # Same 422 as FastAPI's default, but never echoing the input back (it can be a whole base64 photo)
+    errors = [{"loc": list(e.get("loc", ())), "msg": e.get("msg"), "type": e.get("type")} for e in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})

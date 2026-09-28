@@ -1,4 +1,5 @@
-import { ApiRequestError, buildQuery, http, setUnauthorizedHandler, tokenStore } from './client'
+import { ApiRequestError, buildQuery, http, mediaUrl, setUnauthorizedHandler, tokenStore } from './client'
+import { api } from './index'
 
 function mockFetch(status: number, body: unknown) {
   const fetchMock = vi.fn().mockResolvedValue(
@@ -55,5 +56,54 @@ describe('api client', () => {
   it('returns undefined for 204 responses', async () => {
     mockFetch(204, undefined)
     await expect(http.delete('/routes/1')).resolves.toBeUndefined()
+  })
+})
+
+describe('mediaUrl', () => {
+  it('keeps backend paths on the same origin for the web app', () => {
+    expect(mediaUrl('/media/photos/1_t.jpg', '/api/v1')).toBe('/media/photos/1_t.jpg')
+  })
+
+  it('uses the API host for the Android app', () => {
+    expect(mediaUrl('/media/photos/1.jpg', 'https://api.example.com/api/v1')).toBe('https://api.example.com/media/photos/1.jpg')
+    expect(mediaUrl('/media/photos/1.jpg', 'http://10.0.2.2:8080/api/v1')).toBe('http://10.0.2.2:8080/media/photos/1.jpg')
+  })
+
+  it('passes absolute http(s) URLs through and refuses anything else', () => {
+    expect(mediaUrl('https://cdn.example.com/a.jpg', '/api/v1')).toBe('https://cdn.example.com/a.jpg')
+    expect(mediaUrl('javascript:alert(1)', '/api/v1')).toBeNull()
+    expect(mediaUrl('//evil.example.com/a.jpg', '/api/v1')).toBeNull()
+    expect(mediaUrl(null)).toBeNull()
+  })
+})
+
+describe('photo upload', () => {
+  it('sends multipart FormData with the position and no JSON content type', async () => {
+    tokenStore.set('abc')
+    const fetchMock = mockFetch(202, { id: 7, status: 'PENDING' })
+    const file = new File(['jpeg'], 'a.jpg', { type: 'image/jpeg' })
+
+    const result = await api.uploadPhoto({ type: 'PLACE', id: 5 }, file, { latitude: 40.98, longitude: 29.02, accuracy: 15 })
+
+    expect(result).toEqual({ id: 7, status: 'PENDING' })
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/v1/places/5/photos')
+    expect(init.method).toBe('POST')
+    expect(init.headers['Content-Type']).toBeUndefined()
+    expect(init.headers.Authorization).toBe('Bearer abc')
+    const form = init.body as FormData
+    expect(form).toBeInstanceOf(FormData)
+    expect(form.get('file')).toBeInstanceOf(File)
+    expect(form.get('latitude')).toBe('40.98')
+    expect(form.get('longitude')).toBe('29.02')
+    expect(form.get('accuracy')).toBe('15')
+  })
+
+  it('leaves the position out when unknown and targets the district endpoint', async () => {
+    const fetchMock = mockFetch(202, { id: 8, status: 'PENDING' })
+    await api.uploadPhoto({ type: 'DISTRICT', city: 'istanbul', district: 'kadikoy' }, new File(['x'], 'b.png', { type: 'image/png' }), null)
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('/api/v1/cities/istanbul/districts/kadikoy/photos')
+    expect((init.body as FormData).has('latitude')).toBe(false)
   })
 })

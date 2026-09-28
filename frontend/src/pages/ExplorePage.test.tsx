@@ -23,6 +23,7 @@ const searchPlaces = vi.fn()
 const nearbyPlaces = vi.fn()
 const popularRoutes = vi.fn()
 const startPopularRoute = vi.fn()
+const photos = vi.fn()
 vi.mock('../api', () => ({
   api: {
     districts: (...args: unknown[]) => districts(...args),
@@ -30,6 +31,7 @@ vi.mock('../api', () => ({
     nearbyPlaces: (...args: unknown[]) => nearbyPlaces(...args),
     popularRoutes: (...args: unknown[]) => popularRoutes(...args),
     startPopularRoute: (...args: unknown[]) => startPopularRoute(...args),
+    photos: (...args: unknown[]) => photos(...args),
   },
 }))
 const liveMapProps = vi.fn()
@@ -70,6 +72,7 @@ beforeEach(() => {
   districts.mockReset().mockImplementation((slug: string) => Promise.resolve(slug === 'ankara' ? ANKARA_DISTRICTS : DISTRICTS))
   popularRoutes.mockReset().mockResolvedValue([])
   startPopularRoute.mockReset()
+  photos.mockReset().mockResolvedValue([])
   liveMapProps.mockReset()
   setCity.mockReset()
   auth = { user: null, hasAccess: false }
@@ -117,6 +120,20 @@ describe('ExplorePage districts', () => {
     await waitFor(() => expect(searchPlaces).toHaveBeenLastCalledWith(expect.objectContaining({ district: undefined })))
     // city-wide rows name the district
     expect(await screen.findByText('Kafe · Kadıköy')).toBeInTheDocument()
+  })
+
+  it('shows the district’s user photos strip with a Google Maps link', async () => {
+    photos.mockResolvedValue([{ id: 1, url: '/media/photos/1.jpg', thumbUrl: '/media/photos/1_t.jpg', width: 800, height: 600, createdAt: '2026-09-01T10:00:00Z', uploader: 'Ayşe Y.' }])
+    renderPage('/explore?ilce=kadikoy')
+    const strip = await screen.findByRole('region', { name: 'Kadıköy’den kareler' })
+    await waitFor(() => expect(photos).toHaveBeenCalledWith({ type: 'DISTRICT', city: 'istanbul', district: 'kadikoy' }))
+    expect(await within(strip).findByRole('img', { name: 'Kadıköy — kullanıcı fotoğrafı' })).toHaveAttribute('src', '/media/photos/1_t.jpg')
+    const link = within(strip).getByRole('link', { name: /Google Haritalar/ })
+    expect(new URL(link.getAttribute('href')!).searchParams.get('query')).toBe('Kadıköy, İstanbul')
+
+    // guests go to login first
+    await userEvent.click(within(strip).getByRole('button', { name: /Fotoğraf ekle/ }))
+    expect(await screen.findByText('Giriş sayfası')).toBeInTheDocument()
   })
 
   it('does not list a place twice when it shows up again on the next page', async () => {

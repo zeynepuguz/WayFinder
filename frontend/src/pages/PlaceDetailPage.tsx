@@ -5,9 +5,10 @@ import { useGate } from '../components/gate'
 import { OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { RouteMap } from '../components/RouteMap'
 import { BackButton, ErrorState, Skeleton } from '../components/ui'
+import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, dayNames, formatCost, formatTime, TAG_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsSearchUrl, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
 
@@ -88,6 +89,10 @@ export function PlaceDetailPage() {
         )}
 
         <RouteMap height={180} points={[{ latitude: place.latitude, longitude: place.longitude, label: '•', title: place.name }]} />
+
+        <UserPhotosSection target={{ type: 'PLACE', id: place.id }} name={place.name}
+                           title={t('Kullanıcılarımızdan fotoğraflar', 'Photos from our users')}
+                           mapsUrl={googleMapsSearchUrl(place.name, place.district, place.city)} />
 
         {place.openingHours.length > 0 && (
           <section className="card stack-sm">
