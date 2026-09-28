@@ -5,7 +5,9 @@ import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.media.WikimediaImageResolver;
 import com.nomi.wayfinder.media.WikimediaImageResolver.ResolveResult;
 import com.nomi.wayfinder.osm.OsmCityImporter;
+import com.nomi.wayfinder.osm.OsmContextImporter;
 import com.nomi.wayfinder.osm.OsmImportJobs;
+import com.nomi.wayfinder.osm.PlaceDataNormalizer;
 import com.nomi.wayfinder.osm.OsmImportJobs.ImportStatus;
 import com.nomi.wayfinder.osm.PlaceRealismCleanup;
 import com.nomi.wayfinder.popularity.PlacePopularityService;
@@ -25,10 +27,17 @@ public class AdminController {
     private final PlacePopularityService popularityService;
     private final PopularityJobs popularityJobs;
     private final CityService cityService;
+    private final OsmCityImporter cityImporter;
+    private final OsmContextImporter contextImporter;
+    private final PlaceDataNormalizer normalizer;
 
     public AdminController(OsmImportJobs importJobs, WikimediaImageResolver imageResolver, PlaceRealismCleanup cleanup,
                            PlacePopularityService popularityService, PopularityJobs popularityJobs,
-                           CityService cityService) {
+                           CityService cityService, OsmCityImporter cityImporter, OsmContextImporter contextImporter,
+                           PlaceDataNormalizer normalizer) {
+        this.cityImporter = cityImporter;
+        this.contextImporter = contextImporter;
+        this.normalizer = normalizer;
         this.importJobs = importJobs;
         this.imageResolver = imageResolver;
         this.cleanup = cleanup;
@@ -109,5 +118,33 @@ public class AdminController {
     @GetMapping("/places/popularity-status")
     public java.util.Map<String, Boolean> popularityStatus() {
         return java.util.Map.of("running", popularityJobs.isBusy());
+    }
+    /**
+     * Institution areas (campuses, schools, hospitals, prisons, military / industrial zones) and the sea coastline of
+     * one city from Overpass, then the places' inside_institution / near_sea flags (takes a minute or two; 409 when
+     * running, 503 when Overpass is unavailable - the previous polygons are kept).
+     */
+    @PostMapping("/places/import-context")
+    public OsmContextImporter.ContextImportResult importContext(@RequestParam String city) {
+        OsmCityImporter.CityRow row = cityImporter.findCity(city)
+                .orElseThrow(() -> new ResourceNotFoundException("City not found: " + city));
+        return contextImporter.importNow(row.toOsmCity());
+    }
+
+    // Recomputes one city's inside_institution / near_sea flags from the polygons / coastline already imported
+    @PostMapping("/places/context-flags")
+    public OsmContextImporter.Flags recomputeContextFlags(@RequestParam String city) {
+        long cityId = cityService.findBySlug(city)
+                .orElseThrow(() -> new ResourceNotFoundException("City not found: " + city)).id();
+        return contextImporter.recomputeAndNotify(cityId);
+    }
+
+    /**
+     * Repairs existing OSM place names (broken casing, quotes), hides / removes names that describe an event or a
+     * sentence and adds interest tags derived from names / cuisine. dryRun=true only reports.
+     */
+    @PostMapping("/places/normalize")
+    public PlaceDataNormalizer.NormalizeResult normalizePlaces(@RequestParam(defaultValue = "false") boolean dryRun) {
+        return normalizer.run(dryRun);
     }
 }

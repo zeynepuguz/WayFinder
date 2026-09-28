@@ -187,7 +187,7 @@ class EnglishTextsTest {
                 new StopPlace(11L, "Moda Sahili", PlaceCategory.PARK, null, null, 40.98, 29.02, 0, 4.7, false, null));
         List<StopResponse> stops = firstStatus == StopStatus.PLANNED ? List.of(breakfast, sights) : List.of(breakfast);
 
-        return new RouteResponse(1L, title, LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02,
+        return new RouteResponse(1L, title, LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02, null,
                 LocalTime.of(9, 0), LocalTime.of(22, 0), 2, 700, 400, 800, 12, WalkingTolerance.MEDIUM, List.of(),
                 new WeatherSnapshot("CLEAR", 24.0, "The weather is clear, up to 24°C. Good for exploring."),
                 List.of(), stops, null, null);
@@ -210,7 +210,7 @@ class EnglishTextsTest {
         StopResponse osmStop = new StopResponse(3L, 0, StopType.COFFEE, StopType.COFFEE.getLabel(),
                 LocalTime.of(15, 0), LocalTime.of(15, 45), 300, 5, List.of(), StopStatus.PLANNED,
                 new StopPlace(12L, "Kahve Durağı", PlaceCategory.CAFE, null, null, 40.99, 29.02, null, null, true, null));
-        return new RouteResponse(1L, "R", LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02,
+        return new RouteResponse(1L, "R", LocalDate.of(2026, 9, 27), RouteStatus.DRAFT, false, 40.99, 29.02, null,
                 LocalTime.of(15, 0), LocalTime.of(22, 0), 1, null, 0, 300, 5, WalkingTolerance.MEDIUM, List.of(),
                 null, List.of(), List.of(osmStop), null, null);
     }

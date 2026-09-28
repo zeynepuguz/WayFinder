@@ -157,6 +157,34 @@ class RoutePlannerTest {
         assertThat(result.stops().getFirst().start()).isAfterOrEqualTo(LocalTime.of(9, 0));
     }
 
+    @Test
+    void aSightAfterLunchDoesNotWaitHoursForItsTemplateTime() {
+        add(place(1, "Restoran", PlaceCategory.RESTAURANT, true, 4.5, 100), 100);
+        add(place(2, "Park", PlaceCategory.PARK, false, 4.5, 0), 200);
+
+        PlanResult result = planner.plan(request(List.of(
+                PlanningSlot.at(StopType.LUNCH, LocalTime.of(13, 0)),
+                PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(16, 30))), null, false));
+
+        PlannedStop lunch = result.stops().get(0);
+        PlannedStop park = result.stops().get(1);
+        assertThat(lunch.start()).isEqualTo(LocalTime.of(12, 30));
+        // Was 15:00 (16:30 minus 90 min of flexibility): a 1.5 h hole after lunch
+        assertThat(park.start()).isBefore(lunch.end().plusMinutes(RoutePlanner.FLEXIBLE_MAX_WAIT_MINUTES + 6));
+    }
+
+    @Test
+    void mealsStillWaitForTheirTime() {
+        add(place(1, "Park", PlaceCategory.PARK, false, 4.5, 0), 100);
+        add(place(2, "Restoran", PlaceCategory.RESTAURANT, true, 4.5, 100), 200);
+
+        PlanResult result = planner.plan(request(List.of(
+                PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(9, 0)),
+                PlanningSlot.at(StopType.LUNCH, LocalTime.of(13, 0))), null, false));
+
+        assertThat(result.stops().get(1).start()).isEqualTo(LocalTime.of(12, 30));
+    }
+
     @AfterEach
     void resetLocale() {
         LocaleContextHolder.resetLocaleContext();

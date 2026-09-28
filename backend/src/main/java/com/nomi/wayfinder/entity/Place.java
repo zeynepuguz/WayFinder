@@ -96,6 +96,22 @@ public class Place {
     @Column(insertable = false, updatable = false)
     private boolean hidden;
 
+    // OSM name:en, shown to English requests (getDisplayName); null = none. Written by the OSM import (JDBC)
+    @Column(insertable = false, updatable = false)
+    private String nameEn;
+
+    // OSM cuisine as tagged ("turkish;kebab"); null = unknown. Written by the OSM import (JDBC)
+    @Column(insertable = false, updatable = false)
+    private String cuisine;
+
+    // Inside a campus / hospital / military / industrial area (osm/OsmContextImporter): not planned into routes
+    @Column(insertable = false, updatable = false)
+    private boolean insideInstitution;
+
+    // Within ~300 m of the sea coastline (osm/OsmContextImporter)
+    @Column(insertable = false, updatable = false)
+    private boolean nearSea;
+
     // Real-world interest from Wikipedia (popularity/PlacePopularityService); null = unknown
     @Column(insertable = false, updatable = false)
     private Double popularity;
@@ -202,6 +218,27 @@ public class Place {
     // Hand-verified (web check, admin) as opposed to imported from OpenStreetMap
     public boolean isVerified() {
         return !OSM_SOURCE.equals(source);
+    }
+
+    // The name in the request's language: OSM name:en for English requests when there is one
+    public String getDisplayName() {
+        return nameEn != null && !nameEn.isBlank() && com.nomi.wayfinder.i18n.Texts.english() ? nameEn : name;
+    }
+
+    public String getNameEn() {
+        return nameEn;
+    }
+
+    public String getCuisine() {
+        return cuisine;
+    }
+
+    public boolean isInsideInstitution() {
+        return insideInstitution;
+    }
+
+    public boolean isNearSea() {
+        return nearSea;
     }
 
     public boolean hasTag(String tag) {

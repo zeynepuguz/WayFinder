@@ -1,9 +1,9 @@
 import {
-  BatteryLow, Check, ChevronDown, CloudRain, Footprints, Heart, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
+  BatteryLow, Check, MapPin, Sparkles, ChevronDown, CloudRain, Footprints, Heart, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
   Clock, Ellipsis, History, SkipForward, X,
 } from 'lucide-react'
 import { useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router'
+import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import type { ReplanRequest, Route, RouteStop, StopStatus, StopType } from '../api/types'
 import { useGate } from '../components/gate'
@@ -11,7 +11,7 @@ import { RouteMap } from '../components/RouteMap'
 import { Alert, BackButton, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, STOP_TYPE_LABELS } from '../lib/format'
+import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -25,6 +25,8 @@ export function RouteDetailPage() {
   const gate = useGate()
   const toast = useToast()
   const t = useT()
+  // Interests chosen in the new-route form (shown when the server's route does not list them)
+  const requested = (useLocation().state as { interests?: string[] } | null)?.interests
 
   const { data: route, setData: setRoute, error, loading, reload } = useAsync(() => api.route(routeId), [routeId])
   const [busy, setBusy] = useState(false)
@@ -81,6 +83,7 @@ export function RouteDetailPage() {
   const finished = route.status === 'COMPLETED' || past
   const WeatherIcon = WEATHER_ICON[route.weather.condition ?? ''] ?? CloudRain
   const nextStop = route.stops.find(s => s.status === 'PLANNED')
+  const interests = route.interests?.length ? route.interests : requested ?? []
 
   return (
     <main className="screen screen-flush" style={{ paddingTop: 0 }}>
@@ -108,6 +111,15 @@ export function RouteDetailPage() {
         <div className="stack-sm">
           <span className="t-overline">{formatDate(route.date)} · {t(`${route.partySize} kişi`, route.partySize === 1 ? '1 person' : `${route.partySize} people`)}</span>
           <h1 className="t-title">{route.title}</h1>
+          {route.startLabel && (
+            <span className="t-caption row" style={{ gap: 4 }}><MapPin size={14} /> {t('Başlangıç', 'Start')}: {route.startLabel}</span>
+          )}
+          {interests.length > 0 && (
+            <div className="route-interests" aria-label={t('İlgi alanların', 'Your interests')}>
+              <Sparkles size={14} className="muted" style={{ alignSelf: 'center' }} />
+              {interests.map(key => <span key={key} className="badge badge-brand">{TAG_LABELS[key] ?? key}</span>)}
+            </div>
+          )}
         </div>
 
         <div className="stats">

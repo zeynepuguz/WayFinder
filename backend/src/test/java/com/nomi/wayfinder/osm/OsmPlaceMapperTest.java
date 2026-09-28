@@ -76,18 +76,19 @@ class OsmPlaceMapperTest {
         // "KAHVALTI" in the name (uppercase dotless I) makes it a breakfast place
         OsmPlace breakfast = places.get("node/2");
         assertThat(breakfast.category()).isEqualTo(PlaceCategory.BREAKFAST);
-        assertThat(breakfast.tags()).containsExactly("breakfast");
+        // Kahvaltı is Turkish food: "local" (PlaceTags)
+        assertThat(breakfast.tags()).containsExactly("breakfast", "local");
         assertThat(breakfast.address()).isNull();
         assertThat(breakfast.neighborhood()).isEqualTo("Kadıköy");
         assertThat(breakfast.openingHours()).isEmpty();
 
         assertThat(places.get("node/3").category()).isEqualTo(PlaceCategory.RESTAURANT);
-        assertThat(places.get("node/3").tags()).containsExactly("seafood");
+        assertThat(places.get("node/3").tags()).containsExactly("seafood", "local");
 
         OsmPlace museum = places.get("way/4");
         assertThat(museum.category()).isEqualTo(PlaceCategory.MUSEUM);
         assertThat(museum.latitude()).isEqualTo(41.01);
-        assertThat(museum.tags()).containsExactlyInAnyOrder("history", "museum");
+        assertThat(museum.tags()).containsExactlyInAnyOrder("history", "museum", "architecture");
         // "PH off" is not understood: hours stay unknown instead of guessed
         assertThat(museum.openingHours()).isEmpty();
 
@@ -115,20 +116,21 @@ class OsmPlaceMapperTest {
         // Fast food with a name: a real (quick) meal
         OsmPlace doner = map("amenity", "fast_food", "name", "Bereket Döner", "cuisine", "kebab");
         assertThat(doner.category()).isEqualTo(PlaceCategory.RESTAURANT);
-        assertThat(doner.tags()).containsExactly("quick");
+        // Döner: local and budget-friendly (PlaceTags)
+        assertThat(doner.tags()).containsExactly("quick", "local", "budget");
         assertThat(map("amenity", "fast_food", "name", "Dondurmacı Ali", "cuisine", "ice_cream").category())
                 .isEqualTo(PlaceCategory.DESSERT);
         assertThat(map("amenity", "food_court", "name", "Kanyon Yemek Katı").category()).isEqualTo(PlaceCategory.RESTAURANT);
         // Tea gardens are cafes tagged "tea"
-        assertThat(map("amenity", "cafe", "name", "Emirgan Çay Bahçesi").tags()).containsExactly("tea");
-        assertThat(map("amenity", "cafe", "name", "Ada Çay", "cuisine", "tea").tags()).containsExactly("tea");
+        assertThat(map("amenity", "cafe", "name", "Emirgan Çay Bahçesi").tags()).containsExactly("tea", "local", "budget");
+        assertThat(map("amenity", "cafe", "name", "Ada Çay", "cuisine", "tea").tags()).containsExactly("tea", "budget");
         assertThat(map("shop", "coffee", "name", "Kurukahveci Mehmet Efendi").category()).isEqualTo(PlaceCategory.CAFE);
 
         // Bakeries: pastry shops are desserts, börek / simit shops cafes, bread ovens are not places to go
         assertThat(map("shop", "bakery", "name", "Divan Pastanesi").category()).isEqualTo(PlaceCategory.DESSERT);
         OsmPlace borek = map("shop", "bakery", "name", "Meşhur Sarıyer Börekçisi");
         assertThat(borek.category()).isEqualTo(PlaceCategory.CAFE);
-        assertThat(borek.tags()).containsExactly("bakery");
+        assertThat(borek.tags()).containsExactly("bakery", "local", "budget");
         assertThat(map("shop", "bakery", "name", "Yıldız Ekmek Fırını")).isNull();
 
         // Places of worship only when notable (Wikidata) or historic
@@ -136,7 +138,7 @@ class OsmPlaceMapperTest {
                 "wikidata", "Q193617");
         assertThat(mosque.category()).isEqualTo(PlaceCategory.ATTRACTION);
         assertThat(mosque.indoor()).isTrue();
-        assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious");
+        assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious", "architecture");
         assertThat(map("amenity", "place_of_worship", "name", "Tarihi Kilise", "heritage", "2").category())
                 .isEqualTo(PlaceCategory.ATTRACTION);
         assertThat(map("amenity", "place_of_worship", "religion", "muslim", "name", "Yeni Mahalle Camii")).isNull();

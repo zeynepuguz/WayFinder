@@ -27,6 +27,7 @@ export function RouteCard({ route }: { route: RouteSummary }) {
           <span>{route.stopCount} {route.stopCount === 1 ? t('durak', 'stop') : t('durak', 'stops')}</span>
           <span>~{route.totalEstimatedCost.toLocaleString(locale())} TL</span>
         </div>
+        {route.startLabel && <span className="t-caption">{t('Başlangıç', 'Start')}: {route.startLabel}</span>}
         <div><span className={`badge ${status.tone}`}>{t(status.label[0], status.label[1])}</span></div>
       </div>
       <ChevronRight size={20} className="muted" />

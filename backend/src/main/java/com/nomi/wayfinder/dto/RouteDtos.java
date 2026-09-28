@@ -19,12 +19,14 @@ public final class RouteDtos {
     }
 
     /**
-     * Only the location is required; everything else falls back to the user's preferences
-     * or sensible defaults (today, now, a full day template).
+     * Where the route starts: the user's position (latitude / longitude, startMode LOCATION) or a chosen city /
+     * district (city / district slugs, startMode AREA: its most popular sight, else its centre). startMode defaults
+     * to LOCATION when a position is given, else AREA. Everything else falls back to the user's preferences or
+     * sensible defaults (today, now, a full day template).
      */
     public record RoutePlanRequest(
-            @NotNull @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
-            @NotNull @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
+            @DecimalMin("-90.0") @DecimalMax("90.0") Double latitude,
+            @DecimalMin("-180.0") @DecimalMax("180.0") Double longitude,
             LocalDate date,
             LocalTime startTime,
             LocalTime endTime,
@@ -33,8 +35,27 @@ public final class RouteDtos {
             WalkingTolerance walkingTolerance,
             @Size(max = 10) List<StopType> stops,
             @Size(max = 20) List<@NotBlank String> interests,
-            @Size(max = 255) String title
+            @Size(max = 255) String title,
+            // City slug ("istanbul"); with district: a district slug of that city ("kadikoy")
+            @Size(max = 100) String city,
+            @Size(max = 100) String district,
+            StartMode startMode
     ) {
+
+        public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
+                                LocalTime endTime, Integer partySize, Integer budget,
+                                WalkingTolerance walkingTolerance, List<StopType> stops, List<String> interests,
+                                String title) {
+            this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
+                    title, null, null, null);
+        }
+    }
+
+    public enum StartMode {
+        // At the user's position
+        LOCATION,
+        // At the chosen city / district's best starting point
+        AREA
     }
 
     public record ReplanRequest(
@@ -68,6 +89,8 @@ public final class RouteDtos {
             boolean saved,
             double startLatitude,
             double startLongitude,
+            // "Konumun" / "Your location", the start sight's name or "Kadıköy merkezi"
+            String startLabel,
             LocalTime startTime,
             LocalTime endTime,
             int partySize,

@@ -98,7 +98,7 @@ export function ForgotPasswordPage() {
 
             {error && <Alert tone="danger"><span>{error}</span></Alert>}
 
-            <button className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
+            <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
               {busy ? <Spinner /> : t('Kod gönder', 'Send code')}
             </button>
           </form>
@@ -129,7 +129,7 @@ export function ForgotPasswordPage() {
 
             {error && <Alert tone="danger"><span>{error}</span></Alert>}
 
-            <button className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
+            <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
               {busy ? <Spinner /> : t('Şifremi yenile', 'Reset password')}
             </button>
             <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'center' }}

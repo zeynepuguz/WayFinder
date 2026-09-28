@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Square, SquareCheck, Umbrella } from 'lucide-react'
+import { ChevronDown, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Square, SquareCheck, Umbrella } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -8,13 +8,14 @@ import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
 import { PopularRoutes } from '../components/PopularRoutes'
 import { UserPhotosSection } from '../components/UserPhotos'
-import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet, Skeleton } from '../components/ui'
+import { CitySheet, DistrictSheet } from '../components/AreaSheets'
+import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
 import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
-import { filterByName, filterDistricts, useDistricts } from '../lib/districts'
+import { useDistricts } from '../lib/districts'
 import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, withinBudget } from '../lib/format'
-import { locale, useT } from '../lib/i18n'
+import { useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
 type View = 'list' | 'map'
@@ -172,16 +173,16 @@ export function ExplorePage() {
   // [City ▾] [District ▾] [☐ Popular routes]
   const controls = (
     <div className="explore-controls">
-      <button className="chip city-pill" onClick={() => setCityOpen(true)}
+      <button type="button" className="chip city-pill" onClick={() => setCityOpen(true)}
               aria-haspopup="dialog" aria-label={`${t('Şehir seç', 'Choose city')}: ${cityLabel}`}>
         <MapPin size={15} /> <span>{cityLabel}</span> <ChevronDown size={15} />
       </button>
-      <button className={`chip district-pill ${districtSlug ? 'active' : ''}`} onClick={() => setDistrictOpen(true)}
+      <button type="button" className={`chip district-pill ${districtSlug ? 'active' : ''}`} onClick={() => setDistrictOpen(true)}
               disabled={!citySlug}
               aria-haspopup="dialog" aria-label={`${t('İlçe seç', 'Choose district')}: ${pillLabel}`}>
         <MapIcon size={15} /> <span>{pillLabel}</span> <ChevronDown size={15} />
       </button>
-      <button className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
+      <button type="button" className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
         {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler rotalar', 'Popular routes')}
       </button>
     </div>
@@ -189,11 +190,11 @@ export function ExplorePage() {
 
   const categoryChips = (
     <HScroll className="h-scroll chip-scroll" style={{ gap: 8 }} label={t('Kategoriler', 'Categories')}>
-      <button className={`chip ${category === null ? 'active' : ''}`} onClick={() => setCategory(null)}>{t('Tümü', 'All')}</button>
+      <button type="button" className={`chip ${category === null ? 'active' : ''}`} onClick={() => setCategory(null)}>{t('Tümü', 'All')}</button>
       {(Object.keys(CATEGORY_LABELS) as PlaceCategory[]).map(c => {
         const Icon = CATEGORY_ICON[c]
         return (
-          <button key={c} className={`chip ${category === c ? 'active' : ''}`} aria-pressed={category === c}
+          <button type="button" key={c} className={`chip ${category === c ? 'active' : ''}`} aria-pressed={category === c}
                   onClick={() => setCategory(category === c ? null : c)}>
             <Icon size={15} /> {CATEGORY_LABELS[c]}
           </button>
@@ -230,7 +231,7 @@ export function ExplorePage() {
               <input type="search" placeholder={t('Mekan, kafe, müze ara', 'Search places, cafés, museums')} value={query} onChange={e => setQuery(e.target.value)}
                      aria-label={t('Mekan ara', 'Search places')} />
             </label>
-            <button className="icon-btn" aria-label={t('Filtreler', 'Filters')} onClick={() => setFiltersOpen(true)} style={{ position: 'relative' }}>
+            <button type="button" className="icon-btn" aria-label={t('Filtreler', 'Filters')} onClick={() => setFiltersOpen(true)} style={{ position: 'relative' }}>
               <SlidersHorizontal size={19} />
               {activeFilters > 0 && (
                 <span className="badge badge-brand" style={{ position: 'absolute', top: -6, right: -6, padding: '1px 6px' }}>{activeFilters}</span>
@@ -271,7 +272,7 @@ export function ExplorePage() {
 
           {loading && <ListSkeleton rows={places.length ? 1 : 4} />}
           {hasMore && !loading && (
-            <button className="btn btn-secondary btn-block" onClick={() => void load(page + 1)}>{t('Daha fazla göster', 'Show more')}</button>
+            <button type="button" className="btn btn-secondary btn-block" onClick={() => void load(page + 1)}>{t('Daha fazla göster', 'Show more')}</button>
           )}
         </>
       )}
@@ -287,7 +288,7 @@ export function ExplorePage() {
             <span className="field-label">{t('Kişi başı fiyat', 'Price per person')}</span>
             <div className="chips">
               {priceOptions(t).map(o => (
-                <button key={o.value} className={`chip ${maxCost === o.value ? 'active' : ''}`} onClick={() => setMaxCost(o.value)}>
+                <button type="button" key={o.value} className={`chip ${maxCost === o.value ? 'active' : ''}`} onClick={() => setMaxCost(o.value)}>
                   {o.label}
                 </button>
               ))}
@@ -296,7 +297,7 @@ export function ExplorePage() {
               <span className="t-caption">{t('Fiyat bilgisi olmayan mekanlar bu filtrede gösterilmez.', 'Places without price info are hidden by this filter.')}</span>
             )}
           </div>
-          <button className="list-item card" style={{ borderRadius: 16 }} onClick={() => setIndoorOnly(v => !v)}
+          <button type="button" className="list-item card" style={{ borderRadius: 16 }} onClick={() => setIndoorOnly(v => !v)}
                   aria-pressed={indoorOnly}>
             <span className="list-item-icon"><Umbrella size={18} /></span>
             <span className="grow">
@@ -306,124 +307,11 @@ export function ExplorePage() {
             <span className={`badge ${indoorOnly ? 'badge-success' : ''}`}>{indoorOnly ? t('Açık', 'On') : t('Kapalı', 'Off')}</span>
           </button>
           <div className="row">
-            <button className="btn btn-secondary grow" onClick={() => { setMaxCost(''); setIndoorOnly(false) }}>{t('Temizle', 'Clear')}</button>
-            <button className="btn btn-primary grow" onClick={() => setFiltersOpen(false)}>{t('Uygula', 'Apply')}</button>
+            <button type="button" className="btn btn-secondary grow" onClick={() => { setMaxCost(''); setIndoorOnly(false) }}>{t('Temizle', 'Clear')}</button>
+            <button type="button" className="btn btn-primary grow" onClick={() => setFiltersOpen(false)}>{t('Uygula', 'Apply')}</button>
           </div>
         </div>
       </Sheet>
     </main>
-  )
-}
-
-// Bottom sheet: search field, "All districts" and every district with its number of places
-function DistrictSheet({ open, onClose, selected, districts, onChoose }: {
-  open: boolean
-  onClose: () => void
-  selected: string | null
-  districts: ReturnType<typeof useDistricts>
-  onChoose: (district: District | null) => void
-}) {
-  const t = useT()
-  const [search, setSearch] = useState('')
-  useEffect(() => {
-    if (!open) setSearch('')
-  }, [open])
-
-  const list = districts.data ? filterDistricts(districts.data, search) : []
-  const count = (n: number) => `${n.toLocaleString(locale())} ${t('mekan', n === 1 ? 'place' : 'places')}`
-
-  return (
-    <Sheet open={open} onClose={onClose} label={t('İlçe seç', 'Choose district')}>
-      <div className="stack">
-        <label className="search">
-          <Search size={18} />
-          <input type="search" placeholder={t('İlçe ara', 'Search districts')} value={search} onChange={e => setSearch(e.target.value)}
-                 aria-label={t('İlçe ara', 'Search districts')} />
-        </label>
-
-        {districts.error && <ErrorState message={districts.error} onRetry={() => void districts.reload()} />}
-
-        <div className="list-group district-list">
-          {!search.trim() && (
-            <button className="list-item" aria-pressed={selected == null} onClick={() => onChoose(null)}>
-              <span className="list-item-icon"><MapPin size={18} /></span>
-              <span className="grow" style={{ fontWeight: 700 }}>{t('Tüm ilçeler', 'All districts')}</span>
-              {selected == null && <Check size={18} color="var(--brand)" />}
-            </button>
-          )}
-          {districts.loading && !districts.data && (
-            <div className="stack" style={{ padding: 12 }}>
-              {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
-            </div>
-          )}
-          {list.map(d => (
-            <button key={d.slug} className="list-item" aria-pressed={selected === d.slug} onClick={() => onChoose(d)}>
-              <span className="grow" style={{ fontWeight: 650 }}>{d.name}</span>
-              <span className="t-caption">{count(d.placeCount)}</span>
-              {selected === d.slug && <Check size={18} color="var(--brand)" />}
-            </button>
-          ))}
-          {districts.data && search.trim() && list.length === 0 && (
-            <p className="t-caption" style={{ padding: 16 }}>{t('Bu isimde bir ilçe yok.', 'No district with that name.')}</p>
-          )}
-        </div>
-      </div>
-    </Sheet>
-  )
-}
-
-// Bottom sheet: search field and all 81 cities; cities without places yet are shown as "coming soon"
-function CitySheet({ open, onClose, selected, state, onChoose }: {
-  open: boolean
-  onClose: () => void
-  selected: string | null
-  state: ReturnType<typeof useCity>
-  onChoose: (city: City) => void
-}) {
-  const t = useT()
-  const [search, setSearch] = useState('')
-  useEffect(() => {
-    if (!open) setSearch('')
-  }, [open])
-
-  const list = filterByName(state.cities, search)
-  const count = (n: number) => `${n.toLocaleString(locale())} ${t('mekan', n === 1 ? 'place' : 'places')}`
-
-  return (
-    <Sheet open={open} onClose={onClose} label={t('Şehir seç', 'Choose city')}>
-      <div className="stack">
-        <label className="search">
-          <Search size={18} />
-          <input type="search" placeholder={t('Şehir ara', 'Search cities')} value={search} onChange={e => setSearch(e.target.value)}
-                 aria-label={t('Şehir ara', 'Search cities')} />
-        </label>
-
-        {state.error && <ErrorState message={state.error} onRetry={state.reload} />}
-
-        <div className="list-group district-list city-list">
-          {state.loading && !state.cities.length && (
-            <div className="stack" style={{ padding: 12 }}>
-              {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
-            </div>
-          )}
-          {list.map(c => {
-            const soon = c.placeCount === 0
-            return (
-              <button key={c.slug} className="list-item" aria-pressed={selected === c.slug} disabled={soon}
-                      onClick={() => onChoose(c)}>
-                <span className="grow" style={{ fontWeight: 650 }}>{c.name}</span>
-                {soon
-                  ? <span className="badge">{t('yakında', 'coming soon')}</span>
-                  : <span className="t-caption">{count(c.placeCount)}</span>}
-                {selected === c.slug && <Check size={18} color="var(--brand)" />}
-              </button>
-            )
-          })}
-          {state.cities.length > 0 && search.trim() && list.length === 0 && (
-            <p className="t-caption" style={{ padding: 16 }}>{t('Bu isimde bir şehir yok.', 'No city with that name.')}</p>
-          )}
-        </div>
-      </div>
-    </Sheet>
   )
 }

@@ -46,6 +46,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
+              -- Cafés on a campus, in a hospital or a factory site are not planned (osm/OsmContextImporter)
+              AND NOT p.inside_institution
               AND (p.category IN (:categories)
                    OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
             ORDER BY "distanceMeters"
@@ -61,6 +63,50 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
     );
 
     /**
+     * Like findCandidates, but only places that match the user's interests (planning/InterestMatcher): one of the
+     * interest tags (comma separated, "" for none) or, when nearSea, within ~300 m of the coast. The nearest 40
+     * candidates of a busy area can all be ordinary cafés; this finds the fitting ones a little further away.
+     */
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+              AND NOT p.hidden
+              AND NOT p.inside_institution
+              AND (p.category IN (:categories)
+                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+              AND (p.tags && string_to_array(CAST(:interestTags AS text), ',') OR (:nearSea AND p.near_sea))
+            ORDER BY "distanceMeters"
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PlaceDistance> findInterestCandidates(
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("radius") double radiusMeters,
+            @Param("categories") Collection<String> categories,
+            @Param("tag") String tag,
+            @Param("interestTags") String interestTags,
+            @Param("nearSea") boolean nearSea,
+            @Param("limit") int limit
+    );
+
+    // Visible, plannable places of these categories around a point (is the area worth planning a route in?)
+    @Query(value = """
+            SELECT count(*) FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+              AND NOT p.hidden
+              AND NOT p.inside_institution
+              AND p.category IN (:categories)
+            """, nativeQuery = true)
+    long countPlannable(
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("radius") double radiusMeters,
+            @Param("categories") Collection<String> categories
+    );
+
+    /**
      * Like findCandidates, but only places between minRadius and maxRadius ("better but farther").
      * There can be hundreds in 5 km, so the most promising come first: real rating, then interest
      * matches (interests = comma separated tags, "" for none), then distance.
@@ -72,6 +118,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :maxRadius)
               AND NOT p.hidden
               AND NOT ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :minRadius)
+              AND NOT p.inside_institution
               AND (p.category IN (:categories)
                    OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
             ORDER BY p.rating DESC NULLS LAST,

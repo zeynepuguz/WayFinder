@@ -11,16 +11,22 @@ import java.util.Map;
  * remark: Overpass puts runtime errors (e.g. timeouts) here while still answering 200.
  * members: only for relations queried with "out geom" (district boundaries): each way member carries its
  * geometry (list of points), each node member its lat/lon.
+ * geometry: only for ways queried with "out geom" (institution areas, coastline): the way's points.
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record OverpassResponse(List<Element> elements, String remark) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public record Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags,
-                          List<Member> members) {
+                          List<Member> members, List<Center> geometry) {
 
         public Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags) {
-            this(type, id, lat, lon, center, tags, null);
+            this(type, id, lat, lon, center, tags, null, null);
+        }
+
+        public Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags,
+                       List<Member> members) {
+            this(type, id, lat, lon, center, tags, members, null);
         }
 
         public Double latitude() {

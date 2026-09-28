@@ -22,6 +22,7 @@ public class RouteMapper {
                 route.isSaved(),
                 route.getStartLocation().getY(),
                 route.getStartLocation().getX(),
+                RouteStartService.label(route.getStartKind(), route.getStartLabel()),
                 route.getStartTime(),
                 route.getEndTime(),
                 route.getPartySize(),
@@ -77,7 +78,7 @@ public class RouteMapper {
                 stop.getStatus(),
                 new StopPlace(
                         place.getId(),
-                        place.getName(),
+                        place.getDisplayName(),
                         place.getCategory(),
                         place.getAddress(),
                         place.getNeighborhood(),

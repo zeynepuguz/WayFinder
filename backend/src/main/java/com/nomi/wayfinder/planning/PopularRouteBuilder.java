@@ -143,7 +143,14 @@ public final class PopularRouteBuilder {
     private static final Comparator<Sight> BY_SCORE = Comparator.comparingDouble(Sight::score).reversed()
             .thenComparing(s -> s.place().getId());
 
-    // The same sight mapped twice (a mosque as node and as way, "Sultanahmet Camii" / "Sultan Ahmed Camii")
+    // Two entries within this distance whose names contain one another are one sight ("Gezi Parkı" /
+    // "Taksim Gezi Parkı")
+    static final double SAME_SIGHT_METERS = 200;
+    static final int MIN_CONTAINED_NAME = 5;
+    static final double SAME_SIGHT_NAME_RATIO = 0.55;
+
+    // The same sight mapped twice (a mosque as node and as way, "Sultanahmet Camii" / "Sultan Ahmed Camii",
+    // "Gezi Parkı" / "Taksim Gezi Parkı" next to each other): the more popular entry is kept
     static List<Sight> dedupe(List<Sight> sights) {
         List<Sight> sorted = new ArrayList<>(sights);
         sorted.sort(BY_SCORE);
@@ -152,7 +159,8 @@ public final class PopularRouteBuilder {
         for (Sight sight : sorted) {
             String wikidata = sight.place().getWikidata();
             String name = OsmPlaceMapper.fold(sight.place().getName());
-            boolean duplicate = (wikidata != null && seen.contains("q:" + wikidata)) || seen.contains("n:" + name);
+            boolean duplicate = (wikidata != null && seen.contains("q:" + wikidata)) || seen.contains("n:" + name)
+                    || kept.stream().anyMatch(k -> sameSightNearby(k, sight));
             if (!duplicate) {
                 kept.add(sight);
             }
@@ -162,6 +170,28 @@ public final class PopularRouteBuilder {
             seen.add("n:" + name);
         }
         return kept;
+    }
+
+    static boolean sameSightNearby(Sight a, Sight b) {
+        if (meters(a, b) > SAME_SIGHT_METERS) {
+            return false;
+        }
+        String x = OsmPlaceMapper.fold(a.place().getName());
+        String y = OsmPlaceMapper.fold(b.place().getName());
+        return containedName(x, y, MIN_CONTAINED_NAME, SAME_SIGHT_NAME_RATIO);
+    }
+
+    /**
+     * One folded name contains the other and is not much shorter: "geziparki" in "taksimgeziparki", but not
+     * "ayasofya" in "ayasofyahurremsultanhamami" (another sight next to it).
+     */
+    public static boolean containedName(String x, String y, int minLength, double minRatio) {
+        if (x.length() < minLength || y.length() < minLength) {
+            return false;
+        }
+        String shorter = x.length() <= y.length() ? x : y;
+        String longer = shorter == x ? y : x;
+        return longer.contains(shorter) && (double) shorter.length() / longer.length() >= minRatio;
     }
 
     // ---------- 3. the day ----------

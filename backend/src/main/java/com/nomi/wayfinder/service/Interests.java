@@ -69,16 +69,48 @@ public final class Interests {
     private Interests() {
     }
 
+    // Turkish / English labels ("deniz", "Uygun fiyat", "seaside") -> the tag key, so every client may send either
+    private static final Map<String, String> ALIASES = aliases();
+
+    private static Map<String, String> aliases() {
+        Map<String, String> aliases = new java.util.HashMap<>();
+        LABELS.forEach((key, label) -> aliases.put(label.toLowerCase(Texts.TURKISH), key));
+        LABELS_EN.forEach((key, label) -> aliases.putIfAbsent(label.toLowerCase(Locale.ROOT), key));
+        aliases.put("seaside", "sea");
+        aliases.put("budget", "budget");
+        aliases.put("ucuz", "budget");
+        aliases.put("uygun", "budget");
+        aliases.put("muze", "museum");
+        aliases.put("doga", "nature");
+        aliases.put("sokak sanati", "street-art");
+        aliases.put("street art", "street-art");
+        aliases.put("deniz urunleri", "seafood");
+        aliases.put("museums", "museum");
+        aliases.put("views", "view");
+        return Map.copyOf(aliases);
+    }
+
     public static List<String> normalize(Collection<String> interests) {
         if (interests == null) {
             return List.of();
         }
         return interests.stream()
                 .filter(Objects::nonNull)
-                .map(i -> i.trim().toLowerCase(Locale.ROOT))
+                .map(Interests::key)
                 .filter(i -> !i.isEmpty())
                 .distinct()
                 .toList();
+    }
+
+    // "Deniz" -> "sea"; keys and unknown words stay as they are (lowercase, trimmed)
+    static String key(String interest) {
+        String trimmed = interest.trim().replaceAll("\\s+", " ");
+        String turkish = trimmed.toLowerCase(Texts.TURKISH);
+        String root = trimmed.toLowerCase(Locale.ROOT);
+        if (LABELS.containsKey(root)) {
+            return root;
+        }
+        return ALIASES.getOrDefault(turkish, ALIASES.getOrDefault(root, root));
     }
 
     public static String label(String tag) {

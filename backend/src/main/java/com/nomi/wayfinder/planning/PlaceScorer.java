@@ -1,6 +1,8 @@
 package com.nomi.wayfinder.planning;
 
 import com.nomi.wayfinder.entity.Place;
+import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.service.Interests;
 import org.springframework.stereotype.Component;
@@ -20,6 +22,11 @@ public class PlaceScorer {
     static final double DEFAULT_RATING = 3.8;
     // With a budget, a place of unknown price is slightly less attractive than one known to fit
     static final double UNKNOWN_PRICE_PENALTY = 4;
+    // Interest matches: the first counts a lot (it must beat a small distance advantage), a second one a bit more
+    static final double INTEREST_BONUS = 30;
+    static final double SECOND_INTEREST_BONUS = 12;
+    static final double CAFE_MEAL_BUDGET_BONUS = 12;
+    static final double KNOWN_PRICE_FITS_BONUS = 8;
 
     public ScoredPlace score(Candidate c) {
         Place place = c.place();
@@ -33,15 +40,7 @@ public class PlaceScorer {
         // 2) Distance: closer is better, relative to how far the user is willing to walk.
         // Kept separate so "fit" (everything but distance) can be compared across distances.
         double distancePenalty = (c.distanceMeters() / c.maxLegMeters()) * 25;
-        if (Texts.english()) {
-            reasons.add(String.format(Locale.ROOT, "%d m from %s (~%d min walk)",
-                    Math.round(c.distanceMeters()),
-                    c.firstLeg() ? "your starting point" : "the previous stop", c.walkingMinutes()));
-        } else {
-            reasons.add(String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)",
-                    c.firstLeg() ? "Başlangıç noktana" : "Önceki durağa",
-                    Math.round(c.distanceMeters()), c.walkingMinutes()));
-        }
+        reasons.add(distanceReason(c.distanceMeters(), c.walkingMinutes(), c.firstLeg()));
 
         if (place.getRating() != null) {
             reasons.add(String.format(Locale.ROOT, Texts.t("Puanı %.1f", "Rated %.1f"), place.getRating()));
@@ -68,11 +67,24 @@ public class PlaceScorer {
                     "Indoor place chosen because the weather is " + weather.reasonLabel()));
         }
 
-        // 4) Interests (matched against place tags)
-        List<String> matches = c.interests().stream().filter(place::hasTag).toList();
+        // 4) Interests (planning/InterestMatcher: tags, category, near the sea). Strong on purpose: a place that
+        // matches what the user asked for must beat one that is only a few hundred meters closer
+        List<String> matches = InterestMatcher.matching(place, c.interests());
         if (!matches.isEmpty()) {
-            score += 12 * Math.min(matches.size(), 2);
-            reasons.add(Texts.t("İlgi alanına uygun: ", "Matches your interests: ") + String.join(", ", matches.stream().map(Interests::label).toList()));
+            score += INTEREST_BONUS + SECOND_INTEREST_BONUS * Math.min(matches.size() - 1, 1);
+            reasons.add(Texts.t("İlgi alanına uygun: ", "Matches your interests: ")
+                    + String.join(", ", matches.stream().map(Interests::label).toList()));
+            if (matches.contains("sea") && place.isNearSea() && !place.hasTag("sea")) {
+                reasons.add(Texts.t("Deniz kenarında", "By the sea"));
+            }
+        }
+        // "Uygun fiyat" without known prices: a café is the cheaper meal (never a guessed price)
+        boolean budgetInterest = c.interests() != null && c.interests().contains("budget");
+        if (budgetInterest && matches.stream().noneMatch("budget"::equals) && c.slotType() != null
+                && (c.slotType() == StopType.LUNCH || c.slotType() == StopType.DINNER)
+                && place.getCategory() == PlaceCategory.CAFE && place.getEstimatedCost() == null) {
+            score += CAFE_MEAL_BUDGET_BONUS;
+            reasons.add(Texts.t("Uygun fiyat için restoran yerine kafe", "A café instead of a restaurant, to keep it cheap"));
         }
 
         // 5) Budget: reward places that leave room for the rest of the day.
@@ -88,6 +100,10 @@ public class PlaceScorer {
             } else {
                 double ratio = cost / c.budgetAllowance();
                 score += Math.max(-20, Math.min(10, 10 * (1 - ratio)));
+                // A known price that fits ranks above an unknown one
+                if (cost <= c.budgetAllowance()) {
+                    score += KNOWN_PRICE_FITS_BONUS;
+                }
             }
         }
         reasons.add(cost == null ? Texts.t("Fiyat bilgisi yok", "No price info")
@@ -102,6 +118,16 @@ public class PlaceScorer {
         }
 
         return new ScoredPlace(place, score - distancePenalty, score, reasons);
+    }
+
+    // The first reason of every scored place: "Önceki durağa 350 m (~7 dk yürüme)"
+    public static String distanceReason(double distanceMeters, int walkingMinutes, boolean firstLeg) {
+        if (Texts.english()) {
+            return String.format(Locale.ROOT, "%d m from %s (~%d min walk)", Math.round(distanceMeters),
+                    firstLeg ? "your starting point" : "the previous stop", walkingMinutes);
+        }
+        return String.format(Locale.ROOT, "%s %d m (~%d dk yürüme)", firstLeg ? "Başlangıç noktana" : "Önceki durağa",
+                Math.round(distanceMeters), walkingMinutes);
     }
 
     private static boolean isEvening(LocalTime time) {
@@ -124,8 +150,17 @@ public class PlaceScorer {
             List<String> interests,
             Integer totalCost,
             Double budgetAllowance,
-            Boolean openStatus
+            Boolean openStatus,
+            // The stop being filled (null = a single recommendation): "uygun fiyat" meals may be cafés
+            StopType slotType
     ) {
+
+        public Candidate(Place place, double distanceMeters, double maxLegMeters, int walkingMinutes, boolean firstLeg,
+                         LocalTime arrival, WeatherContext weather, List<String> interests, Integer totalCost,
+                         Double budgetAllowance, Boolean openStatus) {
+            this(place, distanceMeters, maxLegMeters, walkingMinutes, firstLeg, arrival, weather, interests, totalCost,
+                    budgetAllowance, openStatus, null);
+        }
     }
 
     /**

@@ -847,6 +847,14 @@ details > .reasons { margin-top: 8px; }
 }
 .option.active { border-color: var(--brand); background: var(--brand-50); color: var(--brand); }
 
+/* New route: where to start (one or two big options) */
+.start-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 8px; }
+.start-options .option { min-height: 64px; flex-direction: row; font-size: 14px; }
+
+/* Chosen interests stand out in brand colour (they steer the route) */
+.chip.chip-interest.active { background: var(--brand); border-color: var(--brand); color: #fff; }
+.route-interests { display: flex; flex-wrap: wrap; gap: 6px; }
+
 .stepper { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px; border-radius: var(--r-md); border: 1px solid var(--line); background: var(--surface); }
 .stepper button { width: 40px; height: 40px; border-radius: 12px; border: none; background: var(--surface-2); display: grid; place-items: center; }
 .stepper strong { font-size: 17px; }

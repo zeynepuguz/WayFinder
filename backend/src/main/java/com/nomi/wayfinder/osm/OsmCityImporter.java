@@ -57,12 +57,15 @@ public class OsmCityImporter {
     private final OverpassClient overpassClient;
     private final OsmAreaImporter areaImporter;
     private final OsmPlaceImporter placeImporter;
+    private final OsmContextImporter contextImporter;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
 
     public OsmCityImporter(OverpassClient overpassClient, OsmAreaImporter areaImporter, OsmPlaceImporter placeImporter,
-                           JdbcTemplate jdbc, TransactionTemplate transactions, ApplicationEventPublisher events) {
+                           OsmContextImporter contextImporter, JdbcTemplate jdbc, TransactionTemplate transactions,
+                           ApplicationEventPublisher events) {
+        this.contextImporter = contextImporter;
         this.overpassClient = overpassClient;
         this.areaImporter = areaImporter;
         this.placeImporter = placeImporter;
@@ -172,6 +175,19 @@ public class OsmCityImporter {
         }
         places = places.withAreas(areas);
 
+        // Institution areas and the coastline: route realism (campus cafés, "deniz"). Their failure (busy Overpass)
+        // keeps the previous data and does not fail the city
+        OsmContextImporter.ContextImportResult context = null;
+        try {
+            pauseBetweenCalls.run();
+            context = contextImporter.importCity(city, pauseBetweenCalls);
+        } catch (RuntimeException e) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw e;
+            }
+            log.warn("OSM import ({}): institution / coastline import failed, continuing: {}", city.name(), e.getMessage());
+        }
+
         if (districtError == null) {
             jdbc.update("UPDATE cities SET places_imported_at = now() WHERE id = ?", city.id());
         }
@@ -182,7 +198,7 @@ public class OsmCityImporter {
         long seconds = (System.currentTimeMillis() - started) / 1000;
         log.info("OSM import ({}) finished in {} s: {} places, {} districts", city.name(), seconds,
                 places.placesInCity(), areas == null ? "?" : areas.districts());
-        return new CityImportResult(places, districtError, seconds);
+        return new CityImportResult(places, districtError, seconds, context);
     }
 
     // Every city row, for the job to pick from
@@ -286,8 +302,10 @@ public class OsmCityImporter {
 
     /**
      * @param districtError why the district download failed (the city then stays "not imported"); null = fine
+     * @param context       institution areas + coastline of the city; null when that step failed
      */
-    public record CityImportResult(OsmPlaceImporter.ImportResult result, String districtError, long seconds) {
+    public record CityImportResult(OsmPlaceImporter.ImportResult result, String districtError, long seconds,
+                                   OsmContextImporter.ContextImportResult context) {
     }
 
     /**

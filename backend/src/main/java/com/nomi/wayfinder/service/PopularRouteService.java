@@ -105,7 +105,7 @@ public class PopularRouteService {
                 .filter(r -> r.key().equals(request.key()))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Popular route not found: " + request.key()));
-        return routeService.createPlannedRoute(userId, route.title(), replayRequest(route));
+        return routeService.createPlannedRoute(userId, route.title(), replayRequest(route), route.startLabel());
     }
 
     // The planner input that reproduces a previewed route
@@ -286,7 +286,7 @@ public class PopularRouteService {
                 stop.distanceFromPreviousMeters(),
                 new PopularPlace(
                         place.getId(),
-                        place.getName(),
+                        place.getDisplayName(),
                         place.getCategory(),
                         place.getLatitude(),
                         place.getLongitude(),

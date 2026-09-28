@@ -67,6 +67,14 @@ public class Route {
 
     private String weatherAdvice;
 
+    // Where the route starts; null = the user's position (routes created before start areas existed)
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private StartKind startKind;
+
+    // The sight / district / city name of an area start; null for LOCATION
+    private String startLabel;
+
     // The user told us it is raining; stays on for later replans of this route
     @Column(nullable = false)
     private boolean assumeWet;
@@ -232,6 +240,22 @@ public class Route {
 
     public void setWeatherAdvice(String weatherAdvice) {
         this.weatherAdvice = weatherAdvice;
+    }
+
+    public StartKind getStartKind() {
+        return startKind;
+    }
+
+    public void setStartKind(StartKind startKind) {
+        this.startKind = startKind;
+    }
+
+    public String getStartLabel() {
+        return startLabel;
+    }
+
+    public void setStartLabel(String startLabel) {
+        this.startLabel = startLabel;
     }
 
     public boolean isAssumeWet() {

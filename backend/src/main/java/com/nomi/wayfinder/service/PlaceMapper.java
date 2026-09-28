@@ -65,7 +65,7 @@ public class PlaceMapper {
         ZonedDateTime now = ZonedDateTime.now(clock);
 
         response.setId(place.getId());
-        response.setName(place.getName());
+        response.setName(place.getDisplayName());
         // Same JSON field in both languages; English falls back to Turkish when there is no translation
         response.setDescription(Texts.english() && place.getDescriptionEn() != null
                 ? place.getDescriptionEn() : place.getDescription());

@@ -242,7 +242,7 @@ function PreferencesForm({ onSaved }: { onSaved: () => void }) {
         </div>
       </div>
       {error && <Alert tone="danger"><span>{error}</span></Alert>}
-      <button className="btn btn-primary btn-lg btn-block" disabled={saving}>{saving ? <Spinner /> : t('Kaydet', 'Save')}</button>
+      <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={saving}>{saving ? <Spinner /> : t('Kaydet', 'Save')}</button>
     </form>
   )
 }

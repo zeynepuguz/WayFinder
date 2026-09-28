@@ -187,6 +187,8 @@ export interface RouteSummary {
   stopCount: number
   totalEstimatedCost: number
   createdAt: string
+  // where the route starts ("Kadıköy merkezi"); null/absent for older routes
+  startLabel?: string | null
 }
 
 export interface HomeResponse {
@@ -248,6 +250,8 @@ export interface Route {
   totalWalkingMinutes: number
   walkingTolerance: WalkingTolerance
   interests: string[]
+  // where the route starts ("Kadıköy merkezi"); null/absent for older routes
+  startLabel?: string | null
   weather: { condition: string | null; temperature: number | null; advice: string | null }
   notes: string[]
   stops: RouteStop[]
@@ -255,9 +259,16 @@ export interface Route {
   updatedAt: string
 }
 
+// LOCATION: start at latitude/longitude (the device); AREA: start in the chosen city / district (lat/lon not sent)
+export type RouteStartMode = 'LOCATION' | 'AREA'
+
 export interface RoutePlanRequest {
-  latitude: number
-  longitude: number
+  latitude?: number
+  longitude?: number
+  startMode?: RouteStartMode
+  // city / district slugs (AREA)
+  city?: string
+  district?: string
   date?: string
   startTime?: string
   endTime?: string

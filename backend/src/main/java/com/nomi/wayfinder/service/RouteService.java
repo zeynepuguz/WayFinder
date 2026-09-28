@@ -8,6 +8,8 @@ import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.*;
 import com.nomi.wayfinder.repository.RouteRepository;
 import com.nomi.wayfinder.weather.WeatherForecast;
+import com.nomi.wayfinder.repository.PlaceRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,28 @@ public class RouteService {
     private final UserService userService;
     private final RouteMapper routeMapper;
     private final Clock clock;
+    // null in unit tests that only plan at a position
+    private final RouteStartService startService;
+    private final PlaceRepository placeRepository;
+
+    @Autowired
+    public RouteService(
+            RouteRepository routeRepository,
+            RoutePlanner planner,
+            UserService userService,
+            RouteMapper routeMapper,
+            Clock clock,
+            RouteStartService startService,
+            PlaceRepository placeRepository
+    ) {
+        this.routeRepository = routeRepository;
+        this.planner = planner;
+        this.userService = userService;
+        this.routeMapper = routeMapper;
+        this.clock = clock;
+        this.startService = startService;
+        this.placeRepository = placeRepository;
+    }
 
     public RouteService(
             RouteRepository routeRepository,
@@ -39,11 +63,7 @@ public class RouteService {
             RouteMapper routeMapper,
             Clock clock
     ) {
-        this.routeRepository = routeRepository;
-        this.planner = planner;
-        this.userService = userService;
-        this.routeMapper = routeMapper;
-        this.clock = clock;
+        this(routeRepository, planner, userService, routeMapper, clock, null, null);
     }
 
     // ================= PLAN =================
@@ -81,16 +101,24 @@ public class RouteService {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "No stops fit into the requested time window");
         }
 
+        RouteStartService.Start origin = startService != null ? startService.resolve(request)
+                : locationOnly(request);
+
         PlanResult result = planner.plan(new PlanningRequest(
-                request.latitude(), request.longitude(), date, start, end,
+                origin.latitude(), origin.longitude(), date, start, end,
                 partySize, budget, tolerance, interests, slots, Set.of(), false));
+        if (origin.kind() == StartKind.LOCATION) {
+            result = withSparseAreaNote(result, origin, slots);
+        }
 
         Route route = new Route();
         route.setUserId(userId);
         route.setTitle(request.title() != null && !request.title().isBlank()
                 ? request.title().trim() : defaultTitle(date));
         route.setDate(date);
-        route.setStartLocation(request.latitude(), request.longitude());
+        route.setStartLocation(origin.latitude(), origin.longitude());
+        route.setStartKind(origin.kind());
+        route.setStartLabel(origin.label());
         route.setStartTime(start);
         route.setEndTime(end);
         route.setPartySize(partySize);
@@ -102,12 +130,56 @@ public class RouteService {
         return routeRepository.save(route);
     }
 
+    // Radius and minimum of plannable places around a start position before we suggest choosing a city / district
+    static final double SPARSE_RADIUS_METERS = 1500;
+    static final int MIN_PLANNABLE_AROUND = 6;
+
+    private static RouteStartService.Start locationOnly(RoutePlanRequest request) {
+        if (request.latitude() == null || request.longitude() == null) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "latitude and longitude are required");
+        }
+        return new RouteStartService.Start(request.latitude(), request.longitude(), StartKind.LOCATION, null);
+    }
+
+    /**
+     * Few places around the user's position (an industrial zone, a campus, the outskirts): the plan is still made,
+     * with a note suggesting to choose a city / district instead.
+     */
+    private PlanResult withSparseAreaNote(PlanResult result, RouteStartService.Start origin, List<PlanningSlot> slots) {
+        if (placeRepository == null) {
+            return result;
+        }
+        List<String> categories = slots.stream()
+                .flatMap(s -> s.searchCategories().stream())
+                .map(PlaceCategory::name).distinct().sorted().toList();
+        if (categories.isEmpty()) {
+            return result;
+        }
+        long plannable = placeRepository.countPlannable(origin.latitude(), origin.longitude(), SPARSE_RADIUS_METERS,
+                categories);
+        if (plannable >= MIN_PLANNABLE_AROUND) {
+            return result;
+        }
+        List<String> notes = new ArrayList<>(result.notes());
+        notes.addFirst(Texts.t("Bulunduğun yerin 1,5 km çevresinde rotaya uygun çok az mekan var (" + plannable
+                        + "). Daha iyi bir rota için Yeni rota ekranında bir şehir ve ilçe seçebilirsin.",
+                "There are very few places for a route within 1.5 km of where you are (" + plannable
+                        + "). For a better route, choose a city and district on the New route screen."));
+        return new PlanResult(result.stops(), notes, result.forecast(), result.weatherAdvice());
+    }
+
     /**
      * Saves a plan made from a ready planner request (a popular route the user starts): the same request as the
      * preview, so the route has the same stops as long as places, opening hours and the forecast did not change.
      */
     @Transactional
     public RouteResponse createPlannedRoute(Long userId, String title, PlanningRequest request) {
+        return createPlannedRoute(userId, title, request, null);
+    }
+
+    // startSight: the name of the sight the route starts at (a popular route's first sight); null = the position
+    @Transactional
+    public RouteResponse createPlannedRoute(Long userId, String title, PlanningRequest request, String startSight) {
         PlanResult result = planner.plan(request);
 
         Route route = new Route();
@@ -115,6 +187,8 @@ public class RouteService {
         route.setTitle(title);
         route.setDate(request.date());
         route.setStartLocation(request.startLatitude(), request.startLongitude());
+        route.setStartKind(startSight == null ? StartKind.LOCATION : StartKind.SIGHT);
+        route.setStartLabel(startSight);
         route.setStartTime(request.startTime());
         route.setEndTime(request.endTime());
         route.setPartySize(request.partySize());

@@ -40,6 +40,44 @@ public final class PlacePopularity {
     static final double MIN_NAME_SIMILARITY = 0.25;
 
     /**
+     * Wikidata classes (direct "instance of", P31) of things that happened, not places: an OSM element tagged with
+     * such an item ("Gezi Parkı olaylarının gerçekleştiği yer" -> Q13410316, the Gezi Park protests) marks an event.
+     */
+    static final Set<String> EVENT_CLASSES = Set.of(
+            "Q1190554",  // occurrence
+            "Q1656682",  // event
+            "Q13418847", // historical event
+            "Q175331",   // demonstration
+            "Q273120",   // protest
+            "Q124734",   // riot
+            "Q7283",     // terrorism
+            "Q2223653",  // terrorist attack
+            "Q178561",   // battle
+            "Q188055",   // siege
+            "Q198",      // war
+            "Q645883",   // military operation
+            "Q831663",   // military campaign
+            "Q3199915",  // massacre
+            "Q750215",   // mass murder
+            "Q3839081",  // disaster
+            "Q8065",     // natural disaster
+            "Q7944",     // earthquake
+            "Q168983",   // conflagration
+            "Q10931",    // revolution
+            "Q45382"     // coup d'état
+    );
+    // A person: the tomb / statue / park is named after them, the item is not about the place
+    static final String HUMAN = "Q5";
+
+    static boolean isEvent(Set<String> instanceOf) {
+        return instanceOf != null && instanceOf.stream().anyMatch(EVENT_CLASSES::contains);
+    }
+
+    static boolean isPerson(Set<String> instanceOf) {
+        return instanceOf != null && instanceOf.contains(HUMAN);
+    }
+
+    /**
      * Is the Wikidata item (through its Wikipedia titles) about this place? OSM's wikidata tag is sometimes put on
      * a place although it names something else: a tomb tagged with the sultan buried there, a park tagged with an
      * event that happened in it. Then the item's fame is not the place's. At least one title must be similar to

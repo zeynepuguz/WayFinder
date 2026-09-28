@@ -267,7 +267,7 @@ function Chat({ canSend }: { canSend: boolean }) {
             <form className="composer-box" onSubmit={submit}>
               <input value={input} onChange={e => setInput(e.target.value)} placeholder={t('Nomi’ye yaz…', 'Message Nomi…')} maxLength={1000}
                      aria-label={t('Mesaj', 'Message')} enterKeyHint="send" />
-              <button className="send-btn" disabled={sending || !input.trim()} aria-label={t('Gönder', 'Send')}><ArrowUp size={20} /></button>
+              <button type="submit" className="send-btn" disabled={sending || !input.trim()} aria-label={t('Gönder', 'Send')}><ArrowUp size={20} /></button>
             </form>
           </>
         ) : (
@@ -366,7 +366,7 @@ function ConversationList({ conversations, currentId, canEdit, onOpen, onChanged
                 <input value={title} onChange={e => setTitle(e.target.value)} maxLength={120} autoFocus
                        aria-label={t('Sohbet adı', 'Chat name')} />
               </span>
-              <button className="icon-btn icon-btn-plain" disabled={busy || !title.trim()} aria-label={t('Kaydet', 'Save')}><Check size={18} /></button>
+              <button type="submit" className="icon-btn icon-btn-plain" disabled={busy || !title.trim()} aria-label={t('Kaydet', 'Save')}><Check size={18} /></button>
               <button type="button" className="icon-btn icon-btn-plain" onClick={() => setEditing(null)} aria-label={t('Vazgeç', 'Cancel')}><X size={18} /></button>
             </form>
           ) : (

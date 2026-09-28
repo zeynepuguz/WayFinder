@@ -65,7 +65,7 @@ public class WikiPopularityClient {
             MultiValueMap<String, String> form = form();
             form.add("action", "wbgetentities");
             form.add("ids", String.join("|", ids));
-            form.add("props", "sitelinks");
+            form.add("props", "sitelinks|claims");
             try {
                 return post(properties.wikidataApiUrl(), form, body -> WikiPopularityParser.sitelinks(body, jsonMapper));
             } catch (ApiErrorException e) {

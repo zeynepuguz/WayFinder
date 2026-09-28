@@ -67,6 +67,7 @@ public class OverpassClient {
               nwr["amenity"~"^(theatre|arts_centre|place_of_worship|marketplace)$"]["name"](area.city);
               nwr["natural"="beach"]["name"](area.city);
               nwr["man_made"="lighthouse"]["name"](area.city);
+              nwr["tourism"="artwork"]["artwork_type"~"mural|graffiti"]["name"](area.city);
             );
             out center tags;
             """;
@@ -75,6 +76,30 @@ public class OverpassClient {
             [out:json][timeout:180];
             area(id:%d)->.city;
             relation["boundary"="administrative"]["admin_level"="6"](area.city);
+            out geom;
+            """;
+
+    // Areas of institutions a visitor does not walk into (campuses, schools, hospitals, prisons, military and industrial
+    // zones), as polygons: closed ways and multipolygon relations with their geometry
+    static final String INSTITUTIONS_QUERY = """
+            [out:json][timeout:300];
+            area(id:%d)->.city;
+            (
+              way["amenity"~"^(university|college|school|hospital|prison)$"](area.city);
+              relation["amenity"~"^(university|college|school|hospital|prison)$"](area.city);
+              way["landuse"~"^(military|industrial)$"](area.city);
+              relation["landuse"~"^(military|industrial)$"](area.city);
+              way["military"](area.city);
+              relation["military"](area.city);
+            );
+            out geom;
+            """;
+
+    // The sea coastline in a box around the city (south, west, north, east). A bounding box instead of the city area:
+    // provinces' boundaries often run along the coast, and inland cities simply get no ways
+    static final String COASTLINE_QUERY = """
+            [out:json][timeout:180];
+            way["natural"="coastline"](%s);
             out geom;
             """;
 
@@ -145,6 +170,20 @@ public class OverpassClient {
     public List<OverpassResponse.Element> fetchAreas(long relationId) {
         // Every province has named neighbourhoods; "none" is a mirror with a missing / stale area index
         return fetch(AREAS_QUERY.formatted(areaId(relationId)), true);
+    }
+
+    public List<OverpassResponse.Element> fetchInstitutions(long relationId) {
+        // Every province has schools; "none" is a mirror with a missing / stale area index
+        return fetch(INSTITUTIONS_QUERY.formatted(areaId(relationId)), true);
+    }
+
+    // Inland cities have no coastline: an empty answer is a valid answer here
+    public List<OverpassResponse.Element> fetchCoastline(double south, double west, double north, double east) {
+        return fetch(COASTLINE_QUERY.formatted(bbox(south, west, north, east)), false);
+    }
+
+    static String bbox(double south, double west, double north, double east) {
+        return String.format(java.util.Locale.ROOT, "%.5f,%.5f,%.5f,%.5f", south, west, north, east);
     }
 
     // The food / drink query and the sights query of a city

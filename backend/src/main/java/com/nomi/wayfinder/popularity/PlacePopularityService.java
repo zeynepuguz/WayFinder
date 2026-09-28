@@ -30,7 +30,7 @@ public class PlacePopularityService {
     private static final Logger log = LoggerFactory.getLogger(PlacePopularityService.class);
 
     private static final String PENDING = """
-            SELECT id, wikidata, name FROM places
+            SELECT id, wikidata, name, category, source FROM places
             WHERE wikidata IS NOT NULL AND NOT hidden
               AND (CAST(? AS bigint) IS NULL OR city_id = ?)
               AND (popularity_checked_at IS NULL
@@ -42,6 +42,11 @@ public class PlacePopularityService {
     private static final String WRITE = """
             UPDATE places SET wiki_sitelinks = ?, wiki_pageviews = ?, popularity = ?, popularity_checked_at = now()
             WHERE id = ?
+            """;
+
+    private static final String HIDE_EVENT = """
+            UPDATE places SET not_a_place = TRUE, hidden = TRUE, updated_at = now()
+            WHERE id = ? AND source = 'OSM'
             """;
 
     private final WikiPopularityClient client;
@@ -74,7 +79,8 @@ public class PlacePopularityService {
         try {
             long started = System.currentTimeMillis();
             List<Pending> pending = jdbc.query(PENDING,
-                    (rs, i) -> new Pending(rs.getLong("id"), rs.getString("wikidata"), rs.getString("name")),
+                    (rs, i) -> new Pending(rs.getLong("id"), rs.getString("wikidata"), rs.getString("name"),
+                            rs.getString("category"), rs.getString("source")),
                     cityId, cityId, properties.recheckAfter().toSeconds(), Math.max(1, properties.maxPlacesPerRun()));
             if (pending.isEmpty()) {
                 log.info("Popularity: nothing to check{}", cityId == null ? "" : " in city " + cityId);
@@ -127,6 +133,14 @@ public class PlacePopularityService {
 
             // 3. Store (items Wikidata does not know: checked, no articles -> 0)
             List<Outcome> outcomes = decide(pending, sitelinks, views, failed);
+            // An OSM sight that only marks an event (its item is a protest, a battle ...): not a place, hidden
+            List<Outcome> eventMarkers = outcomes.stream().filter(Outcome::event).toList();
+            if (!eventMarkers.isEmpty()) {
+                jdbc.batchUpdate(HIDE_EVENT, eventMarkers, 500, (ps, o) -> ps.setLong(1, o.placeId()));
+                eventMarkers.stream().limit(10).forEach(o -> log.info(
+                        "Popularity: place {} only marks an event (Wikidata {}), hidden", o.placeId(),
+                        pending.stream().filter(p -> p.id() == o.placeId()).map(Pending::wikidata).findFirst().orElse("?")));
+            }
             jdbc.batchUpdate(WRITE, outcomes, 500, (ps, o) -> {
                 // An item about something else: checked, but the place's popularity stays unknown
                 if (o.mismatch()) {
@@ -167,18 +181,35 @@ public class PlacePopularityService {
             Sitelinks links = sitelinks.get(place.wikidata());
             int count = links == null ? 0 : links.wikipedias();
             long pageviews = views.getOrDefault(place.wikidata(), 0L);
+            Set<String> classes = links == null ? Set.of() : links.instanceOf();
+            // The item is a thing that happened: an OSM sight that only marks it is not a place; a real park or
+            // museum tagged with it just has the wrong item (its popularity is not the event's)
+            boolean eventItem = PlacePopularity.isEvent(classes);
+            boolean event = eventItem && "ATTRACTION".equals(place.category())
+                    && (place.source() == null || "OSM".equals(place.source()));
             boolean mismatch = links != null
-                    && !PlacePopularity.aboutThePlace(place.name(), links.trTitle(), links.enTitle());
-            outcomes.add(new Outcome(place.id(), count, pageviews, mismatch));
+                    && (!PlacePopularity.aboutThePlace(place.name(), links.trTitle(), links.enTitle())
+                    || eventItem || PlacePopularity.isPerson(classes));
+            outcomes.add(new Outcome(place.id(), count, pageviews, mismatch, event));
         }
         return outcomes;
     }
 
-    record Pending(long id, String wikidata, String name) {
+    // category / source: null when unknown (treated as an OSM place of unknown kind)
+    record Pending(long id, String wikidata, String name, String category, String source) {
+
+        Pending(long id, String wikidata, String name) {
+            this(id, wikidata, name, null, null);
+        }
     }
 
-    // mismatch: the Wikidata item is about something else (PlacePopularity.aboutThePlace)
-    record Outcome(long placeId, int sitelinks, long pageviews, boolean mismatch) {
+    // mismatch: the Wikidata item is about something else (PlacePopularity.aboutThePlace, a person, an event);
+    // event: the place is only an OSM marker of an event (hidden)
+    record Outcome(long placeId, int sitelinks, long pageviews, boolean mismatch, boolean event) {
+
+        Outcome(long placeId, int sitelinks, long pageviews, boolean mismatch) {
+            this(placeId, sitelinks, pageviews, mismatch, false);
+        }
     }
 
     /**

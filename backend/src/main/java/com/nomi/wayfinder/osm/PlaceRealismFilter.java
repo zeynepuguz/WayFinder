@@ -97,12 +97,20 @@ public final class PlaceRealismFilter {
                 }
             }
         }
+        // "Gezi Parkı olaylarının gerçekleştiği yer": a description of an event, not a place (whatever else it has)
+        if (PlaceNames.describesEventOrSentence(place.name())) {
+            return "describes an event / a sentence";
+        }
         // A public business (website, phone, brand, opening hours, Wikidata item) is real even when its name is a
         // generic or institution word: the restaurant "Kantin" in Nişantaşı. A bare "okul kantini" has none of these
         if (hasPublicBusinessSigns(tags)) {
             return null;
         }
-        return rejectName(place.name(), place.category());
+        // The name as mapped in OSM: the place name was already title-cased (PlaceNames), which would hide a lowercase
+        // description such as "okul kantini"
+        String raw = tags.get("name:tr") != null && !tags.get("name:tr").isBlank() ? tags.get("name:tr")
+                : tags.get("name") != null && !tags.get("name").isBlank() ? tags.get("name") : place.name();
+        return rejectName(raw.strip(), place.category());
     }
 
     private static final List<String> BUSINESS_KEYS = List.of("website", "contact:website", "phone", "contact:phone",
@@ -126,6 +134,9 @@ public final class PlaceRealismFilter {
         String folded = OsmPlaceMapper.fold(name);
         if (folded.isEmpty() || folded.chars().allMatch(Character::isDigit) || GENERIC_NAMES.contains(folded)) {
             return "generic name";
+        }
+        if (PlaceNames.describesEventOrSentence(name)) {
+            return "describes an event / a sentence";
         }
         List<String> words = words(name);
 

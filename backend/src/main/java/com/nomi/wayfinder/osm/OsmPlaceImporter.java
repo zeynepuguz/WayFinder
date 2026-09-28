@@ -40,9 +40,9 @@ public class OsmPlaceImporter {
     static final int MAX_EXAMPLES = 20;
 
     private static final String UPSERT = """
-            INSERT INTO places (name, location, category, indoor, tags, source, source_url, osm_id,
+            INSERT INTO places (name, name_en, cuisine, location, category, indoor, tags, source, source_url, osm_id,
                                 address, neighborhood, wikidata, commons_file, created_at, updated_at)
-            VALUES (?, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?, ?, ?, 'OSM', ?, ?, ?, ?, ?, ?, now(), now())
+            VALUES (?, ?, ?, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?, ?, ?, 'OSM', ?, ?, ?, ?, ?, ?, now(), now())
             ON CONFLICT (osm_id) DO UPDATE SET
                 -- A new wikidata id / Commons file means the photo must be looked up again
                 image_checked_at = CASE
@@ -52,6 +52,8 @@ public class OsmPlaceImporter {
                 wikidata = EXCLUDED.wikidata,
                 commons_file = EXCLUDED.commons_file,
                 name = EXCLUDED.name,
+                name_en = EXCLUDED.name_en,
+                cuisine = EXCLUDED.cuisine,
                 location = EXCLUDED.location,
                 category = EXCLUDED.category,
                 indoor = EXCLUDED.indoor,
@@ -59,8 +61,10 @@ public class OsmPlaceImporter {
                 source_url = EXCLUDED.source_url,
                 address = EXCLUDED.address,
                 neighborhood = EXCLUDED.neighborhood,
-                -- It passed the realism filter this time (PlaceRealismFilter)
-                hidden = FALSE,
+                -- It passed the realism filter this time (PlaceRealismFilter); an element whose Wikidata item is an event
+                -- stays hidden while it keeps that item (PlacePopularityService)
+                hidden = (places.not_a_place AND places.wikidata IS NOT DISTINCT FROM EXCLUDED.wikidata),
+                not_a_place = (places.not_a_place AND places.wikidata IS NOT DISTINCT FROM EXCLUDED.wikidata),
                 updated_at = now()
             WHERE places.source = 'OSM'
             """;
@@ -300,18 +304,20 @@ public class OsmPlaceImporter {
 
         jdbc.batchUpdate(UPSERT, writable, CHUNK_SIZE, (ps, p) -> {
             ps.setString(1, p.name());
-            ps.setDouble(2, p.longitude());
-            ps.setDouble(3, p.latitude());
-            ps.setString(4, p.category().name());
-            ps.setBoolean(5, p.indoor());
+            ps.setString(2, p.nameEn());
+            ps.setString(3, p.cuisine());
+            ps.setDouble(4, p.longitude());
+            ps.setDouble(5, p.latitude());
+            ps.setString(6, p.category().name());
+            ps.setBoolean(7, p.indoor());
             Array tags = ps.getConnection().createArrayOf("text", p.tags().toArray());
-            ps.setArray(6, tags);
-            ps.setString(7, p.sourceUrl());
-            ps.setString(8, p.osmId());
-            ps.setString(9, p.address());
-            ps.setString(10, p.neighborhood());
-            ps.setString(11, p.wikidata());
-            ps.setString(12, p.commonsFile());
+            ps.setArray(8, tags);
+            ps.setString(9, p.sourceUrl());
+            ps.setString(10, p.osmId());
+            ps.setString(11, p.address());
+            ps.setString(12, p.neighborhood());
+            ps.setString(13, p.wikidata());
+            ps.setString(14, p.commonsFile());
         });
 
         // Opening hours: replace whatever the previous import wrote

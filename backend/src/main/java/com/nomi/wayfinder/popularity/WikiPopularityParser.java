@@ -20,8 +20,13 @@ final class WikiPopularityParser {
      * @param wikipedias number of Wikipedia language editions with an article
      * @param trTitle    Turkish Wikipedia article title, null when there is none
      * @param enTitle    English Wikipedia article title, null when there is none
+     * @param instanceOf the item's "instance of" (P31) classes, e.g. Q273120 (protest); empty when unknown
      */
-    record Sitelinks(int wikipedias, String trTitle, String enTitle) {
+    record Sitelinks(int wikipedias, String trTitle, String enTitle, Set<String> instanceOf) {
+
+        Sitelinks(int wikipedias, String trTitle, String enTitle) {
+            this(wikipedias, trTitle, enTitle, Set.of());
+        }
     }
 
     // The API reported a problem; "no-such-entity" names the unknown id (one bad id fails the whole request)
@@ -65,7 +70,7 @@ final class WikiPopularityParser {
             }
             Map<String, Sitelink> links = entity.sitelinks() == null ? Map.of() : entity.sitelinks();
             Sitelinks sitelinks = new Sitelinks(PlacePopularity.wikipediaCount(links), title(links.get("trwiki")),
-                    title(links.get("enwiki")));
+                    title(links.get("enwiki")), instanceOf(entity.claims()));
             result.put(entry.getKey(), sitelinks);
             if (entity.redirects() != null && entity.redirects().from() != null) {
                 result.put(entity.redirects().from(), sitelinks);
@@ -144,7 +149,37 @@ final class WikiPopularityParser {
 
     // missing is present (as "") when the item does not exist; redirects when the requested id was merged
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record Entity(String id, Object missing, Redirect redirects, Map<String, Sitelink> sitelinks) {
+    record Entity(String id, Object missing, Redirect redirects, Map<String, Sitelink> sitelinks,
+                  Map<String, List<Claim>> claims) {
+    }
+
+    // Only the main value of a statement is read ("instance of": {"id": "Q273120", ...})
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Claim(Snak mainsnak) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record Snak(DataValue datavalue) {
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record DataValue(Object value) {
+    }
+
+    // P31 item ids of a statement map ("Q273120"); empty without claims
+    static Set<String> instanceOf(Map<String, List<Claim>> claims) {
+        if (claims == null || claims.get("P31") == null) {
+            return Set.of();
+        }
+        Set<String> ids = new LinkedHashSet<>();
+        for (Claim claim : claims.get("P31")) {
+            if (claim != null && claim.mainsnak() != null && claim.mainsnak().datavalue() != null
+                    && claim.mainsnak().datavalue().value() instanceof Map<?, ?> value
+                    && value.get("id") instanceof String id) {
+                ids.add(id);
+            }
+        }
+        return Set.copyOf(ids);
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

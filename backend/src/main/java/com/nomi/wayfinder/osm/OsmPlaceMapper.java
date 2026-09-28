@@ -26,6 +26,7 @@ public final class OsmPlaceMapper {
     static final int MAX_ADDRESS = 255;
     static final int MAX_NEIGHBORHOOD = 100;
     static final int MAX_COMMONS_FILE = 255;
+    static final int MAX_CUISINE = 255;
 
     private static final Pattern WIKIDATA_ID = Pattern.compile("Q\\d{1,15}");
     private static final Pattern COMMONS_TAG = Pattern.compile("(?i)(?:file|image):(.+)");
@@ -50,7 +51,8 @@ public final class OsmPlaceMapper {
      * @return null when the element is not a place we can show (no name, no or impossible coordinates, unknown kind)
      */
     public static OsmPlace map(OverpassResponse.Element element) {
-        String name = trimToNull(element.tag("name"));
+        // name:tr when OSM has it, else name; obviously broken casing repaired (PlaceNames)
+        String name = PlaceNames.choose(element.tag("name"), element.tag("name:tr"));
         Double latitude = element.latitude();
         Double longitude = element.longitude();
         if (name == null || latitude == null || longitude == null || element.type() == null
@@ -90,6 +92,9 @@ public final class OsmPlaceMapper {
         if (trimToNull(element.tag("historic")) != null) {
             tags.add("history");
         }
+        if ("artwork".equals(tourism)) {
+            tags.add("art");
+        }
         if (category == PlaceCategory.MUSEUM) {
             tags.add("museum");
         }
@@ -104,6 +109,10 @@ public final class OsmPlaceMapper {
             tags.add("dessert");
         }
 
+        // Interest tags from cuisine, OSM tags and name words (local, seafood, budget, view, books, ...)
+        List<String> allTags = PlaceTags.merge(tags.stream().distinct().toList(),
+                PlaceTags.derive(name, category, cuisines, element.tags(), tags));
+
         List<OpeningHoursDto> hours = OsmOpeningHoursParser.parse(element.tag("opening_hours"));
 
         String osmId = element.type() + "/" + element.id();
@@ -115,12 +124,14 @@ public final class OsmPlaceMapper {
                 longitude,
                 category,
                 kind.indoor() != null ? kind.indoor() : indoor(category),
-                tags.stream().distinct().toList(),
+                allTags,
                 truncate(address(element), MAX_ADDRESS),
                 truncate(neighborhood(element), MAX_NEIGHBORHOOD),
                 hours,
                 wikidata(element.tag("wikidata")),
-                commonsFile(element.tag("wikimedia_commons"), element.tag("image"))
+                commonsFile(element.tag("wikimedia_commons"), element.tag("image")),
+                truncate(PlaceNames.english(element.tag("name:en"), name), MAX_NAME),
+                truncate(trimToNull(cuisine), MAX_CUISINE)
         );
     }
 
@@ -210,6 +221,12 @@ public final class OsmPlaceMapper {
         }
         if ("aquarium".equals(tourism)) {
             return new Kind(PlaceCategory.ATTRACTION, List.of("sea"), true);
+        }
+        // Named murals / graffiti (street art); statues and other artworks only count through historic=* / Wikidata
+        String artworkType = element.tag("artwork_type");
+        if ("artwork".equals(tourism) && artworkType != null
+                && (artworkType.contains("mural") || artworkType.contains("graffiti"))) {
+            return new Kind(PlaceCategory.ATTRACTION, List.of("art", "street-art"), false);
         }
 
         String leisure = element.tag("leisure");
@@ -376,7 +393,11 @@ public final class OsmPlaceMapper {
             // Wikidata item id ("Q123") or null
             String wikidata,
             // Commons file title without "File:" or null
-            String commonsFile
+            String commonsFile,
+            // OSM name:en when it differs from name; null = none
+            String nameEn,
+            // OSM cuisine as tagged (lowercase), null = none
+            String cuisine
     ) {
 
         public boolean hasMedia() {

@@ -105,7 +105,7 @@ export function AuthPage() {
 
           {error && <Alert tone="danger"><span>{error}</span></Alert>}
 
-          <button className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
+          <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={busy} style={{ marginTop: 6 }}>
             {busy ? <Spinner /> : mode === 'login' ? t('Giriş yap', 'Log in') : t('Hesap oluştur', 'Create account')}
           </button>
         </form>

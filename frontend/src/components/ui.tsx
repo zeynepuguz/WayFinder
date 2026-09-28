@@ -1,5 +1,5 @@
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, LoaderCircle, Minus, Plus, X, type LucideIcon } from 'lucide-react'
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router'
 import { useT } from '../lib/i18n'
 
@@ -43,7 +43,7 @@ export function Alert({ tone = 'info', icon, children, action }: {
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   const t = useT()
   return (
-    <Alert tone="danger" action={onRetry && <button className="btn btn-sm btn-secondary" onClick={onRetry}>{t('Tekrar dene', 'Try again')}</button>}>
+    <Alert tone="danger" action={onRetry && <button type="button" className="btn btn-sm btn-secondary" onClick={onRetry}>{t('Tekrar dene', 'Try again')}</button>}>
       <span>{message}</span>
     </Alert>
   )
@@ -69,7 +69,7 @@ export function BackButton({ to, glass }: { to?: string; glass?: boolean }) {
   const navigate = useNavigate()
   const t = useT()
   return (
-    <button className={`icon-btn ${glass ? 'icon-btn-glass' : ''}`} aria-label={t('Geri', 'Back')}
+    <button type="button" className={`icon-btn ${glass ? 'icon-btn-glass' : ''}`} aria-label={t('Geri', 'Back')}
             onClick={() => (to ? navigate(to) : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
       <ChevronLeft size={22} />
     </button>
@@ -84,7 +84,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
   return (
     <div className="segmented" role="tablist">
       {options.map(o => (
-        <button key={o.value} role="tab" aria-selected={value === o.value} className={value === o.value ? 'active' : ''}
+        <button type="button" key={o.value} role="tab" aria-selected={value === o.value} className={value === o.value ? 'active' : ''}
                 onClick={() => onChange(o.value)}>
           {o.label}
         </button>
@@ -117,21 +117,27 @@ export function Sheet({ open, onClose, children, label }: {
   label: string
 }) {
   const t = useT()
+  const backdrop = useRef<HTMLDivElement>(null)
   useEffect(() => {
     if (!open) return
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    // With a sheet opened from another sheet, Escape closes only the top one
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return
+      const sheets = document.querySelectorAll('.sheet-backdrop')
+      if (!backdrop.current || sheets[sheets.length - 1] === backdrop.current) onClose()
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
   if (!open) return null
   return (
-    <div className="sheet-backdrop" onClick={onClose}>
+    <div className="sheet-backdrop" ref={backdrop} onClick={onClose}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={label} onClick={e => e.stopPropagation()}>
         <div className="sheet-grip" />
         <div className="row-between" style={{ marginBottom: 12 }}>
           <h2 className="t-title">{label}</h2>
-          <button className="icon-btn icon-btn-plain" aria-label={t('Kapat', 'Close')} onClick={onClose}><X size={20} /></button>
+          <button type="button" className="icon-btn icon-btn-plain" aria-label={t('Kapat', 'Close')} onClick={onClose}><X size={20} /></button>
         </div>
         {children}
       </div>
