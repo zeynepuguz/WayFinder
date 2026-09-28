@@ -53,6 +53,16 @@ describe('api client', () => {
     expect(onUnauthorized).toHaveBeenCalled()
   })
 
+  it('explains a proxy 502 (backend down / restarting) instead of showing "Bad Gateway"', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })))
+
+    const error = await http.get('/places').catch((e: ApiRequestError) => e) as ApiRequestError
+
+    expect(error.status).toBe(502)
+    expect(error.message).toBe('Sunucuya şu an ulaşılamıyor, birazdan tekrar dene')
+  })
+
   it('returns undefined for 204 responses', async () => {
     mockFetch(204, undefined)
     await expect(http.delete('/routes/1')).resolves.toBeUndefined()

@@ -132,6 +132,8 @@ public class RouteService {
 
     // Radius and minimum of plannable places around a start position before we suggest choosing a city / district
     static final double SPARSE_RADIUS_METERS = 1500;
+    // A re-plan uses the user's position only this close to the route (else they are editing it from elsewhere)
+    static final double ON_ROUTE_METERS = 3000;
     static final int MIN_PLANNABLE_AROUND = 6;
 
     private static RouteStartService.Start locationOnly(RoutePlanRequest request) {
@@ -447,8 +449,9 @@ public class RouteService {
                         : s.getPlace().getEstimatedCost() * route.getPartySize())
                 .sum();
 
+        double[] origin = replanOrigin(route, done, request.latitude(), request.longitude());
         PlanResult result = planner.plan(new PlanningRequest(
-                request.latitude(), request.longitude(), route.getDate(), start, end,
+                origin[0], origin[1], route.getDate(), start, end,
                 route.getPartySize(), remainingBudget, tolerance, interests, slots, excluded, assumeWet));
 
         changes.addAll(describeChanges(remaining, result.stops()));
@@ -461,6 +464,29 @@ public class RouteService {
         routeRepository.saveAndFlush(route);
 
         return changes;
+    }
+
+    /**
+     * Where a re-plan starts from, as {latitude, longitude}. The user's position only when they are on the route (within
+     * ON_ROUTE_METERS of its start or one of its stops): a route planned for Ankara and edited from Kocaeli must stay in
+     * Ankara. Otherwise the last visited stop, else the route's own start.
+     */
+    static double[] replanOrigin(Route route, List<RouteStop> done, Double latitude, Double longitude) {
+        double startLat = route.getStartLocation().getY();
+        double startLon = route.getStartLocation().getX();
+        if (latitude != null && longitude != null) {
+            boolean onRoute = PopularRouteBuilder.meters(latitude, longitude, startLat, startLon) <= ON_ROUTE_METERS
+                    || route.getStops().stream().anyMatch(s -> PopularRouteBuilder.meters(latitude, longitude,
+                    s.getPlace().getLatitude(), s.getPlace().getLongitude()) <= ON_ROUTE_METERS);
+            if (onRoute) {
+                return new double[]{latitude, longitude};
+            }
+        }
+        return done.stream()
+                .filter(s -> s.getStatus() == StopStatus.VISITED)
+                .max(Comparator.comparing(RouteStop::getPlannedEnd))
+                .map(s -> new double[]{s.getPlace().getLatitude(), s.getPlace().getLongitude()})
+                .orElse(new double[]{startLat, startLon});
     }
 
     // ================= HELPERS =================

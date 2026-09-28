@@ -99,7 +99,15 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
   }
 
   if (!response.ok) {
-    let error: ApiError = { status: response.status, message: response.statusText, errors: {} }
+    // 502/503/504 come from the proxy (Vite / Caddy) while the backend is down or restarting, not from the backend
+    const unreachable = response.status >= 502 && response.status <= 504
+    let error: ApiError = {
+      status: response.status,
+      message: unreachable
+        ? tr('Sunucuya şu an ulaşılamıyor, birazdan tekrar dene', 'Can’t reach the server right now, try again shortly')
+        : response.statusText || tr('Bir hata oluştu', 'Something went wrong'),
+      errors: {},
+    }
     try {
       error = await response.json()
     } catch {
