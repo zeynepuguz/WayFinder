@@ -14,9 +14,10 @@ class DayTemplateTest {
     void fullDayWhenNoStopsRequested() {
         List<PlanningSlot> slots = DayTemplate.slotsFor(null, LocalTime.of(9, 0), LocalTime.of(22, 0));
 
+        // Three sights, not five food stops and two sights
         assertThat(slots).extracting(PlanningSlot::type).containsExactly(
-                StopType.BREAKFAST, StopType.SIGHTSEEING, StopType.LUNCH, StopType.COFFEE,
-                StopType.SIGHTSEEING, StopType.DESSERT, StopType.DINNER);
+                StopType.BREAKFAST, StopType.SIGHTSEEING, StopType.LUNCH, StopType.SIGHTSEEING,
+                StopType.COFFEE, StopType.SIGHTSEEING, StopType.DINNER);
     }
 
     @Test

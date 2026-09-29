@@ -41,6 +41,16 @@ class OvertureMapperTest {
     }
 
     @Test
+    void aMealInTheNameBeatsAWrongCafeTaxonomy() {
+        OverturePlace doner = map(row("Gözde Cağ Döner", "food_and_drink/non_alcoholic_beverage_venue/coffee_shop"));
+        assertThat(doner.category()).isEqualTo(PlaceCategory.RESTAURANT);
+        assertThat(doner.tags()).contains("quick");
+        // A café that also sells tost / döner stays a café; a pastry shop named Çağla stays a dessert place
+        assertThat(category("Döner Cafe", "food_and_drink/casual_eatery/cafe")).isEqualTo(PlaceCategory.CAFE);
+        assertThat(category("Çağla Pastanesi", "food_and_drink/casual_eatery/bakery")).isEqualTo(PlaceCategory.DESSERT);
+    }
+
+    @Test
     void teaGardensAreOutdoorTeaCafes() {
         OverturePlace garden = map(row("Çayırova Kızılay Çay Bahçesi", "food_and_drink/casual_eatery/cafe"));
 

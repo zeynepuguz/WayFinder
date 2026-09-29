@@ -177,6 +177,27 @@ class RoutePlannerTest {
     }
 
     @Test
+    void aPopularRoutesFamousOutdoorSightsGetOneUmbrellaNoteInTheRain() {
+        Place koza = place(1, "Koza Han", PlaceCategory.ATTRACTION, false, 4.8, 0);
+        Place kule = place(2, "Saat Kulesi", PlaceCategory.ATTRACTION, false, 4.6, 0);
+        places.put(1L, koza);
+        places.put(2L, kule);
+        when(repository.findWithOpeningHoursById(1L)).thenReturn(Optional.of(koza));
+        when(repository.findWithOpeningHoursById(2L)).thenReturn(Optional.of(kule));
+        when(repository.distanceTo(anyLong(), anyDouble(), anyDouble())).thenReturn(100.0);
+
+        PlanResult result = planner.plan(request(List.of(
+                PlanningSlot.popularSight(1L, LocalTime.of(10, 0), 45, true),
+                PlanningSlot.popularSight(2L, LocalTime.of(11, 0), 30, true)), null, true));
+
+        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Koza Han", "Saat Kulesi");
+        assertThat(result.notes()).containsOnlyOnce(
+                "Yağış bekleniyor; Koza Han, Saat Kulesi açık alanda ama rotanın asıl görülecek yerleri. "
+                        + "Şemsiye almayı unutma.");
+        assertThat(result.notes()).noneMatch(n -> n.contains("kapalı bir gezi mekanı bulamadım"));
+    }
+
+    @Test
     void aKiraathaneIsNeverTheBreakfastStop() {
         add(place(1, "Joker Kıraathanesi", PlaceCategory.CAFE, true, 4.5, 50), 100);
         add(place(2, "Köşe Börekçisi", PlaceCategory.CAFE, true, 4.0, 80, "bakery"), 400);

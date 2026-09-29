@@ -60,8 +60,13 @@ Interests must be chosen only from: {", ".join(sorted(ALLOWED_INTERESTS))}.
 "deniz/sahil" / "sea/seaside" -> sea.
 
 walkingTolerance: LOW if they do not want to walk much or are tired, HIGH if they like walking, else null.
-budget: total TL for the whole group as a number (e.g. "700 TL" / "700 lira" -> 700). partySize: number of people
-("2 kişiyiz" / "we are 2 people" -> 2).
+budget: total TL for the whole group as a number (e.g. "700 TL" / "700 lira" -> 700). A budget per person ("kişi başı
+1000 TL", "her birimizin 1000'er TL", "1000'er lira", "1000 TL each", "per person") is multiplied by partySize
+(4 people, 1000 each -> 4000). partySize: number of people ("2 kişiyiz" / "we are 2 people" -> 2, "4 arkadaş" /
+"4 friends" -> 4, "ailemle 3 kişi" -> 3).
+popular: true when they want the famous / best-known / must-see sights of the place ("ünlü bir rota", "meşhur yerler",
+"popüler rota", "görülmesi gereken yerler", "famous", "must-see", "highlights"), else null. Such a request is
+PLAN_ROUTE; add history to interests unless they named other interests.
 date: the day the plan / weather question is for, as YYYY-MM-DD. context.today is today's date in Istanbul
 (with its weekday): "bugün"/"today" -> today, "yarın"/"tomorrow" -> today + 1, "yarından sonra"/"öbür gün"/
 "day after tomorrow" -> today + 2, a weekday ("cumartesi", "on Saturday") -> its next occurrence (today only if

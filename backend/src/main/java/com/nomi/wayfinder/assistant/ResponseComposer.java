@@ -23,6 +23,25 @@ public class ResponseComposer {
         return planCreated(route, null);
     }
 
+    // "ünlü bir rota": one of the area's popular routes (its famous sights, by Wikipedia popularity)
+    public String popularPlanCreated(RouteResponse route, String area) {
+        String intro = area == null
+                ? Texts.t("Buranın en bilinen yerlerinden geçen hazır bir rota seçtim. ",
+                "I picked a ready route through the best-known sights here. ")
+                : Texts.t(TurkishSuffix.genitive(area) + " en bilinen yerlerinden geçen hazır bir rota seçtim. ",
+                "I picked a ready route through the best-known sights of " + area + ". ");
+        return intro + planCreated(route, null);
+    }
+
+    // Asked for famous sights, but the area has no popular route (its sights are not known well enough yet)
+    public String noPopularRoute(String area) {
+        return area == null
+                ? Texts.t("Burası için hazır bir ünlü yerler rotası bulamadım; tarihi yerlere öncelik veren bir plan yaptım. ",
+                "I found no ready route of famous sights here, so I planned a day that favours historic places. ")
+                : Texts.t(area + " için hazır bir ünlü yerler rotası bulamadım; tarihi yerlere öncelik veren bir plan yaptım. ",
+                "I found no ready route of famous sights for " + area + ", so I planned a day that favours historic places. ");
+    }
+
     /**
      * @param startArea the district / neighbourhood the user named and the route starts at ("Üsküdar"), or null
      */

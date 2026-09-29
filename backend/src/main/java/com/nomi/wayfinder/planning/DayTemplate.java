@@ -10,14 +10,15 @@ import java.util.List;
 // Turns "which stops" + "which hours" into an ordered list of planner slots
 public final class DayTemplate {
 
-    // A full day in Kadıköy when the user does not list stops
+    // A full day when the user does not list stops: a trip is about the places, so three sights and the meals
+    // around them (dessert only when asked for; it made days of five food stops and two sights)
     static final List<PlanningSlot> FULL_DAY = List.of(
             PlanningSlot.at(StopType.BREAKFAST, LocalTime.of(9, 30)),
             PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0)),
             PlanningSlot.at(StopType.LUNCH, LocalTime.of(13, 0)),
-            PlanningSlot.at(StopType.COFFEE, LocalTime.of(15, 0)),
-            PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(16, 30)),
-            PlanningSlot.at(StopType.DESSERT, LocalTime.of(18, 30)),
+            PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(14, 30)),
+            PlanningSlot.at(StopType.COFFEE, LocalTime.of(16, 0)),
+            PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(17, 0)),
             PlanningSlot.at(StopType.DINNER, LocalTime.of(20, 0))
     );
 

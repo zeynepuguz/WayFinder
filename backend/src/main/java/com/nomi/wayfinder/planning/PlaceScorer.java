@@ -27,6 +27,12 @@ public class PlaceScorer {
     static final double SECOND_INTEREST_BONUS = 12;
     static final double CAFE_MEAL_BUDGET_BONUS = 12;
     static final double KNOWN_PRICE_FITS_BONUS = 8;
+    // Sights: points per popularity point (popularity is ~0..20; Ulu Cami 16, Koza Han 12, a mahalle mescidi none)
+    static final double POPULARITY_WEIGHT = 2.5;
+    static final double MAX_POPULARITY = 20;
+    static final double WELL_KNOWN_POPULARITY = 10;
+    private static final java.util.Set<PlaceCategory> SIGHT_CATEGORIES = java.util.EnumSet.of(PlaceCategory.ATTRACTION,
+            PlaceCategory.MUSEUM, PlaceCategory.PARK, PlaceCategory.CULTURE);
 
     public ScoredPlace score(Candidate c) {
         Place place = c.place();
@@ -65,6 +71,17 @@ public class PlaceScorer {
             score += 10;
             reasons.add(Texts.t("Hava " + weather.reasonLabel() + " olduğu için kapalı mekan seçildi",
                     "Indoor place chosen because the weather is " + weather.reasonLabel()));
+        }
+
+        // 3b) Sights: how well-known the place is (Wikipedia sitelinks + pageviews, ~0..20). Without it a route through
+        // Bursa's old town visited three neighbourhood mescits next to Koza Han and the Ulu Cami
+        if (SIGHT_CATEGORIES.contains(place.getCategory()) && place.getPopularity() != null
+                && place.getPopularity() > 0) {
+            double popularity = Math.min(place.getPopularity(), MAX_POPULARITY);
+            score += popularity * POPULARITY_WEIGHT;
+            if (popularity >= WELL_KNOWN_POPULARITY) {
+                reasons.add(Texts.t("Çok bilinen bir yer", "A well-known sight"));
+            }
         }
 
         // 4) Interests (planning/InterestMatcher: tags, category, near the sea). Strong on purpose: a place that

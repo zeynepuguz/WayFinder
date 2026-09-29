@@ -45,14 +45,28 @@ public record AssistantIntent(
         UNKNOWN
     }
 
+    /**
+     * @param budget  TL for the whole group (a per-person budget is already multiplied by partySize)
+     * @param popular the user asked for the famous / must-see sights ("ünlü bir rota"): a popular route of the area
+     */
     public record PlanParams(
             Integer partySize,
             Integer budget,
             WalkingTolerance walkingTolerance,
             List<StopType> stops,
             List<String> interests,
-            LocalTime startTime
+            LocalTime startTime,
+            Boolean popular
     ) {
+
+        public PlanParams(Integer partySize, Integer budget, WalkingTolerance walkingTolerance, List<StopType> stops,
+                          List<String> interests, LocalTime startTime) {
+            this(partySize, budget, walkingTolerance, stops, interests, startTime, null);
+        }
+
+        public boolean wantsPopular() {
+            return Boolean.TRUE.equals(popular);
+        }
     }
 
     /**

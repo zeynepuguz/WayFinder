@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.assistant;
 
 import com.nomi.wayfinder.area.AreaResolver;
+import com.nomi.wayfinder.area.CityService;
 import com.nomi.wayfinder.area.NamedArea;
 import com.nomi.wayfinder.assistant.AssistantIntent.PlanParams;
 import com.nomi.wayfinder.assistant.AssistantIntent.RouteEdit;
@@ -9,6 +10,7 @@ import com.nomi.wayfinder.assistant.IntentParser.StopRef;
 import com.nomi.wayfinder.dto.RouteDtos.ReplanRequest;
 import com.nomi.wayfinder.dto.RouteDtos.RoutePlanRequest;
 import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
+import com.nomi.wayfinder.dto.RouteDtos.StartMode;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
@@ -16,11 +18,13 @@ import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.ReplanType;
 import com.nomi.wayfinder.repository.AssistantConversationRepository;
 import com.nomi.wayfinder.repository.AssistantMessageRepository;
+import com.nomi.wayfinder.service.PopularRouteService;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
 import com.nomi.wayfinder.service.RecommendationService.TieredRecommendations;
 import com.nomi.wayfinder.service.RouteService;
 import com.nomi.wayfinder.weather.WeatherService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +60,9 @@ public class AssistantService {
     private final AssistantConversationRepository conversationRepository;
     private final AreaResolver areaResolver;
     private final Clock clock;
+    // "ünlü bir rota" and the user's city; null in tests that do not need them
+    private final PopularRouteService popularRoutes;
+    private final CityService cityService;
 
     public AssistantService(
             IntentParser intentParser,
@@ -68,6 +75,26 @@ public class AssistantService {
             AreaResolver areaResolver,
             Clock clock
     ) {
+        this(intentParser, routeService, recommendationService, weatherService, composer, messageRepository,
+                conversationRepository, areaResolver, clock, null, null);
+    }
+
+    @Autowired
+    public AssistantService(
+            IntentParser intentParser,
+            RouteService routeService,
+            RecommendationService recommendationService,
+            WeatherService weatherService,
+            ResponseComposer composer,
+            AssistantMessageRepository messageRepository,
+            AssistantConversationRepository conversationRepository,
+            AreaResolver areaResolver,
+            Clock clock,
+            PopularRouteService popularRoutes,
+            CityService cityService
+    ) {
+        this.popularRoutes = popularRoutes;
+        this.cityService = cityService;
         this.intentParser = intentParser;
         this.routeService = routeService;
         this.recommendationService = recommendationService;
@@ -252,15 +279,44 @@ public class AssistantService {
         double latitude = area.map(NamedArea::latitude).orElse(request.latitude());
         double longitude = area.map(NamedArea::longitude).orElse(request.longitude());
         LocalDate date = day(intent, request.message());
+        String areaName = area.map(NamedArea::name).orElse(null);
+        AssistantIntent resolved = intent.withDateAndArea(date, area.map(NamedArea::name).orElse(intent.area()));
 
+        // A named city / district starts like "Rotalarım > Yeni rota > şehir / ilçe": at its best-known sight with
+        // cafés around, else its centre. A neighbourhood (or nothing named) starts at its point / the user's position
+        String citySlug = area.filter(a -> a.kind() != NamedArea.Kind.AREA).map(NamedArea::citySlug).orElse(null);
+        String districtSlug = area.filter(a -> a.kind() == NamedArea.Kind.DISTRICT)
+                .map(NamedArea::districtSlug).orElse(null);
+
+        // "ünlü bir rota": one of the area's popular routes (famous sights by Wikipedia popularity)
+        String popularNote = "";
+        if (p.wantsPopular() && popularRoutes != null) {
+            String city = citySlug != null ? citySlug : currentCitySlug(request);
+            Optional<RouteResponse> popular = popularRoutes.startBest(userId, city, districtSlug, date,
+                    p.partySize(), p.budget(), p.walkingTolerance() == WalkingTolerance.LOW);
+            if (popular.isPresent()) {
+                return withRoute(resolved, composer.popularPlanCreated(popular.get(), areaName), popular.get(),
+                        List.of());
+            }
+            popularNote = composer.noPopularRoute(areaName);
+        }
+
+        boolean areaStart = citySlug != null;
         Route route = routeService.createRoute(userId, new RoutePlanRequest(
                 latitude, longitude, date, p.startTime(), null,
-                p.partySize(), p.budget(), p.walkingTolerance(), p.stops(), p.interests(), null));
+                p.partySize(), p.budget(), p.walkingTolerance(), p.stops(), p.interests(), null,
+                areaStart ? citySlug : null, areaStart ? districtSlug : null, areaStart ? StartMode.AREA : null));
 
         RouteResponse response = routeService.toResponse(route);
-        AssistantIntent resolved = intent.withDateAndArea(date, area.map(NamedArea::name).orElse(intent.area()));
-        return withRoute(resolved, composer.planCreated(response, area.map(NamedArea::name).orElse(null)),
-                response, List.of());
+        return withRoute(resolved, popularNote + composer.planCreated(response, areaName), response, List.of());
+    }
+
+    // The city (slug) the user is in, for "ünlü bir rota" without a place name
+    private String currentCitySlug(AssistantRequest request) {
+        if (cityService == null || request.latitude() == null || request.longitude() == null) {
+            return null;
+        }
+        return cityService.findCityAt(request.latitude(), request.longitude()).map(CityService.City::slug).orElse(null);
     }
 
     /**

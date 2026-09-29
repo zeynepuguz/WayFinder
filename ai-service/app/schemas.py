@@ -78,6 +78,10 @@ class PlanParams(BaseModel):
     stops: list[StopType]
     interests: list[str]
     startTime: str | None = Field(description="HH:MM, only if the user said when to start")
+    # Added later: the default keeps older payloads valid; OpenAI's strict schema still lists it as required (nullable)
+    popular: bool | None = Field(
+        default=None,
+        description="true when the user wants the famous / must-see sights of the place (ünlü, meşhur, popüler)")
 
 
 class RouteEdit(BaseModel):

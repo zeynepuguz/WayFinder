@@ -163,6 +163,8 @@ public class RoutePlanner {
         List<Chosen> chosen = new ArrayList<>();
         List<String> notes = new ArrayList<>();
         Set<Long> used = new HashSet<>(request.excludedPlaceIds());
+        // Famous outdoor sights a popular route keeps in the rain on purpose: one umbrella note for all of them
+        List<String> rainyKept = new ArrayList<>();
 
         double latitude = request.startLatitude();
         double longitude = request.startLongitude();
@@ -203,6 +205,9 @@ public class RoutePlanner {
 
             // The scorer only penalizes outdoor places in rain; say so when nothing indoor was left
             if (!stop.place().isIndoor()
+                    && WeatherContext.at(forecast, stop.start(), request.assumeWet()).wet() && slot.keepInRain()) {
+                rainyKept.add(stop.place().getDisplayName());
+            } else if (!stop.place().isIndoor()
                     && WeatherContext.at(forecast, stop.start(), request.assumeWet()).wet()) {
                 slotNotes.add(Texts.t(
                         stop.place().getDisplayName() + " açık alan ve o saatte yağış bekleniyor; yakında uygun kapalı bir "
@@ -221,6 +226,13 @@ public class RoutePlanner {
             if (remainingBudget != null) {
                 remainingBudget -= stop.totalCost(request.partySize());
             }
+        }
+        if (!rainyKept.isEmpty()) {
+            String names = String.join(", ", rainyKept);
+            notes.add(Texts.t("Yağış bekleniyor; " + names + " açık alanda ama rotanın asıl görülecek yerleri. "
+                            + "Şemsiye almayı unutma.",
+                    "Rain is expected; " + names + " " + (rainyKept.size() == 1 ? "is" : "are")
+                            + " outdoors but the point of this route. Take an umbrella."));
         }
         return new Pass(chosen, notes);
     }
@@ -404,7 +416,10 @@ public class RoutePlanner {
                     || !BosphorusSides.sameSide(leg.latitude(), leg.longitude(), place.getLatitude(), place.getLongitude())
                     || samePlaceAsChosen(place, leg.chosen())
                     // A take-away bakery or a kıraathane is not a stop (still listed in Explore)
-                    || !PlaceSuitability.isStop(place)) {
+                    || !PlaceSuitability.isStop(place)
+                    // Lunch / dinner at a tea house or coffee shop is not a meal
+                    || (slot.type() == StopType.LUNCH || slot.type() == StopType.DINNER)
+                    && !PlaceSuitability.servesMeals(place)) {
                 continue;
             }
 

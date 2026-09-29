@@ -28,10 +28,33 @@ public final class PlaceSuitability {
             "sofra", "lokanta", "salonu",
             // Börek shops almost always have tables
             "borek");
+    // Places for a drink, not a meal
+    private static final List<String> DRINKS_ONLY = List.of("cayevi", "caybahce", "cayocag", "kahve", "coffee",
+            "kiraathane", "kahvehane", "nargile", "espresso", "roastery");
     private static final Set<PlaceCategory> LIGHT_FOOD = Set.of(PlaceCategory.CAFE, PlaceCategory.DESSERT,
             PlaceCategory.BREAKFAST);
 
     private PlaceSuitability() {
+    }
+
+    /**
+     * Can the place be a lunch / dinner? Restaurants yes; a café only when it is not a tea house or coffee shop (a
+     * "budget" day may eat at a börek café, never dinner at "Yıldız Çay Evi"); dessert shops never.
+     */
+    public static boolean servesMeals(Place place) {
+        if (place == null) {
+            return false;
+        }
+        return switch (place.getCategory()) {
+            case RESTAURANT, BREAKFAST -> true;
+            case CAFE -> {
+                String folded = OsmPlaceMapper.fold(place.getName());
+                List<String> tags = place.getTags() == null ? List.of() : place.getTags();
+                yield !tags.contains("tea") && !tags.contains("coffee")
+                        && DRINKS_ONLY.stream().noneMatch(folded::contains);
+            }
+            default -> false;
+        };
     }
 
     public static boolean isStop(Place place) {

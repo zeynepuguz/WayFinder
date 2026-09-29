@@ -226,4 +226,29 @@ class RuleBasedIntentParserTest {
         // Asking for the current route is still SHOW_ROUTE
         assertThat(parser.parse("rotamı göster", WITH_ROUTE).type()).isEqualTo(IntentType.SHOW_ROUTE);
     }
+
+    @Test
+    void aGroupTripWithAPerPersonBudgetAndFamousSights() {
+        AssistantIntent intent = parser.parse("bursaya 4 arkadaş gezmeye gideceğiz bize az yürüyeceğimiz şekilde ünlü "
+                + "bir rota oluşturur musun her birimizin ayrı ayrı bütçesi 1000'er TL", NO_ROUTE);
+
+        assertThat(intent.type()).isEqualTo(AssistantIntent.IntentType.PLAN_ROUTE);
+        assertThat(intent.plan().partySize()).isEqualTo(4);
+        // 1000 each for four
+        assertThat(intent.plan().budget()).isEqualTo(4000);
+        assertThat(intent.plan().walkingTolerance()).isEqualTo(com.nomi.wayfinder.entity.WalkingTolerance.LOW);
+        assertThat(intent.plan().wantsPopular()).isTrue();
+        assertThat(intent.plan().interests()).contains("history");
+    }
+
+    @Test
+    void aTotalBudgetStaysTheTotal() {
+        AssistantIntent intent = parser.parse("3 kişiyiz 1500 tl bütçemiz var bir gün planla", NO_ROUTE);
+
+        assertThat(intent.plan().partySize()).isEqualTo(3);
+        assertThat(intent.plan().budget()).isEqualTo(1500);
+        assertThat(intent.plan().wantsPopular()).isFalse();
+        assertThat(RuleBasedIntentParser.budget("kişi başı 500 tl")).isEqualTo(500);
+        assertThat(RuleBasedIntentParser.perPerson("kişi başı 500 tl")).isTrue();
+    }
 }

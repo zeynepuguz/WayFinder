@@ -35,4 +35,16 @@ class PlaceSuitabilityTest {
     private static boolean stop(String name, PlaceCategory category, String... tags) {
         return PlaceSuitability.isStop(name, category, List.of(tags));
     }
+
+    @Test
+    void teaHousesAndCoffeeShopsAreNoMeal() {
+        assertThat(PlaceSuitability.servesMeals(
+                com.nomi.wayfinder.TestPlaces.place(1, "Yıldız Çay Evi", PlaceCategory.CAFE, true, 4.0, 0))).isFalse();
+        assertThat(PlaceSuitability.servesMeals(
+                com.nomi.wayfinder.TestPlaces.place(2, "Mola", PlaceCategory.CAFE, true, 4.0, 0, "coffee"))).isFalse();
+        assertThat(PlaceSuitability.servesMeals(
+                com.nomi.wayfinder.TestPlaces.place(3, "İnchiborek", PlaceCategory.CAFE, true, 4.0, 0, "bakery"))).isTrue();
+        assertThat(PlaceSuitability.servesMeals(
+                com.nomi.wayfinder.TestPlaces.place(4, "Kebapçı", PlaceCategory.RESTAURANT, true, 4.0, 0))).isTrue();
+    }
 }

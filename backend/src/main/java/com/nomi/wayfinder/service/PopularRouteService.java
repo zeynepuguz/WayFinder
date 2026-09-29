@@ -63,6 +63,8 @@ public class PopularRouteService {
     static final int MAX_ROUTES = 5;
     static final int MAX_CLUSTERS_TRIED = 15;
     static final int MAX_WALKING_MINUTES = 90;
+    // "Az yürüyelim": a popular route that walks at most this much in total counts as little walking
+    static final int LESS_WALKING_MAX_MINUTES = 40;
     static final int CITY_SEEDS = 250;
     static final int DISTRICT_SEEDS = 120;
 
@@ -106,6 +108,41 @@ public class PopularRouteService {
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("Popular route not found: " + request.key()));
         return routeService.createPlannedRoute(userId, route.title(), replayRequest(route), route.startLabel());
+    }
+
+    /**
+     * The assistant's "ünlü bir rota": the area's best popular route (with little walking, the one that walks least),
+     * saved for the user with their group size and budget. Empty when the area has none (no famous sights known or
+     * the area is unknown).
+     */
+    @Transactional
+    public Optional<RouteResponse> startBest(Long userId, String city, String district, LocalDate date,
+                                             Integer partySize, Integer budget, boolean lessWalking) {
+        if (city == null || city.isBlank()) {
+            return Optional.empty();
+        }
+        LocalDate day = dayOrToday(date);
+        PopularRouteService routes = self != null ? self : this;
+        List<PopularRouteResponse> found;
+        try {
+            found = routes.popularRoutes(city, district, day);
+        } catch (ResourceNotFoundException | BusinessException e) {
+            return Optional.empty();
+        }
+        // The routes come most popular first. Little walking: the most popular one that walks little enough, else
+        // the one that walks least (not simply the least walking: that was a town 80 km from Bursa)
+        Optional<PopularRouteResponse> best = lessWalking
+                ? found.stream().filter(r -> r.totalWalkingMinutes() <= LESS_WALKING_MAX_MINUTES).findFirst()
+                .or(() -> found.stream().min(Comparator.comparingInt(PopularRouteResponse::totalWalkingMinutes)))
+                : found.stream().findFirst();
+        return best.map(route -> {
+            PlanningRequest replay = replayRequest(route);
+            PlanningRequest request = new PlanningRequest(replay.startLatitude(), replay.startLongitude(),
+                    replay.date(), replay.startTime(), replay.endTime(),
+                    partySize != null ? partySize : replay.partySize(), budget, replay.walkingTolerance(),
+                    replay.interests(), replay.slots(), replay.excludedPlaceIds(), replay.assumeWet());
+            return routeService.createPlannedRoute(userId, route.title(), request, route.startLabel());
+        });
     }
 
     // The planner input that reproduces a previewed route

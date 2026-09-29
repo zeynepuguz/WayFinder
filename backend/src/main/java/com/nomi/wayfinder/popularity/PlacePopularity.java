@@ -64,7 +64,13 @@ public final class PlacePopularity {
             "Q7944",     // earthquake
             "Q168983",   // conflagration
             "Q10931",    // revolution
-            "Q45382"     // coup d'état
+            "Q45382",    // coup d'état
+            // Meetings and agreements: "Birinci İznik Konsili" is the First Council of Nicaea, not a place to visit
+            "Q51645",    // ecumenical council
+            "Q111161",   // synod
+            "Q2761147",  // meeting
+            "Q2020153",  // conference
+            "Q131569"    // treaty
     );
     // A person: the tomb / statue / park is named after them, the item is not about the place
     static final String HUMAN = "Q5";

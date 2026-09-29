@@ -71,6 +71,8 @@ class WikidataEventTest {
     void eventClassesAreOnlyThingsThatHappened() {
         assertThat(PlacePopularity.isEvent(Set.of("Q273120"))).isTrue();
         assertThat(PlacePopularity.isEvent(Set.of("Q178561"))).isTrue();
+        // "Birinci İznik Konsili": the First Council of Nicaea (an ecumenical council) is not a place
+        assertThat(PlacePopularity.isEvent(Set.of("Q51645"))).isTrue();
         // mosque, park
         assertThat(PlacePopularity.isEvent(Set.of("Q32815", "Q22698"))).isFalse();
         assertThat(PlacePopularity.isPerson(Set.of("Q5"))).isTrue();

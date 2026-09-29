@@ -42,7 +42,11 @@ public final class OvertureMapper {
             "pasta", "tatli", "baklava", "kunefe", "muhallebi", "cikolata", "chocolate", "cake", "dessert");
     private static final Pattern STUCK_SHIFT = Pattern.compile("\\p{Lu}{2,}\\p{Ll}{2,}");
     private static final Locale TURKISH = Locale.forLanguageTag("tr");
-    private static final Set<String> CLOSED = Set.of("permanently_closed", "temporarily_closed");
+    // A meal in the name (folded prefixes): "döner", "kebap", "köfteci", "pide", "lahmacun", "iskender", "mantı"
+    private static final List<String> MEAL_WORDS = List.of("doner", "kebap", "kebab", "kofte", "pide", "lahmacun",
+            "iskender", "manti", "lokanta", "tantuni", "kokorec", "durum", "cagkebap");
+    private static final List<String> CAFE_WORDS = List.of("cafe", "kafe", "kahve", "coffee", "cayevi", "caybahce");
+    private static final Set<String> CLOSED =Set.of("permanently_closed", "temporarily_closed");
 
     private OvertureMapper() {
     }
@@ -96,6 +100,18 @@ public final class OvertureMapper {
     }
 
     static Kind classify(List<String> hierarchy, String folded) {
+        Kind kind = classifyByTaxonomy(hierarchy, folded);
+        // Meta pages are often filed wrongly ("Gözde Cağ Döner" as a coffee shop): a meal in the name wins over a
+        // café / dessert taxonomy, unless the name also says café / coffee
+        if (kind != null && kind.category() != PlaceCategory.RESTAURANT
+                && MEAL_WORDS.stream().anyMatch(folded::contains)
+                && CAFE_WORDS.stream().noneMatch(folded::contains)) {
+            return new Kind(PlaceCategory.RESTAURANT, List.of("quick"));
+        }
+        return kind;
+    }
+
+    private static Kind classifyByTaxonomy(List<String> hierarchy, String folded) {
         if (hierarchy.isEmpty() || !"food_and_drink".equals(hierarchy.getFirst())) {
             return null;
         }

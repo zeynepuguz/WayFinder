@@ -108,24 +108,25 @@ public class AreaResolver {
     private AreaMatcher load() {
         try {
             List<NamedArea> areas = new ArrayList<>(jdbc.query("""
-                            SELECT name, label_lat, label_lon FROM cities WHERE places_imported_at IS NOT NULL
+                            SELECT name, slug, label_lat, label_lon FROM cities WHERE label_lat IS NOT NULL
                             """,
+                    // Every province, also one whose OSM import has not run yet (Overture may have its places)
                     (rs, i) -> new NamedArea(rs.getString("name"), NamedArea.Kind.CITY,
-                            rs.getDouble("label_lat"), rs.getDouble("label_lon"), null, rs.getString("name"))));
+                            rs.getDouble("label_lat"), rs.getDouble("label_lon"), null, rs.getString("name"),
+                            rs.getString("slug"), null)));
             areas.addAll(jdbc.query("""
-                            SELECT d.name, d.label_lat, d.label_lon, c.name AS city
+                            SELECT d.name, d.slug, d.label_lat, d.label_lon, c.name AS city, c.slug AS city_slug
                             FROM districts d JOIN cities c ON c.id = d.city_id
-                            WHERE c.places_imported_at IS NOT NULL
+                            WHERE d.label_lat IS NOT NULL
                             """,
                     (rs, i) -> new NamedArea(rs.getString("name"), NamedArea.Kind.DISTRICT,
                             rs.getDouble("label_lat"), rs.getDouble("label_lon"), rs.getString("name"),
-                            rs.getString("city"))));
+                            rs.getString("city"), rs.getString("city_slug"), rs.getString("slug"))));
             areas.addAll(jdbc.query("""
                             SELECT a.name, a.lat, a.lon, d.name AS district, c.name AS city
                             FROM areas a
                             JOIN cities c ON c.id = a.city_id
                             LEFT JOIN districts d ON d.id = a.district_id
-                            WHERE c.places_imported_at IS NOT NULL
                             ORDER BY a.id
                             """,
                     (rs, i) -> new NamedArea(rs.getString("name"), NamedArea.Kind.AREA,

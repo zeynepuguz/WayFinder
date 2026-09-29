@@ -129,4 +129,18 @@ class PlaceScorerTest {
                 place, 300, 1200, RoutePlanner.walkingMinutes(300), false, LocalTime.of(15, 0), NICE,
                 List.of(), cost, allowance, true));
     }
+
+    @Test
+    void aWellKnownSightBeatsAnUnknownOneNearby() {
+        Place mescit = place(1, "Simkaş Mescidi", PlaceCategory.ATTRACTION, true, 4.5, 0, "history");
+        Place kozaHan = place(2, "Koza Han", PlaceCategory.ATTRACTION, true, 4.5, 0, "history");
+        org.springframework.test.util.ReflectionTestUtils.setField(kozaHan, "popularity", 11.8);
+
+        PlaceScorer.ScoredPlace near = score(mescit, NICE, LocalTime.of(11, 0), 100, null);
+        PlaceScorer.ScoredPlace famous = score(kozaHan, NICE, LocalTime.of(11, 0), 500, null);
+
+        assertThat(famous.score()).isGreaterThan(near.score());
+        assertThat(famous.reasons()).contains("Çok bilinen bir yer");
+        assertThat(near.reasons()).doesNotContain("Çok bilinen bir yer");
+    }
 }

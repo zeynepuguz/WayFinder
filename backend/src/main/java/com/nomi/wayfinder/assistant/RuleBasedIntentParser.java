@@ -30,11 +30,16 @@ public class RuleBasedIntentParser implements IntentParser {
 
     private static final Locale TR = Locale.forLanguageTag("tr-TR");
 
-    private static final Pattern PARTY_DIGITS = Pattern.compile("(\\d{1,2})\\s*kişi");
+    // "4 kişi", "4 arkadaş", "4 kişilik"
+    private static final Pattern PARTY_DIGITS = Pattern.compile("(\\d{1,2})\\s*(?:kişi|arkadaş)");
     private static final Pattern PARTY_DIGITS_EN = Pattern.compile(
             "(?<![\\d.,])(\\d{1,2})\\s*(?:people|persons|person|adults|of us|pax)(?!\\p{L})"
                     + "|(?:party|group) of (\\d{1,2})(?!\\d)");
-    private static final Pattern BUDGET = Pattern.compile("(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})\\s*(?:tl|₺|lira)");
+    // "700 tl", "1.500 lira", "1000'er tl" (the distributive suffix: that much each)
+    private static final Pattern BUDGET = Pattern.compile(
+            "(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})\\s*(?:'?(?:er|ar|şer|şar)\\s*)?(?:tl|₺|lira)");
+    // "1000'er", "500'şer": the amount is per person
+    private static final Pattern DISTRIBUTIVE = Pattern.compile("\\d+\\s*'?(?:er|ar|şer|şar)\\s*(?:tl|₺|lira)");
     // "budget of 700", "budget is 700", "₺700", "tl 700"
     private static final Pattern BUDGET_EN = Pattern.compile(
             "(?:budget(?:\\s+(?:of|is))?\\s*:?\\s*(?:₺|tl)?|₺|(?<!\\p{L})tl)\\s*(\\d{1,3}(?:[.,]\\d{3})+|\\d{2,6})(?![\\d])");
@@ -85,6 +90,10 @@ public class RuleBasedIntentParser implements IntentParser {
         PARTY_WORDS.put("dört kişi", 4);
         PARTY_WORDS.put("dördümüz", 4);
         PARTY_WORDS.put("beş kişi", 5);
+        PARTY_WORDS.put("iki arkadaş", 2);
+        PARTY_WORDS.put("üç arkadaş", 3);
+        PARTY_WORDS.put("dört arkadaş", 4);
+        PARTY_WORDS.put("beş arkadaş", 5);
 
         PARTY_WORDS_EN.put("by myself", 1);
         PARTY_WORDS_EN.put("on my own", 1);
@@ -210,14 +219,20 @@ public class RuleBasedIntentParser implements IntentParser {
                 planStops.add(StopType.SIGHTSEEING);
             }
 
-            PlanParams plan = new PlanParams(
-                    partySize(text),
-                    budget(text),
-                    walking(text),
-                    planStops,
-                    interests(text),
-                    startTime(text)
-            );
+            Integer party = partySize(text);
+            Integer budget = budget(text);
+            // "her birimizin 1000'er TL" / "kişi başı 1000 TL": the route's budget is for the whole group
+            if (budget != null && party != null && perPerson(text)) {
+                budget = budget * party;
+            }
+            boolean popular = popular(text);
+            List<String> interests = interests(text);
+            // The famous sights of a place are mostly historic ones
+            if (popular && interests.isEmpty()) {
+                interests.add("history");
+            }
+            PlanParams plan = new PlanParams(party, budget, walking(text), planStops, interests, startTime(text),
+                    popular ? Boolean.TRUE : null);
             return new AssistantIntent(IntentType.PLAN_ROUTE, plan, List.of(), null, "rules");
         }
 
@@ -364,6 +379,20 @@ public class RuleBasedIntentParser implements IntentParser {
             return Integer.parseInt(en.group(1).replaceAll("[.,]", ""));
         }
         return null;
+    }
+
+    static boolean perPerson(String text) {
+        return DISTRIBUTIVE.matcher(text).find()
+                || containsAny(text, "kişi başı", "kişi başına", "her birimiz", "her biri", "her kişi", "adam başı",
+                "kişi için")
+                || hasWord(text, "each", "per person", "per head", "apiece", "a head");
+    }
+
+    // "ünlü bir rota", "meşhur yerler", "görülmesi gereken" / "famous", "must-see", "highlights"
+    static boolean popular(String text) {
+        return containsAny(text, "ünlü", "meşhur", "popüler", "görülmesi gereken", "en bilinen", "turistik")
+                || hasWord(text, "famous", "must-see", "must see", "highlights", "popular", "best-known",
+                "best known", "top sights");
     }
 
     static WalkingTolerance walking(String text) {

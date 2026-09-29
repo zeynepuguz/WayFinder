@@ -29,4 +29,27 @@ public final class TurkishSuffix {
         String ending = BACK_VOWELS.indexOf(vowel) >= 0 ? "an" : "en";
         return name.trim() + "'" + consonant + ending;
     }
+
+    // Genitive ("of"): "Bursa" -> "Bursa'nın", "İzmir" -> "İzmir'in", "Kadıköy" -> "Kadıköy'ün", "Konya" -> "Konya'nın"
+    public static String genitive(String name) {
+        String lower = name.trim().toLowerCase(Texts.TURKISH);
+        if (lower.isEmpty()) {
+            return name;
+        }
+        char vowel = 'e';
+        for (int i = lower.length() - 1; i >= 0; i--) {
+            if (VOWELS.indexOf(lower.charAt(i)) >= 0) {
+                vowel = lower.charAt(i);
+                break;
+            }
+        }
+        String ending = switch (vowel) {
+            case 'a', 'ı' -> "ın";
+            case 'o', 'u' -> "un";
+            case 'ö', 'ü' -> "ün";
+            default -> "in";
+        };
+        boolean endsWithVowel = VOWELS.indexOf(lower.charAt(lower.length() - 1)) >= 0;
+        return name.trim() + "'" + (endsWithVowel ? "n" : "") + ending;
+    }
 }
