@@ -88,6 +88,8 @@ public class PlaceMapper {
         response.setSource(place.getSource());
         response.setVerified(place.isVerified());
         response.setSourceUrl(place.getSourceUrl());
+        response.setPhone(place.getPhone());
+        response.setWebsite(place.getWebsite());
         response.setLastVerifiedAt(place.getLastVerifiedAt());
         response.setImage(PlaceImage.of(place));
 

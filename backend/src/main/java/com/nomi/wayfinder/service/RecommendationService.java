@@ -7,6 +7,7 @@ import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.UserPreferences;
 import com.nomi.wayfinder.entity.WalkingTolerance;
 import com.nomi.wayfinder.i18n.Texts;
+import com.nomi.wayfinder.planning.PlaceSuitability;
 import com.nomi.wayfinder.planning.BosphorusSides;
 import com.nomi.wayfinder.planning.PlaceScorer;
 import com.nomi.wayfinder.planning.RoutePlanner;
@@ -129,6 +130,8 @@ public class RecommendationService {
         for (PlaceDistance candidate : found) {
             Place place = places.get(candidate.getId());
             if (place == null
+                    // A take-away bakery or a kıraathane is not a suggestion (still listed in Explore)
+                    || !PlaceSuitability.isStop(place)
                     // No walking across the Bosphorus
                     || !BosphorusSides.sameSide(ctx.latitude(), ctx.longitude(), place.getLatitude(), place.getLongitude())) {
                 continue;

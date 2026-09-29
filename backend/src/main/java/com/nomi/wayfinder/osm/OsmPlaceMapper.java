@@ -135,7 +135,7 @@ public final class OsmPlaceMapper {
         );
     }
 
-    static boolean plausibleCoordinates(double latitude, double longitude) {
+    public static boolean plausibleCoordinates(double latitude, double longitude) {
         return latitude >= MIN_LATITUDE && latitude <= MAX_LATITUDE
                 && longitude >= MIN_LONGITUDE && longitude <= MAX_LONGITUDE;
     }

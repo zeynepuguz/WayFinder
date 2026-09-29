@@ -56,7 +56,7 @@ public class OsmContextImporter {
             UPDATE places p SET inside_institution = x.inside
             FROM (
                 SELECT p2.id,
-                       (p2.source = 'OSM' AND p2.wikidata IS NULL
+                       (p2.source IN ('OSM', 'OVERTURE') AND p2.wikidata IS NULL
                         AND p2.category NOT IN ('MUSEUM', 'ATTRACTION', 'CULTURE')
                         AND EXISTS (SELECT 1 FROM institution_areas a
                                     WHERE ST_Intersects(a.geom, p2.location::geometry))) AS inside

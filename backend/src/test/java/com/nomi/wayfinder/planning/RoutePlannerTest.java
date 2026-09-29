@@ -158,6 +158,36 @@ class RoutePlannerTest {
     }
 
     @Test
+    void inTheRainAnIndoorSightBeatsAnOutdoorOneThatMatchesTheInterests() {
+        add(place(1, "Park", PlaceCategory.PARK, false, 4.5, 0, "nature"), 100);
+        add(place(2, "Kültür Merkezi", PlaceCategory.CULTURE, true, 4.0, 0), 600);
+
+        PlanResult rainy = planner.plan(new PlanningRequest(40.99, 29.02, DAY, LocalTime.of(9, 0),
+                LocalTime.of(22, 0), 1, null, WalkingTolerance.MEDIUM, List.of("nature"),
+                List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))), Set.of(), true));
+        PlanResult dry = planner.plan(new PlanningRequest(40.99, 29.02, DAY, LocalTime.of(9, 0),
+                LocalTime.of(22, 0), 1, null, WalkingTolerance.MEDIUM, List.of("nature"),
+                List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))), Set.of(), false));
+
+        assertThat(rainy.stops().getFirst().place().getName()).isEqualTo("Kültür Merkezi");
+        // Not "no nature place in this area": there is one, the rain ruled it out
+        assertThat(rainy.notes()).anyMatch(n -> n.startsWith("Yağış beklendiği için doğa tercihine"))
+                .noneMatch(n -> n.contains("doğa tercihine uygun mekan bulunamadı"));
+        assertThat(dry.stops().getFirst().place().getName()).isEqualTo("Park");
+    }
+
+    @Test
+    void aKiraathaneIsNeverTheBreakfastStop() {
+        add(place(1, "Joker Kıraathanesi", PlaceCategory.CAFE, true, 4.5, 50), 100);
+        add(place(2, "Köşe Börekçisi", PlaceCategory.CAFE, true, 4.0, 80, "bakery"), 400);
+
+        PlanResult result = planner.plan(request(List.of(PlanningSlot.at(StopType.BREAKFAST, LocalTime.of(9, 30))),
+                null, false));
+
+        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Köşe Börekçisi");
+    }
+
+    @Test
     void aSightAfterLunchDoesNotWaitHoursForItsTemplateTime() {
         add(place(1, "Restoran", PlaceCategory.RESTAURANT, true, 4.5, 100), 100);
         add(place(2, "Park", PlaceCategory.PARK, false, 4.5, 0), 200);

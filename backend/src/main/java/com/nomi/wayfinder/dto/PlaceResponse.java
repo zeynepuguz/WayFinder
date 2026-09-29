@@ -31,6 +31,9 @@ public class PlaceResponse {
     // true = hand-verified data; false = imported from OpenStreetMap (no price / rating / description)
     private boolean verified;
     private String sourceUrl;
+    // The business' own phone / website (Overture Maps); null = unknown
+    private String phone;
+    private String website;
     private Instant lastVerifiedAt;
     // Wikimedia Commons photo with attribution; null = no image
     private PlaceImage image;
@@ -193,6 +196,22 @@ public class PlaceResponse {
 
     public void setSourceUrl(String sourceUrl) {
         this.sourceUrl = sourceUrl;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getWebsite() {
+        return website;
+    }
+
+    public void setWebsite(String website) {
+        this.website = website;
     }
 
     public Instant getLastVerifiedAt() {

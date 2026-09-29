@@ -130,6 +130,19 @@ nomi:
     read-timeout: 5m
     max-attempts: 3
     retry-delay: 30s
+  overture:
+    # Food places (restaurants, cafés, breakfast, desserts) from Overture Maps (Foursquare, Meta, Microsoft) next to
+    # OpenStreetMap: new places OSM lacks, and OSM food places no source knows any more are left out (likely closed)
+    enabled: ${OVERTURE_ENABLED:true}
+    # After startup, in the background: every city with OSM places that was never imported from Overture
+    import-on-startup: ${OVERTURE_IMPORT_ON_STARTUP:true}
+    # Overture publishes monthly (3rd / 4th week): 05:30 on the 28th re-imports cities on an older release
+    refresh-cron: ${OVERTURE_REFRESH_CRON:0 30 5 28 * *}
+    catalog-url: https://stac.overturemaps.org/catalog.json
+    data-url: s3://overturemaps-us-west-2/release/%s/theme=places/type=place/*
+    min-confidence: ${OVERTURE_MIN_CONFIDENCE:0.7}
+    memory-limit: ${OVERTURE_MEMORY_LIMIT:1GB}
+    city-delay: 5s
   images:
     # One free-licensed Wikimedia Commons photo per place (from OSM's wikidata / wikimedia_commons / image tags)
     resolve-after-import: ${IMAGES_RESOLVE_AFTER_IMPORT:true}

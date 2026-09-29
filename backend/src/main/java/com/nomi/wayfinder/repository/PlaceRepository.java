@@ -27,6 +27,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
             ORDER BY "distanceMeters"
             LIMIT :limit
@@ -46,6 +48,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               -- Cafés on a campus, in a hospital or a factory site are not planned (osm/OsmContextImporter)
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
@@ -73,6 +77,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
                    OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
@@ -96,6 +102,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             SELECT count(*) FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               AND NOT p.inside_institution
               AND p.category IN (:categories)
             """, nativeQuery = true)
@@ -117,6 +125,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :maxRadius)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               AND NOT ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :minRadius)
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
@@ -147,8 +157,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             FROM places p
             WHERE p.location && CAST(ST_MakeEnvelope(:west, :south, :east, :north, 4326) AS geography)
               AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
               AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
-            ORDER BY CASE WHEN p.source = 'OSM' THEN 1 ELSE 0 END, "distanceMeters"
+            ORDER BY CASE WHEN p.source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END, "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
     List<PlaceDistance> findInArea(

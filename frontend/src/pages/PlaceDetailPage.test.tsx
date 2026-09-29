@@ -39,3 +39,32 @@ describe('PlaceDetailPage photo', () => {
     expect(screen.queryByText(/Wikimedia Commons/)).not.toBeInTheDocument()
   })
 })
+
+describe('PlaceDetailPage Overture place', () => {
+  it('shows the phone, website and the Overture attribution', async () => {
+    current = place(6, 'Devran Kebap', {
+      category: 'RESTAURANT', source: 'OVERTURE', phone: '+90 262 000 00 00', website: 'https://example.com',
+    })
+    renderPage()
+    await screen.findByRole('heading', { name: 'Devran Kebap' })
+    expect(screen.getByRole('link', { name: '+90 262 000 00 00' })).toHaveAttribute('href', 'tel:+902620000000')
+    expect(screen.getByRole('link', { name: /Web sitesi/ })).toHaveAttribute('href', 'https://example.com')
+    expect(screen.getByText(/Overture Maps’ten \(Foursquare, Meta/)).toBeInTheDocument()
+    expect(screen.queryByText(/OpenStreetMap katkıcılarından/)).not.toBeInTheDocument()
+  })
+
+  it('finds an Overture place by name for directions, an OSM place by its point', async () => {
+    current = place(8, 'Devran Kebap', { source: 'OVERTURE', district: 'Çayırova', city: 'Kocaeli' })
+    renderPage()
+    await screen.findByRole('heading', { name: 'Devran Kebap' })
+    expect(screen.getByRole('link', { name: /Yol tarifi al/ }).getAttribute('href'))
+      .toContain('destination=Devran%20Kebap%2C%20%C3%87ay%C4%B1rova%2C%20Kocaeli')
+  })
+
+  it('never links a website that is not http(s)', async () => {
+    current = place(7, 'Köşe Kahve', { source: 'OVERTURE', website: 'javascript:alert(1)' })
+    renderPage()
+    await screen.findByRole('heading', { name: 'Köşe Kahve' })
+    expect(screen.queryByRole('link', { name: /Web sitesi/ })).not.toBeInTheDocument()
+  })
+})

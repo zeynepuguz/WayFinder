@@ -15,13 +15,13 @@ public class PopularSightRepository {
 
     // Visible sights of the city (or district) with any real signal of interest, most popular first
     private static final String SEEDS = """
-            SELECT p.id, p.popularity, p.source <> 'OSM' AS verified, p.rating, p.image_url IS NOT NULL AS has_image
+            SELECT p.id, p.popularity, p.source NOT IN ('OSM', 'OVERTURE') AS verified, p.rating, p.image_url IS NOT NULL AS has_image
             FROM places p
             WHERE NOT p.hidden AND NOT p.inside_institution AND p.city_id = ?
               AND (CAST(? AS bigint) IS NULL OR p.district_id = ?)
               AND p.category IN ('ATTRACTION', 'MUSEUM', 'PARK', 'CULTURE')
-              AND (p.popularity > 0 OR p.source <> 'OSM' OR p.rating IS NOT NULL OR p.image_url IS NOT NULL)
-            ORDER BY p.popularity DESC NULLS LAST, (p.source <> 'OSM') DESC, p.rating DESC NULLS LAST, p.id
+              AND (p.popularity > 0 OR p.source NOT IN ('OSM', 'OVERTURE') OR p.rating IS NOT NULL OR p.image_url IS NOT NULL)
+            ORDER BY p.popularity DESC NULLS LAST, (p.source NOT IN ('OSM', 'OVERTURE')) DESC, p.rating DESC NULLS LAST, p.id
             LIMIT ?
             """;
 

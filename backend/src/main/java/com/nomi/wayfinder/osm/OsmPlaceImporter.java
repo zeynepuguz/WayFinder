@@ -72,7 +72,7 @@ public class OsmPlaceImporter {
     // Only the two photo references, only onto a verified place that has neither yet
     private static final String COPY_MEDIA_TO_VERIFIED = """
             UPDATE places SET wikidata = ?, commons_file = ?
-            WHERE id = ? AND source <> 'OSM' AND wikidata IS NULL AND commons_file IS NULL
+            WHERE id = ? AND source NOT IN ('OSM', 'OVERTURE') AND wikidata IS NULL AND commons_file IS NULL
             """;
 
     // Rows of earlier imports; kept when a route, a saved place or a user photo points at them
@@ -92,7 +92,8 @@ public class OsmPlaceImporter {
             """;
 
     // Places inside the city polygon; the padded bounding box lets the geography GiST index pre-filter
-    private static final String ASSIGN_CITY = """
+    // Also used by overture/OverturePlaceImporter for the places it adds
+    public static final String ASSIGN_CITY = """
             UPDATE places p SET city_id = c.id
             FROM cities c
             WHERE c.id = ? AND c.geom IS NOT NULL
@@ -142,7 +143,7 @@ public class OsmPlaceImporter {
         OsmDeduplicator deduplicator = new OsmDeduplicator(jdbc.query("""
                         SELECT id, name, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon,
                                (wikidata IS NOT NULL OR commons_file IS NOT NULL) AS has_media
-                        FROM places WHERE source <> 'OSM'
+                        FROM places WHERE source NOT IN ('OSM', 'OVERTURE')
                         """,
                 (rs, i) -> new OsmDeduplicator.ExistingPlace(rs.getLong("id"), rs.getString("name"),
                         rs.getDouble("lat"), rs.getDouble("lon"), rs.getBoolean("has_media"))));

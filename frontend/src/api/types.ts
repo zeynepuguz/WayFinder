@@ -101,6 +101,9 @@ export interface Place {
   verified: boolean
   // link to the OpenStreetMap object for imported places
   sourceUrl: string | null
+  // the business' own phone / website (Overture Maps); null / missing = unknown
+  phone?: string | null
+  website?: string | null
   // one free-licensed photo when available (most cafes and restaurants have none)
   image: PlaceImage | null
   distanceMeters?: number

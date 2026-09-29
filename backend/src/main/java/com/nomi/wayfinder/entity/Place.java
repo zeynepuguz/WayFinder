@@ -18,6 +18,8 @@ import java.util.List;
 public class Place {
 
     public static final String OSM_SOURCE = "OSM";
+    // Food places from Overture Maps (Foursquare, Meta, Microsoft), written by overture/OverturePlaceImporter
+    public static final String OVERTURE_SOURCE = "OVERTURE";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -112,6 +114,21 @@ public class Place {
     @Column(insertable = false, updatable = false)
     private boolean nearSea;
 
+    // Overture Maps place id: the row itself (source OVERTURE) or the Overture place that confirmed an OSM row.
+    // Phone / website are the business' own, from Overture. Written by overture/OverturePlaceImporter (JDBC)
+    @Column(insertable = false, updatable = false)
+    private String overtureId;
+
+    @Column(insertable = false, updatable = false)
+    private String phone;
+
+    @Column(insertable = false, updatable = false)
+    private String website;
+
+    // An OSM food place no current Overture source knows (likely closed): left out of lists, plans and suggestions
+    @Column(insertable = false, updatable = false)
+    private boolean unconfirmed;
+
     // Real-world interest from Wikipedia (popularity/PlacePopularityService); null = unknown
     @Column(insertable = false, updatable = false)
     private Double popularity;
@@ -131,7 +148,7 @@ public class Place {
     private String cityName;
 
     // Sort keys for district lists: verified first, then places with a photo
-    @Formula("(CASE WHEN source = 'OSM' THEN 1 ELSE 0 END)")
+    @Formula("(CASE WHEN source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END)")
     private int verifiedRank;
 
     @Formula("(CASE WHEN image_url IS NULL THEN 1 ELSE 0 END)")
@@ -215,9 +232,30 @@ public class Place {
         return !start.isBefore(interval[0]) && !end.isAfter(interval[1]);
     }
 
-    // Hand-verified (web check, admin) as opposed to imported from OpenStreetMap
+    // Hand-verified (web check, admin) as opposed to imported from OpenStreetMap / Overture
     public boolean isVerified() {
-        return !OSM_SOURCE.equals(source);
+        return !isImported(source);
+    }
+
+    // Written by an importer (no price / rating / description), not checked by hand
+    public static boolean isImported(String source) {
+        return OSM_SOURCE.equals(source) || OVERTURE_SOURCE.equals(source);
+    }
+
+    public String getOvertureId() {
+        return overtureId;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public String getWebsite() {
+        return website;
+    }
+
+    public boolean isUnconfirmed() {
+        return unconfirmed;
     }
 
     // The name in the request's language: OSM name:en for English requests when there is one

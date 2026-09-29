@@ -68,6 +68,9 @@ public class RoutePlanner {
     // "Az yürüyelim": say so when the day still needs more walking than this
     static final int LOW_TOTAL_WALKING_MINUTES = 25;
 
+    // Interests that are only met outdoors
+    static final Set<String> OUTDOOR_INTERESTS = Set.of("sea", "nature", "view");
+
     private static final Set<StopType> FLEXIBLE = EnumSet.of(StopType.SIGHTSEEING, StopType.COFFEE, StopType.DESSERT);
 
     private final PlaceRepository placeRepository;
@@ -132,7 +135,10 @@ public class RoutePlanner {
         }
 
         if (shape) {
-            notes.addAll(interestNotes(stops, request.interests()));
+            // Rain at a sightseeing stop: outdoor interests (sea, nature, view) were left out on purpose, not missing
+            boolean rainySights = stops.stream().anyMatch(s -> s.type() == StopType.SIGHTSEEING
+                    && WeatherContext.at(forecast.orElse(null), s.start(), request.assumeWet()).wet());
+            notes.addAll(interestNotes(stops, request.interests(), rainySights));
             int walking = stops.stream().mapToInt(PlannedStop::walkingMinutes).sum();
             if (request.walkingTolerance() == WalkingTolerance.LOW && walking > LOW_TOTAL_WALKING_MINUTES) {
                 notes.add(Texts.t("Az yürüyüş istedin; bu bölgede uygun mekanlar dağınık olduğu için toplam yürüyüş ~"
@@ -388,13 +394,17 @@ public class RoutePlanner {
         List<PlaceScorer.ScoredPlace> affordable = new ArrayList<>();
         List<PlaceScorer.ScoredPlace> overBudget = new ArrayList<>();
         Map<Long, Timing> timings = new HashMap<>();
+        // Outdoor candidates with rain expected on arrival
+        Set<Long> rainedOut = new HashSet<>();
 
         for (PlaceDistance candidate : found) {
             Place place = places.get(candidate.getId());
             if (place == null || used.contains(place.getId())
                     // Route legs are walked: stay on the same side of the Bosphorus
                     || !BosphorusSides.sameSide(leg.latitude(), leg.longitude(), place.getLatitude(), place.getLongitude())
-                    || samePlaceAsChosen(place, leg.chosen())) {
+                    || samePlaceAsChosen(place, leg.chosen())
+                    // A take-away bakery or a kıraathane is not a stop (still listed in Explore)
+                    || !PlaceSuitability.isStop(place)) {
                 continue;
             }
 
@@ -408,6 +418,10 @@ public class RoutePlanner {
             // null = price unknown (e.g. OpenStreetMap places); the scorer handles it
             Integer cost = place.getEstimatedCost() == null ? null : place.getEstimatedCost() * request.partySize();
 
+            WeatherContext weather = WeatherContext.at(forecast, time(timing.arrival()), request.assumeWet());
+            if (weather.wet() && !place.isIndoor()) {
+                rainedOut.add(place.getId());
+            }
             PlaceScorer.ScoredPlace scored = scorer.score(new PlaceScorer.Candidate(
                     place,
                     candidate.getDistanceMeters(),
@@ -415,7 +429,7 @@ public class RoutePlanner {
                     timing.walkingMinutes(),
                     leg.firstLeg(),
                     time(timing.arrival()),
-                    WeatherContext.at(forecast, time(timing.arrival()), request.assumeWet()),
+                    weather,
                     request.interests(),
                     cost,
                     leg.allowance(),
@@ -443,10 +457,12 @@ public class RoutePlanner {
             }
         }
 
-        // Sightseeing: when some candidate matches the user's interests, choose among those only
+        // Sightseeing: when some candidate matches the user's interests, choose among those only. An outdoor place in
+        // the rain does not count as a match (a "nature" park must not beat an indoor museum when it rains)
         boolean interestMatched = false;
         if (slot.type() == StopType.SIGHTSEEING && slot.categories() == null) {
             List<PlaceScorer.ScoredPlace> matchingAffordable = affordable.stream()
+                    .filter(s -> !rainedOut.contains(s.place().getId()))
                     .filter(s -> !InterestMatcher.matching(s.place(), request.interests()).isEmpty()
                             && request.interests().stream().anyMatch(InterestMatcher::known))
                     .toList();
@@ -662,7 +678,7 @@ public class RoutePlanner {
      * Which interests shaped the plan ("Deniz ve doğa tercihine göre seçilen duraklar: Moda Sahili, Kalamış Parkı.")
      * and which could not be matched in the area ("Bu bölgede deniz kenarı mekan bulunamadı.").
      */
-    static List<String> interestNotes(List<PlannedStop> stops, List<String> interests) {
+    static List<String> interestNotes(List<PlannedStop> stops, List<String> interests, boolean rainySights) {
         List<String> known = interests.stream().filter(InterestMatcher::known).toList();
         if (known.isEmpty() || stops.isEmpty()) {
             return List.of();
@@ -689,7 +705,18 @@ public class RoutePlanner {
                     "Chosen for your " + labels + " interest" + (used.size() > 1 ? "s" : "") + ": "
                             + String.join(", ", names) + "."));
         }
+        List<String> rainedOut = rainySights
+                ? missing.stream().filter(OUTDOOR_INTERESTS::contains).toList() : List.of();
+        if (!rainedOut.isEmpty()) {
+            String labels = labels(rainedOut);
+            notes.add(Texts.t("Yağış beklendiği için " + labels + " tercihine uyan açık alanlar yerine kapalı mekan seçildi.",
+                    "Rain is expected, so an indoor place was chosen instead of outdoor ones for your " + labels
+                            + " interest" + (rainedOut.size() > 1 ? "s" : "") + "."));
+        }
         for (String interest : missing) {
+            if (rainedOut.contains(interest)) {
+                continue;
+            }
             notes.add("sea".equals(interest)
                     ? Texts.t("Bu bölgede deniz kenarı mekan bulunamadı.", "No seaside place was found in this area.")
                     : Texts.t("Bu bölgede " + Interests.label(interest) + " tercihine uygun mekan bulunamadı.",

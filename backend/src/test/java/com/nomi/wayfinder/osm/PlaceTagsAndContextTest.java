@@ -129,6 +129,6 @@ class PlaceTagsAndContextTest {
                 .contains("out geom;");
         // Museums / sights / culture venues, Wikidata items and verified places stay plannable on a campus
         assertThat(OsmContextImporter.FLAG_INSIDE_INSTITUTION)
-                .contains("p2.source = 'OSM'", "p2.wikidata IS NULL", "NOT IN ('MUSEUM', 'ATTRACTION', 'CULTURE')");
+                .contains("p2.source IN ('OSM', 'OVERTURE')", "p2.wikidata IS NULL", "NOT IN ('MUSEUM', 'ATTRACTION', 'CULTURE')");
     }
 }

@@ -133,15 +133,15 @@ class RouteShapeTest {
     void breakfastFallsBackToAnOpenCafeWhenNoBreakfastPlaceIsOpen() {
         add(at(openEveryDay(place(1, "Öğlen Kahvaltıcısı", PlaceCategory.BREAKFAST, true, 4.8, 0), "12:00", "20:00"),
                 100, 0));
-        add(at(openEveryDay(place(2, "Sabah Fırını", PlaceCategory.CAFE, true, 4.2, 0, "bakery"), "07:00", "20:00"),
+        add(at(openEveryDay(place(2, "Sabah Börekçisi", PlaceCategory.CAFE, true, 4.2, 0, "bakery"), "07:00", "20:00"),
                 200, 0));
 
         PlanResult result = planner.plan(request(List.of(PlanningSlot.at(StopType.BREAKFAST, LocalTime.of(9, 30))),
                 WalkingTolerance.MEDIUM, List.of(), null));
 
-        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Sabah Fırını");
+        assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Sabah Börekçisi");
         assertThat(result.stops().getFirst().type()).isEqualTo(StopType.BREAKFAST);
-        assertThat(result.notes()).anyMatch(n -> n.contains("kahvaltı için açık olan Sabah Fırını"));
+        assertThat(result.notes()).anyMatch(n -> n.contains("kahvaltı için açık olan Sabah Börekçisi"));
     }
 
     // ---------- interests ----------

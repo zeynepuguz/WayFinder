@@ -10,6 +10,8 @@ import com.nomi.wayfinder.osm.OsmImportJobs;
 import com.nomi.wayfinder.osm.PlaceDataNormalizer;
 import com.nomi.wayfinder.osm.OsmImportJobs.ImportStatus;
 import com.nomi.wayfinder.osm.PlaceRealismCleanup;
+import com.nomi.wayfinder.overture.OvertureImportJobs;
+import com.nomi.wayfinder.overture.OverturePlaceImporter;
 import com.nomi.wayfinder.popularity.PlacePopularityService;
 import com.nomi.wayfinder.popularity.PopularityJobs;
 import org.springframework.http.HttpStatus;
@@ -30,11 +32,13 @@ public class AdminController {
     private final OsmCityImporter cityImporter;
     private final OsmContextImporter contextImporter;
     private final PlaceDataNormalizer normalizer;
+    private final OvertureImportJobs overtureJobs;
 
     public AdminController(OsmImportJobs importJobs, WikimediaImageResolver imageResolver, PlaceRealismCleanup cleanup,
                            PlacePopularityService popularityService, PopularityJobs popularityJobs,
                            CityService cityService, OsmCityImporter cityImporter, OsmContextImporter contextImporter,
-                           PlaceDataNormalizer normalizer) {
+                           PlaceDataNormalizer normalizer, OvertureImportJobs overtureJobs) {
+        this.overtureJobs = overtureJobs;
         this.cityImporter = cityImporter;
         this.contextImporter = contextImporter;
         this.normalizer = normalizer;
@@ -129,6 +133,25 @@ public class AdminController {
         OsmCityImporter.CityRow row = cityImporter.findCity(city)
                 .orElseThrow(() -> new ResourceNotFoundException("City not found: " + city));
         return contextImporter.importNow(row.toOsmCity());
+    }
+
+    /**
+     * Food places from Overture Maps (Foursquare, Meta, Microsoft) next to OSM: ?city=slug imports that city now
+     * (~1 min; 503 when Overture is unreachable); without it every city is queued in the background
+     * (GET /places/overture-status).
+     */
+    @PostMapping("/places/import-overture")
+    public ResponseEntity<?> importOverture(@RequestParam(required = false) String city) {
+        if (city != null && !city.isBlank()) {
+            OverturePlaceImporter.ImportResult result = overtureJobs.importNow(city);
+            return ResponseEntity.ok(result);
+        }
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(overtureJobs.enqueueAll());
+    }
+
+    @GetMapping("/places/overture-status")
+    public OvertureImportJobs.Status overtureStatus() {
+        return overtureJobs.status();
     }
 
     // Recomputes one city's inside_institution / near_sea flags from the polygons / coastline already imported

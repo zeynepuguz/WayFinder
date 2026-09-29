@@ -49,8 +49,10 @@ public class PlaceService {
     // Explore screen: filter + paginate
     @Transactional(readOnly = true)
     public PageResponse<PlaceResponse> searchPlaces(PlaceSearchFilter filter, int page, int size) {
-        // Hidden places (not realistic, kept only because a route / saved place / photo uses them) are never listed
-        Specification<Place> spec = (root, query, cb) -> cb.isFalse(root.get("hidden"));
+        // Hidden places (not realistic, kept only because a route / saved place / photo uses them) and OSM food places
+        // no current source confirms (likely closed, overture/OverturePlaceImporter) are never listed
+        Specification<Place> spec = (root, query, cb) -> cb.and(cb.isFalse(root.get("hidden")),
+                cb.isFalse(root.get("unconfirmed")));
 
         if (filter.category() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category"), filter.category()));
@@ -66,8 +68,8 @@ public class PlaceService {
         }
         if (filter.verified() != null) {
             spec = spec.and((root, query, cb) -> filter.verified()
-                    ? cb.notEqual(root.get("source"), Place.OSM_SOURCE)
-                    : cb.equal(root.get("source"), Place.OSM_SOURCE));
+                    ? root.get("source").in(Place.OSM_SOURCE, Place.OVERTURE_SOURCE).not()
+                    : root.get("source").in(Place.OSM_SOURCE, Place.OVERTURE_SOURCE));
         }
         if (filter.indoor() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("indoor"), filter.indoor()));

@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, Heart, Info, MapPin, Navigation, Timer, Umbrella, Wallet } from 'lucide-react'
+import { Clock, ExternalLink, Globe, Heart, Info, MapPin, Navigation, Phone, Timer, Umbrella, Wallet } from 'lucide-react'
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
@@ -8,7 +8,7 @@ import { BackButton, ErrorState, Skeleton } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsSearchUrl, TAG_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsSearchUrl, httpUrl, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
 
@@ -37,7 +37,12 @@ export function PlaceDetailPage() {
   const isSaved = saved.isSaved(place.id)
   const today = (new Date().getDay() + 6) % 7 + 1
   const todayHours = place.openingHours.filter(h => h.dayOfWeek === today)
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}&travelmode=walking`
+  // Overture pins come from the business' own page and can be a few hundred meters off: let Google find the place
+  // by name there. OSM / verified places are mapped precisely: go to the point
+  const destination = place.source === 'OVERTURE'
+    ? [place.name, place.district, place.city].filter(Boolean).join(', ')
+    : `${place.latitude},${place.longitude}`
+  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
@@ -79,6 +84,15 @@ export function PlaceDetailPage() {
                 : t('Bugün kapalı', 'Closed today')}
           </div>
           <div className="info-row"><Wallet size={18} />{formatCost(place.estimatedCost)}{place.estimatedCost != null && place.estimatedCost > 0 ? t(' kişi başı, tahmini', ' per person, estimated') : ''}</div>
+          {place.phone && (
+            <div className="info-row"><Phone size={18} /><a href={`tel:${place.phone.replace(/[^+\d]/g, '')}`}>{place.phone}</a></div>
+          )}
+          {httpUrl(place.website) && (
+            <div className="info-row">
+              <Globe size={18} />
+              <a href={httpUrl(place.website)!} target="_blank" rel="noopener noreferrer">{t('Web sitesi', 'Website')} <ExternalLink size={12} /></a>
+            </div>
+          )}
           {place.avgVisitMinutes != null && place.avgVisitMinutes > 0 && <div className="info-row"><Timer size={18} />{t(`Ortalama ${place.avgVisitMinutes} dakika`, `About ${place.avgVisitMinutes} minutes`)}</div>}
         </div>
 
@@ -117,7 +131,11 @@ export function PlaceDetailPage() {
 
         <p className="t-caption row" style={{ alignItems: 'flex-start' }}>
           <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
-          {!place.verified ? (
+          {!place.verified && place.source === 'OVERTURE' ? (
+            <span>
+              {t('Bu mekanın bilgileri Overture Maps’ten (Foursquare, Meta ve diğer kaynaklar) geliyor ve güncel olmayabilir. Konumu işletmenin kendi sayfasından geldiği için haritada biraz kayabilir; yol tarifi mekanı adıyla bulur.', 'This place’s details come from Overture Maps (Foursquare, Meta and other sources) and may be out of date. Its pin comes from the business’ own page and can be a little off; directions find the place by name.')}
+            </span>
+          ) : !place.verified ? (
             <span>
               {t('Bu mekanın bilgileri OpenStreetMap katkıcılarından geliyor ve güncel olmayabilir.', 'This place’s details come from OpenStreetMap contributors and may be out of date.')}
               {place.sourceUrl && /^https?:\/\//.test(place.sourceUrl) && (
