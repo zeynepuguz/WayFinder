@@ -49,8 +49,15 @@ public class RouteMapper {
                 route.isSaved(),
                 route.getStops().size(),
                 totalCost(route),
-                route.getCreatedAt()
+                route.getCreatedAt(),
+                costKnown(route)
         );
+    }
+
+    // Some (not skipped) stop has a known price
+    public static boolean costKnown(Route route) {
+        return route.getStops().stream()
+                .anyMatch(s -> s.getStatus() != StopStatus.SKIPPED && s.getPlace().getEstimatedCost() != null);
     }
 
     // Skipped stops cost nothing; stops with unknown price (null) are left out, not counted as free

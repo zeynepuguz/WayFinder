@@ -54,8 +54,17 @@ public class PlaceService {
         Specification<Place> spec = (root, query, cb) -> cb.and(cb.isFalse(root.get("hidden")),
                 cb.isFalse(root.get("unconfirmed")));
 
-        if (filter.category() != null) {
+        if (filter.category() == PlaceCategory.WORSHIP) {
+            // Places to pray at, plus the famous mosques / churches that are sights
+            spec = spec.and((root, query, cb) -> cb.or(cb.equal(root.get("category"), PlaceCategory.WORSHIP),
+                    cb.like(cb.function("array_to_string", String.class, root.get("tags"), cb.literal(",")),
+                            "%religious%")));
+        } else if (filter.category() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category"), filter.category()));
+        } else {
+            // "Tümü": markets and places of worship have their own filter
+            spec = spec.and((root, query, cb) -> root.get("category")
+                    .in(PlaceCategory.MARKET, PlaceCategory.WORSHIP).not());
         }
         if (filter.neighborhood() != null && !filter.neighborhood().isBlank()) {
             spec = spec.and((root, query, cb) ->

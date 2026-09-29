@@ -1,6 +1,6 @@
 import {
   CakeSlice, Camera, CloudFog, CloudLightning, CloudRain, CloudSun, Coffee, Croissant, Drama, Landmark, Moon,
-  Snowflake, Star, Sun, Trees, UtensilsCrossed, type LucideIcon,
+  MoonStar, ShoppingBasket, Snowflake, Star, Sun, Trees, UtensilsCrossed, type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import type { PlaceCategory, PlaceImage, StopType } from '../api/types'
@@ -15,6 +15,8 @@ export const CATEGORY_ICON: Record<PlaceCategory, LucideIcon> = {
   MUSEUM: Landmark,
   PARK: Trees,
   CULTURE: Drama,
+  WORSHIP: MoonStar,
+  MARKET: ShoppingBasket,
 }
 
 export const STOP_ICON: Record<StopType, LucideIcon> = {

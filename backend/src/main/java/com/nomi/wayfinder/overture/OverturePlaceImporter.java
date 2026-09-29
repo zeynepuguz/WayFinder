@@ -36,16 +36,21 @@ public class OverturePlaceImporter {
     static final int COVERAGE_CHECK_ABOVE = 50;
 
     private static final String FOOD = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT')";
+    // What Overture places may confirm: food, markets, places of worship and sights (a famous mosque is an ATTRACTION)
+    private static final String MATCHABLE = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT', 'MARKET', 'WORSHIP', 'ATTRACTION')";
+    // What may be unconfirmed: food places and markets (Overture knows too few of the mosques to judge those)
+    private static final String CONFIRMABLE = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT', 'MARKET')";
+    private static final Set<String> FOOD_CATEGORIES = Set.of("BREAKFAST", "RESTAURANT", "CAFE", "DESSERT");
     // The box exactly as Overture was read (planar lon / lat). A geography && alone is not enough: it compares
     // geodesic boxes, which reach well outside the lon / lat range (it only pre-filters through the GiST index)
     static final String IN_BOX = "location && CAST(ST_MakeEnvelope(?, ?, ?, ?, 4326) AS geography)"
             + " AND ST_Intersects(CAST(location AS geometry), ST_MakeEnvelope(?, ?, ?, ?, 4326))";
 
     private static final String EXISTING = """
-            SELECT id, name, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon, source
+            SELECT id, name, ST_Y(location::geometry) AS lat, ST_X(location::geometry) AS lon, source, category
             FROM places
             WHERE source <> 'OVERTURE' AND NOT hidden AND category IN %s AND %s
-            """.formatted(FOOD, IN_BOX);
+            """.formatted(MATCHABLE, IN_BOX);
 
     // Overture ids move to the rows that now hold them: freed first (the column is unique). The phone / website
     // came with the match (OSM rows have none of their own), so they go too
@@ -84,7 +89,7 @@ public class OverturePlaceImporter {
             UPDATE places SET unconfirmed = NOT (id = ANY (?)), updated_at = now()
             WHERE source = 'OSM' AND wikidata IS NULL AND category IN %s AND %s
               AND unconfirmed IS DISTINCT FROM NOT (id = ANY (?))
-            """.formatted(FOOD, IN_BOX);
+            """.formatted(CONFIRMABLE, IN_BOX);
 
     private final OvertureClient client;
     private final OvertureProperties properties;
@@ -137,7 +142,8 @@ public class OverturePlaceImporter {
                 city.west(), city.south(), city.east(), city.north()};
         List<ExistingPlace> existing = jdbc.query(EXISTING,
                 (rs, i) -> new ExistingPlace(rs.getLong("id"), rs.getString("name"), rs.getDouble("lat"),
-                        rs.getDouble("lon"), rs.getString("source")), box);
+                        rs.getDouble("lon"), rs.getString("source"),
+                        com.nomi.wayfinder.entity.PlaceCategory.valueOf(rs.getString("category"))), box);
         OvertureMatcher.Result matched = OvertureMatcher.match(mapped, existing, properties.minConfidence());
 
         Long[] confirmedIds = matched.confirmed().keySet().toArray(Long[]::new);
@@ -195,8 +201,10 @@ public class OverturePlaceImporter {
             return ps;
         }));
 
-        long osmFood = existing.stream().filter(p -> "OSM".equals(p.source())).count();
-        boolean complete = osmFood <= COVERAGE_CHECK_ABOVE || mapped.size() >= osmFood * MIN_COVERAGE;
+        long osmFood = existing.stream()
+                .filter(p -> "OSM".equals(p.source()) && FOOD_CATEGORIES.contains(p.category().name())).count();
+        long overtureFood = mapped.stream().filter(p -> FOOD_CATEGORIES.contains(p.category().name())).count();
+        boolean complete = osmFood <= COVERAGE_CHECK_ABOVE || overtureFood >= osmFood * MIN_COVERAGE;
         if (complete) {
             transactions.executeWithoutResult(status -> jdbc.update(con -> {
                 var ps = con.prepareStatement(FLAG_UNCONFIRMED);

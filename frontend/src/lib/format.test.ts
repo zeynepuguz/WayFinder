@@ -1,4 +1,4 @@
-import { formatCost, formatDistance, formatTime, haversineMeters, httpUrl, withinBudget } from './format'
+import { formatCost, formatDistance, formatTime, haversineMeters, httpUrl, routeCost, withinBudget } from './format'
 
 describe('format helpers', () => {
   it('formats times, distances and costs for Turkish users', () => {
@@ -33,5 +33,14 @@ describe('httpUrl', () => {
     expect(httpUrl('javascript:alert(1)')).toBeNull()
     expect(httpUrl(null)).toBeNull()
     expect(httpUrl(undefined)).toBeNull()
+  })
+})
+
+describe('routeCost', () => {
+  it('never shows ~0 TL when no stop has a known price', () => {
+    expect(routeCost(0, false)).toBe('Fiyat bilgisi yok')
+    expect(routeCost(400, true)).toBe('~400 TL')
+    // Older servers do not send the flag
+    expect(routeCost(400, undefined)).toBe('~400 TL')
   })
 })

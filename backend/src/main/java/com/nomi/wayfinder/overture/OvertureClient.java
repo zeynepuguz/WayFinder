@@ -38,7 +38,9 @@ public class OvertureClient {
                    websites[1] AS website, (bbox.ymin + bbox.ymax) / 2 AS lat, (bbox.xmin + bbox.xmax) / 2 AS lon
             FROM read_parquet(?, hive_partitioning = 1)
             WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?
-              AND taxonomy.hierarchy[1] = 'food_and_drink'
+              AND (taxonomy.hierarchy[1] = 'food_and_drink'
+                   OR list_has_any(taxonomy.hierarchy, ['grocery_store', 'supermarket', 'convenience_store',
+                                                        'place_of_worship']))
             """;
 
     private final OvertureProperties properties;

@@ -181,16 +181,21 @@ public final class OsmPlaceMapper {
         if ("theatre".equals(amenity) || "arts_centre".equals(amenity)) {
             return new Kind(PlaceCategory.CULTURE, List.of(), null);
         }
-        if ("place_of_worship".equals(amenity)
-                && (notable || trimToNull(element.tag("historic")) != null || trimToNull(element.tag("heritage")) != null)) {
-            // Only famous / historic mosques, churches and synagogues, not every neighbourhood mescit
-            return new Kind(PlaceCategory.ATTRACTION, List.of("history", "religious"), true);
+        if ("place_of_worship".equals(amenity)) {
+            // Famous / historic mosques, churches and synagogues are sights; every other one is a place to pray at
+            if (notable || trimToNull(element.tag("historic")) != null || trimToNull(element.tag("heritage")) != null) {
+                return new Kind(PlaceCategory.ATTRACTION, List.of("history", "religious"), true);
+            }
+            return new Kind(PlaceCategory.WORSHIP, List.of("religious"), true);
         }
         if ("marketplace".equals(amenity)) {
             return new Kind(PlaceCategory.ATTRACTION, List.of("shopping", "local"), false);
         }
 
         String shop = element.tag("shop");
+        if ("supermarket".equals(shop) || "convenience".equals(shop) || "grocery".equals(shop)) {
+            return new Kind(PlaceCategory.MARKET, List.of(), true);
+        }
         if ("pastry".equals(shop) || "confectionery".equals(shop)) {
             return new Kind(PlaceCategory.DESSERT, List.of(), null);
         }

@@ -57,7 +57,8 @@ public final class PlaceRealismFilter {
             "cocukoyunalani", "bahce", "mesirealani", "piknikalani", "seyirterasi", "seyirtepesi", "manzara",
             "viewpoint", "muze", "museum", "cami", "camii", "mescit", "mescidi", "kilise", "church", "mosque", "plaj",
             "beach", "halkplaji", "pazar", "pazaryeri", "semtpazari", "halkpazari", "marketplace", "carsi", "anit",
-            "monument", "kale", "hamam", "cesme", "tiyatro", "galeri", "gallery", "sanatgalerisi");
+            "monument", "kale", "hamam", "cesme", "tiyatro", "galeri", "gallery", "sanatgalerisi", "market",
+            "bakkal", "supermarket", "minimarket", "gida", "sinagog", "cemevi");
     // A lowercase name containing one of these words describes a place instead of naming it ("okul kantini")
     private static final List<String> DESCRIPTION_STEMS = List.of("kantin", "kafe", "cafe", "restoran", "lokanta",
             "park", "bahce", "bufe", "cay", "yemek", "okul", "lise", "fakulte", "pastane", "firin", "kahve");

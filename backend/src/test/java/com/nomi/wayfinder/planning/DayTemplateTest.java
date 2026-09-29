@@ -37,4 +37,28 @@ class DayTemplateTest {
         assertThat(slots).extracting(PlanningSlot::type)
                 .containsExactly(StopType.BREAKFAST, StopType.COFFEE, StopType.DINNER);
     }
+
+    @Test
+    void sightInterestsMakeADayOfSeveralSightsNotOne() {
+        // The form's "Gezi" is a toggle: breakfast, sights, dessert, dinner with history / nature / view / architecture
+        List<PlanningSlot> slots = DayTemplate.slotsFor(
+                List.of(StopType.BREAKFAST, StopType.SIGHTSEEING, StopType.DESSERT, StopType.DINNER),
+                LocalTime.of(10, 0), LocalTime.of(22, 0), List.of("history", "nature", "view", "architecture", "budget"));
+
+        assertThat(slots).filteredOn(s -> s.type() == StopType.SIGHTSEEING).hasSize(DayTemplate.MAX_SIGHTS);
+        // Still in the order of a day
+        assertThat(slots.getFirst().type()).isEqualTo(StopType.BREAKFAST);
+        assertThat(slots.getLast().type()).isEqualTo(StopType.DINNER);
+    }
+
+    @Test
+    void aTickedSightseeingIsAtLeastTwoSightsAndInterestsAddSightsWhenNotTicked() {
+        assertThat(DayTemplate.withEnoughSights(List.of(StopType.SIGHTSEEING, StopType.LUNCH), List.of()))
+                .filteredOn(t -> t == StopType.SIGHTSEEING).hasSize(DayTemplate.MIN_SIGHTS);
+        assertThat(DayTemplate.withEnoughSights(List.of(StopType.LUNCH), List.of("museum")))
+                .filteredOn(t -> t == StopType.SIGHTSEEING).hasSize(DayTemplate.MIN_SIGHTS);
+        // Food only, no sight interests: as asked
+        assertThat(DayTemplate.withEnoughSights(List.of(StopType.BREAKFAST, StopType.COFFEE), List.of("budget")))
+                .containsExactly(StopType.BREAKFAST, StopType.COFFEE);
+    }
 }

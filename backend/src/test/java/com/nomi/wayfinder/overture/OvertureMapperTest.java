@@ -51,6 +51,21 @@ class OvertureMapperTest {
     }
 
     @Test
+    void marketsAndPlacesOfWorshipHaveTheirOwnCategories() {
+        assertThat(category("BİM", "shopping/food_and_beverage_store/grocery_store")).isEqualTo(PlaceCategory.MARKET);
+        assertThat(category("Dolayoba Gözdağı Cami", "cultural_and_historic/place_of_worship/muslim_place_of_worship"))
+                .isEqualTo(PlaceCategory.WORSHIP);
+        // A page named after its address is no place name; a café called "Mahalle" is
+        assertThat(map(row("Hocaalizade Mah Osmangazi Bursa", "shopping/food_and_beverage_store/grocery_store")))
+                .isNull();
+        assertThat(map(row("Atatürk Cad. No: 5", "food_and_drink/casual_eatery/cafe"))).isNull();
+        assertThat(category("Mahalle Kahvesi Moda", "food_and_drink/casual_eatery/cafe")).isEqualTo(PlaceCategory.CAFE);
+        // A market named after pide stays a market
+        assertThat(category("Pide Market", "shopping/food_and_beverage_store/grocery_store"))
+                .isEqualTo(PlaceCategory.MARKET);
+    }
+
+    @Test
     void teaGardensAreOutdoorTeaCafes() {
         OverturePlace garden = map(row("Çayırova Kızılay Çay Bahçesi", "food_and_drink/casual_eatery/cafe"));
 

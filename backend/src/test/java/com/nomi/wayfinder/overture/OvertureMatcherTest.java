@@ -119,6 +119,20 @@ class OvertureMatcherTest {
     }
 
     @Test
+    void aMarketNeverConfirmsTheCafeOfTheSameName() {
+        ExistingPlace cafe = new ExistingPlace(1, "Yıldız Kafe", LAT, LON, "OSM", PlaceCategory.CAFE);
+        OverturePlace market = new OverturePlace("o1", "Yıldız Market", PlaceCategory.MARKET, List.of(), true, 0.9,
+                null, null, LAT, LON);
+
+        OvertureMatcher.Result result = OvertureMatcher.match(List.of(market), List.of(cafe), 0.7);
+
+        assertThat(result.confirmed()).isEmpty();
+        assertThat(result.added()).containsExactly(market);
+        // A famous mosque (a sight) is the same place as Overture's place of worship
+        assertThat(OvertureMatcher.compatible(PlaceCategory.WORSHIP, PlaceCategory.ATTRACTION)).isTrue();
+    }
+
+    @Test
     void shortNamesOnlyMatchExactly() {
         assertThat(OvertureMatcher.sameName("ali", "aliusta")).isFalse();
         assertThat(OvertureMatcher.sameName("aliusta", "corbacialiustaninyeri")).isTrue();

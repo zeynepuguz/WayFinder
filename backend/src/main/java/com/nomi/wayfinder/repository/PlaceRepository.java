@@ -29,7 +29,11 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
-              AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
+              -- "Tümü" leaves out markets and places of worship (they have their own filter); "İbadet" also lists
+              -- the famous mosques / churches that are sights (ATTRACTION tagged religious)
+              AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
+                   OR p.category = CAST(:category AS text)
+                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
             ORDER BY "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -159,7 +163,11 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
-              AND (CAST(:category AS text) IS NULL OR p.category = CAST(:category AS text))
+              -- "Tümü" leaves out markets and places of worship (they have their own filter); "İbadet" also lists
+              -- the famous mosques / churches that are sights (ATTRACTION tagged religious)
+              AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
+                   OR p.category = CAST(:category AS text)
+                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
             ORDER BY CASE WHEN p.source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END, "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)

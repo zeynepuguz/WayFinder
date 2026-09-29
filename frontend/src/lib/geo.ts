@@ -75,4 +75,6 @@ export const CATEGORY_PIN: Record<PlaceCategory, { color: string; symbol: string
   MUSEUM: { color: '#6938ef', symbol: '🏛' },
   PARK: { color: '#038a4f', symbol: '🌳' },
   CULTURE: { color: '#0e8579', symbol: '🎭' },
+  WORSHIP: { color: '#1f6f5c', symbol: '🕌' },
+  MARKET: { color: '#5a7d1a', symbol: '🛒' },
 }

@@ -51,6 +51,7 @@ public class OverpassClient {
             (
               nwr["amenity"~"^(cafe|restaurant|fast_food|food_court|ice_cream)$"]["name"](area.city);
               nwr["shop"~"^(pastry|confectionery|bakery|coffee)$"]["name"](area.city);
+              nwr["shop"~"^(supermarket|convenience|grocery)$"]["name"](area.city);
             );
             out center tags;
             """;

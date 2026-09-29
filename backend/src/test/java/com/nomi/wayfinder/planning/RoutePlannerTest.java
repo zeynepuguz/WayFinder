@@ -198,6 +198,23 @@ class RoutePlannerTest {
     }
 
     @Test
+    void aDayOfSightsIsNotThreeMosquesInARow() {
+        add(place(1, "Ulu Cami", PlaceCategory.ATTRACTION, true, 4.8, 0, "history", "religious"), 100);
+        add(place(2, "Gazi Orhan Camii", PlaceCategory.ATTRACTION, true, 4.7, 0, "history", "religious"), 200);
+        add(place(3, "Ertuğrul Bey Camii", PlaceCategory.ATTRACTION, true, 4.6, 0, "history", "religious"), 250);
+        add(place(4, "Kent Müzesi", PlaceCategory.MUSEUM, true, 4.4, 0), 300);
+
+        PlanResult result = planner.plan(new PlanningRequest(40.99, 29.02, DAY, LocalTime.of(10, 0),
+                LocalTime.of(22, 0), 1, null, WalkingTolerance.MEDIUM, List.of("history"),
+                List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0)),
+                        PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(14, 30)),
+                        PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(16, 30))), Set.of(), false));
+
+        assertThat(result.stops()).extracting(s -> s.place().getName()).contains("Kent Müzesi");
+        assertThat(result.stops()).filteredOn(s -> s.place().hasTag("religious")).hasSizeLessThan(3);
+    }
+
+    @Test
     void aKiraathaneIsNeverTheBreakfastStop() {
         add(place(1, "Joker Kıraathanesi", PlaceCategory.CAFE, true, 4.5, 50), 100);
         add(place(2, "Köşe Börekçisi", PlaceCategory.CAFE, true, 4.0, 80, "bakery"), 400);
@@ -292,8 +309,24 @@ class RoutePlannerTest {
 
         assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("OSM Cafe");
         assertThat(result.stops().getFirst().reasons()).contains("Fiyat bilgisi yok");
-        assertThat(result.notes()).contains("1 durağın fiyat bilgisi yok; toplam tahmine dahil edilmedi.");
+        // No stop has a price: say that the budget could not be used instead of a "~0 TL" total
+        assertThat(result.notes()).contains("Bu mekanların fiyat bilgisi yok; bu yüzden 500 TL bütçene göre hesap "
+                + "yapamadım. Mekanları diğer tercihlerine göre seçtim: yakınlık, açık olma, hava ve ilgi alanların.");
         assertThat(result.notes()).noneMatch(n -> n.contains("bütçeyi"));
+    }
+
+    @Test
+    void someUnknownPricesAreCountedInTheNote() {
+        Place unknown = place(1, "OSM Cafe", PlaceCategory.CAFE, true, 4.5, 0);
+        unknown.setEstimatedCost(null);
+        add(unknown, 100);
+        add(place(2, "Restoran", PlaceCategory.RESTAURANT, true, 4.5, 100), 200);
+
+        PlanResult result = planner.plan(request(List.of(
+                PlanningSlot.at(StopType.LUNCH, LocalTime.of(13, 0)),
+                PlanningSlot.at(StopType.COFFEE, LocalTime.of(15, 0))), 500, false));
+
+        assertThat(result.notes()).contains("1 durağın fiyat bilgisi yok; toplam tahmine dahil edilmedi.");
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.overture;
 
+import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 import com.nomi.wayfinder.overture.OvertureMapper.OverturePlace;
 
@@ -49,7 +50,30 @@ public final class OvertureMatcher {
      *
      * @param source OSM, WEB_CHECK, ... (OVERTURE rows are not passed: they are refreshed by their own id)
      */
-    public record ExistingPlace(long id, String name, double latitude, double longitude, String source) {
+    public record ExistingPlace(long id, String name, double latitude, double longitude, String source,
+                                PlaceCategory category) {
+
+        public ExistingPlace(long id, String name, double latitude, double longitude, String source) {
+            this(id, name, latitude, longitude, source, null);
+        }
+    }
+
+    // Kinds that may be the same place: a café is never the market of the same name next door
+    static String group(PlaceCategory category) {
+        if (category == null) {
+            return null;
+        }
+        return switch (category) {
+            case MARKET -> "market";
+            case WORSHIP, ATTRACTION, MUSEUM, CULTURE, PARK -> "sight";
+            default -> "food";
+        };
+    }
+
+    static boolean compatible(PlaceCategory a, PlaceCategory b) {
+        String x = group(a);
+        String y = group(b);
+        return x == null || y == null || x.equals(y);
     }
 
     /**
@@ -83,7 +107,8 @@ public final class OvertureMatcher {
                 continue;
             }
             Optional<Named<ExistingPlace>> same = existingGrid.near(place.latitude(), place.longitude()).stream()
-                    .filter(e -> meters(place, e.value().latitude(), e.value().longitude()) <= MATCH_METERS
+                    .filter(e -> compatible(place.category(), e.value().category())
+                            && meters(place, e.value().latitude(), e.value().longitude()) <= MATCH_METERS
                             && (sameName(core, e.core()) || sharesToken(place.name(), e.value().name())
                             || containsFullName(place.name(), e.value().name())))
                     .min(Comparator.comparingDouble(e -> meters(place, e.value().latitude(), e.value().longitude())));

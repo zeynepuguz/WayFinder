@@ -184,7 +184,7 @@ class RouteShapeTest {
 
     @Test
     void sightseeingGoesALittleFurtherForAMatchingPlace() {
-        add(at(place(1, "Yakın Müze", PlaceCategory.MUSEUM, true, 4.5, 0), 200, 0));
+        add(at(place(1, "Yakın Park", PlaceCategory.PARK, true, 4.5, 0), 200, 0));
         add(at(place(2, "Tarihi Hamam", PlaceCategory.ATTRACTION, true, 4.5, 0, "history"), 800, 0));
 
         PlanResult result = planner.plan(request(List.of(PlanningSlot.at(StopType.SIGHTSEEING, LocalTime.of(11, 0))),

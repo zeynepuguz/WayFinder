@@ -55,6 +55,8 @@ public class RoutePlanner {
     // A sight / coffee / dessert has no fixed time: never wait longer than this for its target time
     // (otherwise a park after lunch waits until 15:00 and the day has a 1.5 h hole)
     static final int FLEXIBLE_MAX_WAIT_MINUTES = 20;
+    // A second (third) mosque / church / tomb in one day loses this much (twice as much)
+    static final double VARIETY_PENALTY = 35;
     // A reordered meal may start at most this much after its target time
     static final int MEAL_LATE_MINUTES = 60;
     // Look-ahead: score points per maxLeg of distance from the centroid of the stops still to come
@@ -130,7 +132,9 @@ public class RoutePlanner {
 
         // Unknown prices are left out of the totals (not counted as free); say so
         long unknownPrice = stops.stream().filter(s -> s.place().getEstimatedCost() == null).count();
-        if (unknownPrice > 0) {
+        if (unknownPrice > 0 && unknownPrice == stops.size()) {
+            notes.add(noPriceNote(request.budget()));
+        } else if (unknownPrice > 0) {
             notes.add(unknownPriceNote(unknownPrice));
         }
 
@@ -458,6 +462,14 @@ public class RoutePlanner {
                 double penalty = off / maxLegForScoring * leg.anchorWeight();
                 scored = new PlaceScorer.ScoredPlace(place, scored.score() - penalty, scored.fitScore(), scored.reasons());
             }
+            // Variety: a day of three mosques in a row is one kind of place, however famous each is
+            if (slot.type() == StopType.SIGHTSEEING) {
+                double repeat = varietyPenalty(place, leg.chosen());
+                if (repeat > 0) {
+                    scored = new PlaceScorer.ScoredPlace(place, scored.score() - repeat, scored.fitScore() - repeat,
+                            scored.reasons());
+                }
+            }
 
             timings.put(place.getId(), timing);
             // An unknown price cannot be shown to be over budget; the scorer already prefers known prices
@@ -496,6 +508,15 @@ public class RoutePlanner {
                         .map(s -> toStop(slot, s.place(), timings.get(s.place().getId()), s.reasons())),
                 interestMatched
         );
+    }
+
+    // Points off per sight of the same kind already in the day (mosques / churches / tombs are one kind)
+    static double varietyPenalty(Place place, List<Place> chosen) {
+        if (!place.hasTag("religious")) {
+            return 0;
+        }
+        long same = chosen.stream().filter(c -> c.hasTag("religious")).count();
+        return same * VARIETY_PENALTY;
     }
 
     // "Kelebek Cafe" and "Kelebek Cafe ve Restaurant" 5 m apart are one place for a route
@@ -797,6 +818,18 @@ public class RoutePlanner {
         return placeRepository.findByIdIn(found.stream().map(PlaceDistance::getId).toList()).stream()
                 .filter(Objects::nonNull)
                 .collect(Collectors.toMap(Place::getId, Function.identity(), (a, b) -> a));
+    }
+
+    // No stop has a known price: no "~0 TL", say why the budget could not be used
+    static String noPriceNote(Integer budget) {
+        if (budget == null) {
+            return Texts.t("Bu mekanların fiyat bilgisi yok; tahmini harcama hesaplanamadı.",
+                    "These places have no price info, so the spend could not be estimated.");
+        }
+        return Texts.t("Bu mekanların fiyat bilgisi yok; bu yüzden " + budget + " TL bütçene göre hesap yapamadım. "
+                        + "Mekanları diğer tercihlerine göre seçtim: yakınlık, açık olma, hava ve ilgi alanların.",
+                "These places have no price info, so I could not check them against your " + budget + " TL budget. "
+                        + "I chose them by your other preferences: distance, opening hours, weather and interests.");
     }
 
     static String unknownPriceNote(long count) {

@@ -197,12 +197,15 @@ class EnglishTextsTest {
     void unknownPriceStopLineAndTotalInBothLanguages() {
         assertThat(composer.planCreated(osmRoute()))
                 .contains("15:00 → Kahve: Kahve Durağı (fiyat bilgisi yok)")
-                .contains("Toplam tahmini harcama (fiyatı bilinen duraklar): ~0 TL");
+                // No known price at all: no "~0 TL", only the walking
+                .contains("Toplam yürüme: ~5 dk.")
+                .doesNotContain("~0 TL");
 
         LocaleContextHolder.setLocale(Locale.ENGLISH);
         assertThat(composer.planCreated(osmRoute()))
                 .contains("15:00 → Coffee: Kahve Durağı (no price info)")
-                .contains("Estimated total spend (stops with known prices): ~0 TL");
+                .contains("Total walking: ~5 min.")
+                .doesNotContain("~0 TL");
     }
 
     // A one-stop route whose place has no known price (e.g. from OpenStreetMap)

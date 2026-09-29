@@ -141,7 +141,15 @@ class OsmPlaceMapperTest {
         assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious", "architecture");
         assertThat(map("amenity", "place_of_worship", "name", "Tarihi Kilise", "heritage", "2").category())
                 .isEqualTo(PlaceCategory.ATTRACTION);
-        assertThat(map("amenity", "place_of_worship", "religion", "muslim", "name", "Yeni Mahalle Camii")).isNull();
+        // An ordinary mosque is not a sight but a place to pray at (Explore > İbadet)
+        OsmPlaceMapper.OsmPlace neighbourhood = map("amenity", "place_of_worship", "religion", "muslim",
+                "name", "Yeni Mahalle Camii");
+        assertThat(neighbourhood.category()).isEqualTo(PlaceCategory.WORSHIP);
+        assertThat(neighbourhood.tags()).contains("religious");
+        // Markets
+        assertThat(map("shop", "supermarket", "name", "Migros").category()).isEqualTo(PlaceCategory.MARKET);
+        assertThat(map("shop", "convenience", "name", "Yıldız Bakkaliyesi").category()).isEqualTo(PlaceCategory.MARKET);
+        assertThat(PlaceRealismFilter.rejectName("Market", PlaceCategory.MARKET)).isNotNull();
 
         // Historic sites; memorials / tombs only with Wikidata
         assertThat(map("historic", "castle", "name", "Rumeli Hisarı").category()).isEqualTo(PlaceCategory.ATTRACTION);

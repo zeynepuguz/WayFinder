@@ -45,6 +45,11 @@ public final class OvertureMapper {
     // A meal in the name (folded prefixes): "döner", "kebap", "köfteci", "pide", "lahmacun", "iskender", "mantı"
     private static final List<String> MEAL_WORDS = List.of("doner", "kebap", "kebab", "kofte", "pide", "lahmacun",
             "iskender", "manti", "lokanta", "tantuni", "kokorec", "durum", "cagkebap");
+    // Address words as whole words: "Mah", "Mah.", "Mahallesi", "Sok", "Sokak", "Cad", "Caddesi", "Cd", "Sk", "No:"
+    private static final Pattern ADDRESS_NAME = Pattern.compile(
+            "(?iu)(?<!\\p{L})(?:mah\\.?|mahallesi|sok\\.?|sokak|sokağı|cad\\.?|caddesi|cd\\.?|sk\\.?|no\\s*:)(?!\\p{L})");
+    private static final Set<PlaceCategory> LIGHT_FOOD = Set.of(PlaceCategory.CAFE, PlaceCategory.DESSERT,
+            PlaceCategory.BREAKFAST);
     private static final List<String> CAFE_WORDS = List.of("cafe", "kafe", "kahve", "coffee", "cayevi", "caybahce");
     private static final Set<String> CLOSED =Set.of("permanently_closed", "temporarily_closed");
 
@@ -84,6 +89,10 @@ public final class OvertureMapper {
         if (name == null || name.length() > MAX_NAME) {
             return null;
         }
+        // A Meta page named after its address ("Hocaalizade Mah Osmangazi Bursa") is not a place name
+        if (ADDRESS_NAME.matcher(name).find()) {
+            return null;
+        }
         String folded = OsmPlaceMapper.fold(name);
         List<String> hierarchy = row.hierarchy() == null ? List.of() : row.hierarchy();
         Kind kind = classify(hierarchy, folded);
@@ -100,10 +109,18 @@ public final class OvertureMapper {
     }
 
     static Kind classify(List<String> hierarchy, String folded) {
+        // Places to pray at and to buy groceries (Explore only)
+        if (hierarchy.contains("place_of_worship")) {
+            return new Kind(PlaceCategory.WORSHIP, List.of("religious"));
+        }
+        if (hierarchy.contains("grocery_store") || hierarchy.contains("supermarket")
+                || hierarchy.contains("convenience_store")) {
+            return new Kind(PlaceCategory.MARKET, List.of());
+        }
         Kind kind = classifyByTaxonomy(hierarchy, folded);
         // Meta pages are often filed wrongly ("Gözde Cağ Döner" as a coffee shop): a meal in the name wins over a
         // café / dessert taxonomy, unless the name also says café / coffee
-        if (kind != null && kind.category() != PlaceCategory.RESTAURANT
+        if (kind != null && LIGHT_FOOD.contains(kind.category())
                 && MEAL_WORDS.stream().anyMatch(folded::contains)
                 && CAFE_WORDS.stream().noneMatch(folded::contains)) {
             return new Kind(PlaceCategory.RESTAURANT, List.of("quick"));

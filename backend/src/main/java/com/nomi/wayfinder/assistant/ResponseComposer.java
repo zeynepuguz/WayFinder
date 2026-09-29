@@ -72,6 +72,14 @@ public class ResponseComposer {
 
         // Unknown prices are not in the total, so the total must not look like the full cost
         boolean someUnknown = route.stops().stream().anyMatch(s -> s.place().estimatedCost() == null);
+        boolean noneKnown = route.stops().stream().allMatch(s -> s.place().estimatedCost() == null);
+        if (noneKnown) {
+            // No "~0 TL": the route's note says the prices are unknown and the budget could not be used
+            sb.append(Texts.t("\nToplam yürüme: ~" + route.totalWalkingMinutes() + " dk.",
+                    "\nTotal walking: ~" + route.totalWalkingMinutes() + " min."));
+            appendWeatherAndNotes(sb, route);
+            return sb.toString().trim();
+        }
         if (Texts.english()) {
             sb.append(String.format(Locale.ROOT, "\nEstimated total spend%s: ~%d TL (%d %s) · Total walking: ~%d min.",
                     someUnknown ? " (stops with known prices)" : "",

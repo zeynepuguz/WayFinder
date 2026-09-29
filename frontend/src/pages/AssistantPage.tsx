@@ -11,7 +11,7 @@ import { Alert, Sheet } from '../components/ui'
 import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatTime } from '../lib/format'
+import { formatCost, formatTime, routeCost } from '../lib/format'
 import { locale, tr, useT } from '../lib/i18n'
 
 interface Message {
@@ -419,7 +419,9 @@ function RoutePreview({ route }: { route: Route }) {
     <Link to={`/routes/${route.id}`} className="card route-mini card-press">
       <div className="row-between">
         <span className="t-headline" style={{ fontSize: 15 }}>{route.title}</span>
-        <span className="badge badge-brand">~{route.totalEstimatedCost.toLocaleString(locale())} TL</span>
+        <span className="badge badge-brand">
+          {routeCost(route.totalEstimatedCost, route.stops.some(s => s.place.estimatedCost != null))}
+        </span>
       </div>
       <ol>
         {upcoming.slice(0, 7).map(stop => {

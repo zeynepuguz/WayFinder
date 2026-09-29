@@ -151,7 +151,9 @@ public final class RouteDtos {
             boolean saved,
             int stopCount,
             int totalEstimatedCost,
-            Instant createdAt
+            Instant createdAt,
+            // false = no stop has a known price: show "no price info", not "~0 TL"
+            boolean costKnown
     ) {
     }
 

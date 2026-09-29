@@ -6,6 +6,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 
 // Turns "which stops" + "which hours" into an ordered list of planner slots
 public final class DayTemplate {
@@ -23,17 +24,34 @@ public final class DayTemplate {
     );
 
     private static final List<LocalTime> SIGHTSEEING_TIMES =
-            List.of(LocalTime.of(11, 0), LocalTime.of(16, 30), LocalTime.of(17, 30));
+            List.of(LocalTime.of(11, 0), LocalTime.of(14, 30), LocalTime.of(16, 30), LocalTime.of(17, 30));
+
+    // Interests that are about places to see (not food / price): picking them means "show me such places"
+    static final Set<String> SIGHT_INTERESTS = Set.of("history", "museum", "art", "architecture", "nature", "view",
+            "sea", "street-art", "books");
+    // "Gezi" in the form is a toggle, not "one place": at least this many sights, more with several sight interests
+    static final int MIN_SIGHTS = 2;
+    static final int MAX_SIGHTS = 3;
 
     private DayTemplate() {
     }
 
     public static List<PlanningSlot> slotsFor(List<StopType> requested, LocalTime start, LocalTime end) {
+        return slotsFor(requested, start, end, List.of());
+    }
+
+    /**
+     * @param interests the day's interests: with the stops listed, two or more sight interests ("tarih, doğa, mimari")
+     *                  make it MAX_SIGHTS sights, and any sight interest adds sights even when "Gezi" was not ticked
+     */
+    public static List<PlanningSlot> slotsFor(List<StopType> requested, LocalTime start, LocalTime end,
+                                              List<String> interests) {
         if (requested == null || requested.isEmpty()) {
             return FULL_DAY.stream()
                     .filter(s -> fitsWindow(s.targetTime(), start, end))
                     .toList();
         }
+        requested = withEnoughSights(requested, interests);
 
         List<PlanningSlot> slots = new ArrayList<>();
         int sightseeingCount = 0;
@@ -55,6 +73,21 @@ public final class DayTemplate {
         // Keep the natural order of a day: breakfast before lunch before dinner
         slots.sort(Comparator.comparing(PlanningSlot::targetTime, Comparator.nullsLast(Comparator.naturalOrder())));
         return slots;
+    }
+
+    // The requested stops with MIN_SIGHTS..MAX_SIGHTS sightseeing stops when sights are wanted at all
+    static List<StopType> withEnoughSights(List<StopType> requested, List<String> interests) {
+        long sightInterests = interests == null ? 0 : interests.stream().filter(SIGHT_INTERESTS::contains).count();
+        long asked = requested.stream().filter(t -> t == StopType.SIGHTSEEING).count();
+        if (asked == 0 && sightInterests == 0) {
+            return requested;
+        }
+        long wanted = Math.max(asked, sightInterests >= 2 ? MAX_SIGHTS : MIN_SIGHTS);
+        List<StopType> result = new ArrayList<>(requested);
+        for (long i = asked; i < wanted; i++) {
+            result.add(StopType.SIGHTSEEING);
+        }
+        return result;
     }
 
     // A template stop is kept if its time is inside the user's window (with a little slack at the start)

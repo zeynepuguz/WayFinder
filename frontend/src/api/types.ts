@@ -2,6 +2,8 @@
 
 export type PlaceCategory =
   | 'BREAKFAST' | 'RESTAURANT' | 'CAFE' | 'DESSERT' | 'ATTRACTION' | 'MUSEUM' | 'PARK' | 'CULTURE'
+  // Places to pray at and grocery shops: Explore only (never a route stop or a suggestion)
+  | 'WORSHIP' | 'MARKET'
 export type StopType = 'BREAKFAST' | 'SIGHTSEEING' | 'LUNCH' | 'COFFEE' | 'DESSERT' | 'DINNER'
 export type WalkingTolerance = 'LOW' | 'MEDIUM' | 'HIGH'
 // EXPIRED: the route's day is over and it was never finished (read-only, shown under "Geçmiş rotalar")
@@ -190,6 +192,8 @@ export interface RouteSummary {
   stopCount: number
   totalEstimatedCost: number
   createdAt: string
+  // false = no stop has a known price (show "no price info", not "~0 TL"); absent on older servers
+  costKnown?: boolean
   // where the route starts ("Kadıköy merkezi"); null/absent for older routes
   startLabel?: string | null
 }

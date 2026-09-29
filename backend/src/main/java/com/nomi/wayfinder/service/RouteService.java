@@ -96,7 +96,7 @@ public class RouteService {
         List<String> interests = request.interests() != null && !request.interests().isEmpty()
                 ? Interests.normalize(request.interests()) : preferences.getInterests();
 
-        List<PlanningSlot> slots = DayTemplate.slotsFor(request.stops(), start, end);
+        List<PlanningSlot> slots = DayTemplate.slotsFor(request.stops(), start, end, interests);
         if (slots.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "No stops fit into the requested time window");
         }
@@ -211,7 +211,8 @@ public class RouteService {
         List<Route> routes = savedOnly
                 ? routeRepository.findByUserIdAndSavedTrueOrderByCreatedAtDesc(userId)
                 : routeRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        return routes.stream().map(routeMapper::toSummary).toList();
+        // A plan that found no place at all ("0 durak") is not a route to show
+        return routes.stream().filter(r -> !r.getStops().isEmpty()).map(routeMapper::toSummary).toList();
     }
 
     @Transactional
@@ -285,8 +286,11 @@ public class RouteService {
 
     private Optional<Route> findRouteForDay(Long userId, LocalDate date) {
         routeRepository.expireBefore(userId, LocalDate.now(clock));
-        return routeRepository.findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
-                userId, date, List.of(RouteStatus.ACTIVE, RouteStatus.DRAFT));
+        // The latest one with stops: an empty plan is never "Aktif rotan"
+        return routeRepository.findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
+                        userId, date, List.of(RouteStatus.ACTIVE, RouteStatus.DRAFT)).stream()
+                .filter(r -> !r.getStops().isEmpty())
+                .findFirst();
     }
 
     // ================= LIFECYCLE =================

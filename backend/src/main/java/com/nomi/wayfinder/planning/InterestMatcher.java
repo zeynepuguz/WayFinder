@@ -55,6 +55,8 @@ public final class InterestMatcher {
             // Parks, gardens, nature reserves, beaches, viewpoints
             case "nature" -> category == PlaceCategory.PARK || place.hasTag("view") && !place.isIndoor();
             case "museum" -> category == PlaceCategory.MUSEUM;
+            // A city / archaeology museum is history too (and dry when it rains)
+            case "history" -> category == PlaceCategory.MUSEUM;
             case "art" -> category == PlaceCategory.CULTURE;
             // A park or sight on the shore has a sea view
             case "view" -> place.isNearSea() && !place.isIndoor()

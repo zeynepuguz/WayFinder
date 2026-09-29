@@ -578,6 +578,8 @@ svg { flex-shrink: 0; }
 .tile-MUSEUM { --c1: #a797ff; --c2: #6938ef; }
 .tile-PARK { --c1: #47d98f; --c2: #038a4f; }
 .tile-CULTURE { --c1: #3ddcc2; --c2: #0e8579; }
+.tile-WORSHIP { --c1: #6fcfae; --c2: #1f6f5c; }
+.tile-MARKET { --c1: #b5d86a; --c2: #5a7d1a; }
 .tile { isolation: isolate; }
 /* Place photo on top of the tile; the tile keeps the size, so nothing shifts while it loads */
 .tile-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 2; background: var(--surface-2); }

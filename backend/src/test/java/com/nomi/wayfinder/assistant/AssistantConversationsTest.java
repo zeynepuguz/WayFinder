@@ -199,14 +199,14 @@ class AssistantConversationsTest {
 
     @Test
     void onlyTodaysRouteIsCurrent() {
-        when(routeRepository.findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(anyLong(), any(), anyCollection()))
-                .thenReturn(Optional.empty());
+        when(routeRepository.findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(anyLong(), any(), anyCollection()))
+                .thenReturn(List.of());
 
         assertThat(routeService.findCurrentRoute(USER)).isEmpty();
 
         // Past routes are expired first, then only today's date is asked for
         verify(routeRepository).expireBefore(USER, LocalDate.of(2026, 9, 28));
-        verify(routeRepository).findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
+        verify(routeRepository).findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
                 eq(USER), eq(LocalDate.of(2026, 9, 28)), argThat(s -> s.containsAll(
                         List.of(RouteStatus.DRAFT, RouteStatus.ACTIVE)) && s.size() == 2));
     }

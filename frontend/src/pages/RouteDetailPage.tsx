@@ -11,7 +11,7 @@ import { RouteMap } from '../components/RouteMap'
 import { Alert, BackButton, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
+import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeCost, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -123,7 +123,7 @@ export function RouteDetailPage() {
         </div>
 
         <div className="stats">
-          <div className="stat"><Wallet size={16} className="muted" /><strong>~{route.totalEstimatedCost.toLocaleString(locale())} TL</strong>
+          <div className="stat"><Wallet size={16} className="muted" /><strong>{routeCost(route.totalEstimatedCost, route.stops.some(s => s.place.estimatedCost != null))}</strong>
             <span>{route.budget != null ? t(`bütçe ₺${route.budget.toLocaleString(locale())}`, `budget ₺${route.budget.toLocaleString(locale())}`) : t('tahmini', 'estimated')}</span></div>
           <div className="stat"><Footprints size={16} className="muted" /><strong>~{route.totalWalkingMinutes} {t('dk', 'min')}</strong><span>{t('yürüme', 'walking')}</span></div>
           <div className="stat"><Clock size={16} className="muted" /><strong>{route.stops.length}</strong><span>{t('durak', route.stops.length === 1 ? 'stop' : 'stops')}</span></div>

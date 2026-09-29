@@ -24,6 +24,9 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
     Optional<Route> findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
             Long userId, LocalDate date, Collection<RouteStatus> statuses);
 
+    List<Route> findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
+            Long userId, LocalDate date, Collection<RouteStatus> statuses);
+
     // Unfinished routes of days that are over -> EXPIRED (all users: the daily job; one user: on read)
     @Modifying
     @Query("UPDATE Route r SET r.status = com.nomi.wayfinder.entity.RouteStatus.EXPIRED "

@@ -10,6 +10,8 @@ export const CATEGORY_LABELS: Record<PlaceCategory, string> = bilingual({
   MUSEUM: ['Müze', 'Museum'],
   PARK: ['Park', 'Park'],
   CULTURE: ['Kültür', 'Culture'],
+  WORSHIP: ['İbadet', 'Worship'],
+  MARKET: ['Market', 'Groceries'],
 })
 
 export const STOP_TYPE_LABELS: Record<StopType, string> = bilingual({
@@ -93,6 +95,11 @@ export function formatCost(cost: number | null | undefined): string {
   return `~${cost.toLocaleString(locale())} TL`
 }
 
+// A route's spend: "~0 TL" would look free when no stop has a known price (most imported places)
+export function routeCost(total: number, known: boolean | undefined): string {
+  return known === false ? tr('Fiyat bilgisi yok', 'No price info') : `~${total.toLocaleString(locale())} TL`
+}
+
 // Price filter: a place with an unknown price never counts as "within budget"
 export function withinBudget(cost: number | null | undefined, max: number): boolean {
   return cost != null && cost <= max
@@ -142,6 +149,8 @@ export const CATEGORY_SLUGS: Record<PlaceCategory, string> = {
   MUSEUM: 'muze',
   PARK: 'park',
   CULTURE: 'kultur',
+  WORSHIP: 'ibadet',
+  MARKET: 'market',
 }
 
 export const CATEGORY_BY_SLUG: Record<string, PlaceCategory> = Object.fromEntries(
