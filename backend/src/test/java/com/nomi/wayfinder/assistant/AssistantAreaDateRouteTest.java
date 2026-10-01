@@ -139,9 +139,18 @@ class AssistantAreaDateRouteTest {
     }
 
     @Test
-    void withoutAKnownAreaTheRouteStillStartsAtTheUsersPosition() {
+    void withoutAStartTheAssistantAsksWhereToStart() {
         AssistantReply reply = service.handle(1L, new AssistantRequest(
                 "yarın 2 kişi 700 tl ile gezeceğiz, rota önerir misin", 41.0262, 29.0165, null));
+
+        assertThat(reply.route()).isNull();
+        assertThat(reply.reply()).startsWith("Rotaya nereden başlayalım?");
+    }
+
+    @Test
+    void buradanStartsAtTheUsersPosition() {
+        AssistantReply reply = service.handle(1L, new AssistantRequest(
+                "yarın 2 kişi 700 tl ile buradan gezeceğiz, rota önerir misin", 41.0262, 29.0165, null));
 
         assertThat(reply.route().startLatitude()).isEqualTo(41.0262);
         assertThat(reply.reply()).doesNotContain("başlayan bir rota");

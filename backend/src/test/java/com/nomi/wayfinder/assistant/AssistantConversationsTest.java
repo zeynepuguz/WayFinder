@@ -44,7 +44,8 @@ class AssistantConversationsTest {
     // Monday 28 September 2026, 12:00 in Istanbul
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-09-28T09:00:00Z"), ZoneId.of("Europe/Istanbul"));
     private static final long USER = 1L;
-    private static final String PLAN = "2 kişiyiz rota planla";
+    // "buradan": starts at the user's position without the "nereden başlayalım?" question
+    private static final String PLAN = "2 kişiyiz buradan rota planla";
     private static final String TIRED = "çok yorulduk";
 
     private final Map<Long, Route> routes = new HashMap<>();

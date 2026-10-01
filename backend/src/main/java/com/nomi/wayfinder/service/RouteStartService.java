@@ -75,6 +75,10 @@ public class RouteStartService {
                 throw new BusinessException(HttpStatus.BAD_REQUEST,
                         "latitude and longitude are required (or choose a city with startMode AREA)");
             }
+            // A place the user named in the assistant ("Anıtkabir'den başlayalım")
+            if (request.startLabel() != null && !request.startLabel().isBlank()) {
+                return new Start(request.latitude(), request.longitude(), StartKind.SIGHT, request.startLabel().trim());
+            }
             return new Start(request.latitude(), request.longitude(), StartKind.LOCATION, null);
         }
         if (request.city() == null || request.city().isBlank()) {
@@ -91,6 +95,39 @@ public class RouteStartService {
         }
         return bestSight("p.city_id", city.id())
                 .orElse(new Start(city.labelLatitude(), city.labelLongitude(), StartKind.CITY, city.name()));
+    }
+
+    // Visible places whose name contains the text, near a point: the exact name first, then the best known, then nearest
+    private static final String PLACE_NAMED = """
+            SELECT p.name, ST_Y(p.location::geometry) AS lat, ST_X(p.location::geometry) AS lon
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?)
+              AND NOT p.hidden AND NOT p.unconfirmed
+              AND lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) LIKE ?
+            ORDER BY lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) = ? DESC,
+                     p.popularity DESC NULLS LAST,
+                     ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography))
+            LIMIT 1
+            """;
+    static final int PLACE_SEARCH_RADIUS_METERS = 40_000;
+
+    /**
+     * The place the user named as the start ("Anıtkabir", "Kızılay Meydanı"), within PLACE_SEARCH_RADIUS_METERS of
+     * the point (the city they plan in, else their position); empty for names shorter than 3 letters or not found.
+     */
+    public Optional<Start> placeNamed(String name, double latitude, double longitude) {
+        String text = name == null ? "" : name.replace('İ', 'i').replace('I', 'i').replace('ı', 'i')
+                .replace('Ş', 's').replace('ş', 's').replace('Ğ', 'g').replace('ğ', 'g')
+                .replace('Ü', 'u').replace('ü', 'u').replace('Ö', 'o').replace('ö', 'o')
+                .replace('Ç', 'c').replace('ç', 'c').toLowerCase(java.util.Locale.ROOT).trim()
+                .replaceAll("[%_]", "");
+        if (text.length() < 3) {
+            return Optional.empty();
+        }
+        List<Start> found = jdbc.query(PLACE_NAMED,
+                (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
+                longitude, latitude, PLACE_SEARCH_RADIUS_METERS, "%" + text + "%", text, longitude, latitude);
+        return found.stream().findFirst();
     }
 
     // Package-private for tests

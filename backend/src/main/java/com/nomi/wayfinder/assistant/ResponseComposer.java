@@ -39,6 +39,33 @@ public class ResponseComposer {
         return reply != null && (reply.startsWith(WHEN_QUESTION_TR) || reply.startsWith(WHEN_QUESTION_EN));
     }
 
+    static final String START_QUESTION_TR = "rotaya nereden başlayalım?";
+    static final String START_QUESTION_EN = "where should the route start?";
+
+    // No start named (or only a city): the next message answers it (AssistantService)
+    public String askStart(String city) {
+        return city == null
+                ? Texts.t("Rotaya nereden başlayalım? Bulunduğun yerden başlayabilirim ya da bir semt veya yer adı "
+                        + "yazabilirsin (örneğin \"Kızılay\", \"Anıtkabir\").",
+                "Where should the route start? I can start where you are, or you can write a neighbourhood or a place "
+                        + "(for example \"Kızılay\", \"Anıtkabir\").")
+                : Texts.t(city + " içinde " + START_QUESTION_TR + " Bir semt ya da yer adı yazabilirsin (örneğin "
+                        + "\"Kızılay\", \"Anıtkabir\"); \"fark etmez\" dersen en bilinen yerinden başlarım.",
+                "In " + city + ", " + START_QUESTION_EN + " Write a neighbourhood or a place (for example "
+                        + "\"Kızılay\", \"Anıtkabir\"); if you say \"anywhere\" I will start at its best-known sight.");
+    }
+
+    static boolean isStartQuestion(String reply) {
+        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
+        return lower.contains("nereden başlayalım?") || lower.contains(START_QUESTION_EN);
+    }
+
+    // The start the user wrote was not found anywhere near: the route starts at the default instead
+    public String startNotFound(String name) {
+        return Texts.t("\"" + name + "\" adında bir yer bulamadım; rotayı en uygun başlangıç noktasından başlattım. ",
+                "I could not find a place called \"" + name + "\"; the route starts at the best starting point. ");
+    }
+
     public String popularPlanCreated(RouteResponse route, String area) {
         String intro = area == null
                 ? Texts.t("Buranın en bilinen yerlerinden geçen hazır bir rota seçtim. ",

@@ -4,11 +4,14 @@ import com.nomi.wayfinder.area.AreaResolver;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantReply;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantRequest;
 import com.nomi.wayfinder.dto.RouteDtos.RoutePlanRequest;
+import com.nomi.wayfinder.dto.RouteDtos.StartMode;
 import com.nomi.wayfinder.entity.AssistantMessage;
 import com.nomi.wayfinder.entity.Route;
+import com.nomi.wayfinder.entity.StartKind;
 import com.nomi.wayfinder.repository.AssistantMessageRepository;
 import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RouteService;
+import com.nomi.wayfinder.service.RouteStartService;
 import com.nomi.wayfinder.weather.WeatherService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,9 +20,9 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,14 +30,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
-// "2 kişiyiz, 700 TL, kahvaltı ve kahve" at 20:10 planned a breakfast at 20:10: now the assistant asks first
-class AssistantBreakfastWhenTest {
+// A route request without a start: "Rotaya nereden başlayalım?", then the route starts at the named place
+class AssistantStartQuestionTest {
 
-    // Tuesday 29 September 2026, 20:10 in Istanbul
-    private static final Clock EVENING = Clock.fixed(Instant.parse("2026-09-29T17:10:00Z"), ZoneId.of("Europe/Istanbul"));
-    private static final String REQUEST = "2 kişiyiz, 700 TL bütçemiz var, kahvaltı ve kahve istiyoruz";
+    private static final Clock MORNING = Clock.fixed(Instant.parse("2026-10-02T06:00:00Z"), ZoneId.of("Europe/Istanbul"));
 
     private final RouteService routeService = mock(RouteService.class);
+    private final RouteStartService startService = mock(RouteStartService.class);
     private final List<AssistantMessage> saved = new ArrayList<>();
     private AssistantService service;
 
@@ -47,51 +49,44 @@ class AssistantBreakfastWhenTest {
         });
         when(messages.findByConversationIdOrderByCreatedAtDescIdDesc(any(), any(Pageable.class))).thenAnswer(inv -> {
             List<AssistantMessage> newestFirst = new ArrayList<>(saved);
-            java.util.Collections.reverse(newestFirst);
+            Collections.reverse(newestFirst);
             return newestFirst.subList(0, Math.min(((Pageable) inv.getArgument(1)).getPageSize(), newestFirst.size()));
         });
         when(routeService.createRoute(anyLong(), any())).thenReturn(new Route());
         ResponseComposer composer = mock(ResponseComposer.class);
-        when(composer.askWhenForBreakfast()).thenCallRealMethod();
         when(composer.askStart(any())).thenCallRealMethod();
         when(composer.planCreated(any(), any())).thenReturn("plan");
         AreaResolver areas = mock(AreaResolver.class);
-        when(areas.resolve(any(), anyString(), any(), any())).thenReturn(Optional.empty());
+        when(areas.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
+        when(startService.placeNamed(eq("Anıtkabir"), anyDouble(), anyDouble()))
+                .thenReturn(Optional.of(new RouteStartService.Start(39.925, 32.837, StartKind.SIGHT, "Anıtkabir")));
 
-        service = new AssistantService(new RuleBasedIntentParser(EVENING), routeService,
+        service = new AssistantService(new RuleBasedIntentParser(MORNING), routeService,
                 mock(RecommendationService.class), mock(WeatherService.class), composer, messages,
-                AssistantConversationsTest.conversationRepository(), areas, EVENING);
+                AssistantConversationsTest.conversationRepository(), areas, MORNING, null, null, startService);
     }
 
     @Test
-    void asksNowOrAnotherDayThenPlansTheAnsweredDayWithTheFirstRequest() {
-        AssistantReply question = service.handle(1L, new AssistantRequest(REQUEST, 40.8, 29.37, null));
-
-        assertThat(question.reply()).startsWith("Kahvaltı saati geçti.").contains("şimdi için mi");
+    void asksWhereToStartThenStartsAtTheNamedPlace() {
+        AssistantReply question = service.handle(1L, new AssistantRequest("2 kişiyiz, 5000 TL, tarih ve müze", 39.9, 32.8, null));
+        assertThat(question.reply()).startsWith("Rotaya nereden başlayalım?");
         verify(routeService, never()).createRoute(anyLong(), any());
 
-        Long conversation = question.conversationId();
-        AssistantReply where = service.handle(1L, new AssistantRequest("yarın sabah", 40.8, 29.37, null, conversation));
-
-        // Then where to start (no place named): both answers are read with the first request
-        assertThat(where.reply()).startsWith("Rotaya nereden başlayalım?");
-        verify(routeService, never()).createRoute(anyLong(), any());
-        service.handle(1L, new AssistantRequest("buradan", 40.8, 29.37, null, conversation));
+        service.handle(1L, new AssistantRequest("Anıtkabir'den başlayalım", 39.9, 32.8, null, question.conversationId()));
 
         ArgumentCaptor<RoutePlanRequest> plan = ArgumentCaptor.forClass(RoutePlanRequest.class);
         verify(routeService).createRoute(eq(1L), plan.capture());
-        assertThat(plan.getValue().date()).isEqualTo(LocalDate.of(2026, 9, 30));
+        assertThat(plan.getValue().latitude()).isEqualTo(39.925);
+        assertThat(plan.getValue().startLabel()).isEqualTo("Anıtkabir");
+        assertThat(plan.getValue().startMode()).isEqualTo(StartMode.LOCATION);
         // The first message's details are kept
         assertThat(plan.getValue().partySize()).isEqualTo(2);
-        assertThat(plan.getValue().budget()).isEqualTo(700);
-        assertThat(plan.getValue().latitude()).isEqualTo(40.8);
     }
 
     @Test
-    void sayingNowPlansRightAway() {
-        AssistantReply reply = service.handle(1L, new AssistantRequest("şimdi buradan " + REQUEST, 40.8, 29.37, null));
-
-        assertThat(reply.reply()).isEqualTo("plan");
-        verify(routeService).createRoute(eq(1L), any());
+    void startNameDropsSuffixAndFillerWords() {
+        assertThat(AssistantService.startName("Anıtkabir'den başlayalım")).isEqualTo("Anıtkabir");
+        assertThat(AssistantService.startName("Kızılay’dan olsun lütfen")).isEqualTo("Kızılay");
+        assertThat(AssistantService.startName("Kuğulu Park")).isEqualTo("Kuğulu Park");
     }
 }

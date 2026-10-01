@@ -39,8 +39,18 @@ public final class RouteDtos {
             // City slug ("istanbul"); with district: a district slug of that city ("kadikoy")
             @Size(max = 100) String city,
             @Size(max = 100) String district,
-            StartMode startMode
+            StartMode startMode,
+            // A named place the route starts at ("Anıtkabir"): latitude / longitude are that place, shown by this name
+            @Size(max = 200) String startLabel
     ) {
+
+        public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
+                                LocalTime endTime, Integer partySize, Integer budget,
+                                WalkingTolerance walkingTolerance, List<StopType> stops, List<String> interests,
+                                String title, String city, String district, StartMode startMode) {
+            this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
+                    title, city, district, startMode, null);
+        }
 
         public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
                                 LocalTime endTime, Integer partySize, Integer budget,

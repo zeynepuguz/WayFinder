@@ -23,6 +23,7 @@ import com.nomi.wayfinder.service.RecommendationService;
 import com.nomi.wayfinder.service.RecommendationService.Recommendation;
 import com.nomi.wayfinder.service.RecommendationService.TieredRecommendations;
 import com.nomi.wayfinder.service.RouteService;
+import com.nomi.wayfinder.service.RouteStartService;
 import com.nomi.wayfinder.weather.WeatherService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -63,6 +64,8 @@ public class AssistantService {
     // "ünlü bir rota" and the user's city; null in tests that do not need them
     private final PopularRouteService popularRoutes;
     private final CityService cityService;
+    // A start place the user names by its name ("Anıtkabir"); null in tests that do not need it
+    private final RouteStartService startService;
 
     public AssistantService(
             IntentParser intentParser,
@@ -79,7 +82,6 @@ public class AssistantService {
                 conversationRepository, areaResolver, clock, null, null);
     }
 
-    @Autowired
     public AssistantService(
             IntentParser intentParser,
             RouteService routeService,
@@ -93,6 +95,26 @@ public class AssistantService {
             PopularRouteService popularRoutes,
             CityService cityService
     ) {
+        this(intentParser, routeService, recommendationService, weatherService, composer, messageRepository,
+                conversationRepository, areaResolver, clock, popularRoutes, cityService, null);
+    }
+
+    @Autowired
+    public AssistantService(
+            IntentParser intentParser,
+            RouteService routeService,
+            RecommendationService recommendationService,
+            WeatherService weatherService,
+            ResponseComposer composer,
+            AssistantMessageRepository messageRepository,
+            AssistantConversationRepository conversationRepository,
+            AreaResolver areaResolver,
+            Clock clock,
+            PopularRouteService popularRoutes,
+            CityService cityService,
+            RouteStartService startService
+    ) {
+        this.startService = startService;
         this.popularRoutes = popularRoutes;
         this.cityService = cityService;
         this.intentParser = intentParser;
@@ -116,19 +138,17 @@ public class AssistantService {
         messageRepository.save(new AssistantMessage(userId, conversation.getId(), route == null ? null : route.getId(),
                 MessageRole.USER, request.message()));
 
-        // The answer to "şimdi mi, başka bir gün mü?": read together with the plan request it answers
-        boolean dayAnswered = false;
-        String pendingPlan = pendingPlanRequest(conversation.getId());
-        if (pendingPlan != null) {
-            request = new AssistantRequest(pendingPlan + " " + request.message(), request.latitude(),
+        // The answer to "şimdi mi, başka bir gün mü?" / "nereden başlayalım?": read together with the plan request
+        Pending pending = pending(conversation.getId(), request.message());
+        if (pending != null) {
+            request = new AssistantRequest(pending.planText(), request.latitude(),
                     request.longitude(), request.routeId(), request.conversationId());
-            dayAnswered = true;
         }
 
         AssistantIntent intent = intentParser.parse(request.message(), context(route));
 
         AssistantReply reply = switch (intent.type()) {
-            case PLAN_ROUTE -> planRoute(userId, request, intent, dayAnswered);
+            case PLAN_ROUTE -> planRoute(userId, request, intent, pending);
             // Only this chat's route; a past day's route is read-only
             case REPLAN -> route == null ? text(intent, composer.noRoute())
                     : routeService.isPast(route) ? text(intent, RouteService.pastRouteMessage())
@@ -281,16 +301,76 @@ public class AssistantService {
      * The plan request the assistant's last message asked "now or another day?" about, or null. Messages are newest
      * first: [this user message, the question, the request].
      */
-    private String pendingPlanRequest(Long conversationId) {
+    /**
+     * A plan request waiting for answers to the assistant's questions ("şimdi mi, başka gün mü?", "nereden
+     * başlayalım?"), possibly both, one after the other.
+     *
+     * @param planText    the plan request with the day answer (the start answer is not part of it: a place name
+     *                    must not read as an interest or the area of the plan)
+     * @param dayAnswered the day question was answered
+     * @param startAnswer the answer to the start question; null when it was not asked
+     */
+    record Pending(String planText, boolean dayAnswered, String startAnswer) {
+    }
+
+    private Pending pending(Long conversationId, String current) {
         List<AssistantMessage> recent = messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(
-                conversationId, PageRequest.of(0, 3));
-        if (recent == null || recent.size() < 3) {
+                conversationId, PageRequest.of(0, 7));
+        if (recent == null) {
             return null;
         }
-        AssistantMessage question = recent.get(1);
-        AssistantMessage plan = recent.get(2);
-        return question.getRole() == MessageRole.ASSISTANT && ResponseComposer.isWhenQuestion(question.getContent())
-                && plan.getRole() == MessageRole.USER ? plan.getContent() : null;
+        // Newest first: [current answer, question, older user message, question, plan request, ...]
+        List<String> texts = new ArrayList<>();
+        boolean day = false;
+        String start = null;
+        String answer = current;
+        int i = 1;
+        while (i + 1 < recent.size() && recent.get(i).getRole() == MessageRole.ASSISTANT
+                && recent.get(i + 1).getRole() == MessageRole.USER) {
+            String question = recent.get(i).getContent();
+            if (ResponseComposer.isWhenQuestion(question)) {
+                day = true;
+                texts.addFirst(answer);
+            } else if (ResponseComposer.isStartQuestion(question)) {
+                start = answer;
+            } else {
+                break;
+            }
+            answer = recent.get(i + 1).getContent();
+            i += 2;
+        }
+        if (i == 1) {
+            return null;
+        }
+        texts.addFirst(answer);
+        return new Pending(String.join(" ", texts), day, start);
+    }
+
+    // "Buradan", "bulunduğum yerden": the start is the user's position
+    private static final List<String> HERE_WORDS = List.of("buradan", "burdan", "bulunduğum", "bulundugum",
+            "konumum", "konumdan", "olduğum yer", "oldugum yer", "yakınımda", "yakinimda", "here", "my location",
+            "where i am", "near me");
+    // "Fark etmez": the usual start (the city's best-known sight, else the user's position)
+    private static final List<String> ANY_WORDS = List.of("fark etmez", "farketmez", "sen seç", "sen sec",
+            "farketmiyor", "fark etmiyor", "anywhere", "you choose", "doesn't matter", "does not matter");
+
+    private static boolean mentions(String text, List<String> words) {
+        String lower = text == null ? "" : text.toLowerCase(Texts.TURKISH);
+        return words.stream().anyMatch(lower::contains);
+    }
+
+    // The place name in "Anıtkabir'den başlayalım": the words before the suffix, without filler words
+    static String startName(String answer) {
+        String name = answer == null ? "" : answer.trim();
+        name = name.replaceAll("(?iU)\\b(başla\\p{L}*|olsun|lütfen|istiyorum|istiyoruz|start\\p{L}*|from|please)\\b", " ");
+        int apostrophe = name.indexOf('\'');
+        if (apostrophe < 0) {
+            apostrophe = name.indexOf('’');
+        }
+        if (apostrophe > 0) {
+            name = name.substring(0, apostrophe);
+        }
+        return name.replaceAll("[.!?,]", " ").replaceAll("\\s+", " ").trim();
     }
 
     // Breakfast asked for without a day once breakfast time is over: the user may mean tomorrow, or a late breakfast now
@@ -309,9 +389,11 @@ public class AssistantService {
         return !now && !LocalTime.now(clock).isBefore(BREAKFAST_OVER);
     }
 
-    private AssistantReply planRoute(Long userId, AssistantRequest request, AssistantIntent intent, boolean dayAnswered) {
+    private AssistantReply planRoute(Long userId, AssistantRequest request, AssistantIntent intent, Pending pending) {
         PlanParams p = intent.plan() != null ? intent.plan()
                 : new PlanParams(null, null, null, List.of(), List.of(), null);
+        boolean dayAnswered = pending != null && pending.dayAnswered();
+        String startAnswer = pending == null ? null : pending.startAnswer();
         // "Kahvaltı" in the evening without a day: ask before planning (the answer comes back with this request)
         if (askWhen(intent, request, p, dayAnswered)) {
             return text(intent, composer.askWhenForBreakfast());
@@ -321,15 +403,53 @@ public class AssistantService {
         // nothing). A name used in several cities means the one the user is in, unless the message names another city
         Optional<NamedArea> area = areaResolver.resolve(intent.area(), request.message(),
                 request.latitude(), request.longitude());
-        double latitude = area.map(NamedArea::latitude).orElse(request.latitude());
-        double longitude = area.map(NamedArea::longitude).orElse(request.longitude());
+
+        // No start named, or only a city ("Ankara'da"): ask where to start before planning. Not for a popular route
+        // (it starts at its first sight) or when the message already says "buradan"
+        boolean startNamed = area.isPresent() && area.get().kind() != NamedArea.Kind.CITY;
+        if (startAnswer == null && !startNamed && !p.wantsPopular() && !mentions(request.message(), HERE_WORDS)
+                && !mentions(request.message(), ANY_WORDS)) {
+            return text(intent, composer.askStart(area.map(NamedArea::name).orElse(null)));
+        }
+
+        // The answer: "buradan" = the user's position, "fark etmez" = the usual start, else a neighbourhood /
+        // district ("Kızılay") or a place ("Anıtkabir") in the city of the plan (else around the user)
+        StartPlace named = null;
+        String startNote = "";
+        if (startAnswer != null && !mentions(startAnswer, ANY_WORDS)) {
+            if (mentions(startAnswer, HERE_WORDS)) {
+                area = Optional.empty();
+            } else {
+                Optional<NamedArea> planArea = area;
+                double refLat = planArea.map(NamedArea::latitude).orElse(request.latitude());
+                double refLon = planArea.map(NamedArea::longitude).orElse(request.longitude());
+                String name = startName(startAnswer);
+                // The plan's own city again ("Ankara") is no answer to "where in Ankara?"
+                Optional<NamedArea> answered = areaResolver.resolve(null, name, refLat, refLon)
+                        .filter(a -> planArea.isEmpty() || a.kind() != NamedArea.Kind.CITY
+                                || !a.name().equals(planArea.get().name()));
+                Optional<RouteStartService.Start> place = answered.isPresent() || startService == null
+                        ? Optional.empty() : startService.placeNamed(name, refLat, refLon);
+                if (answered.isPresent()) {
+                    area = answered;
+                } else if (place.isPresent()) {
+                    named = new StartPlace(place.get().latitude(), place.get().longitude(), place.get().label());
+                } else {
+                    startNote = composer.startNotFound(name);
+                }
+            }
+        }
+        double latitude = named != null ? named.latitude() : area.map(NamedArea::latitude).orElse(request.latitude());
+        double longitude = named != null ? named.longitude() : area.map(NamedArea::longitude).orElse(request.longitude());
         LocalDate date = day(intent, request.message());
-        String areaName = area.map(NamedArea::name).orElse(null);
+        String areaName = named != null ? named.name() : area.map(NamedArea::name).orElse(null);
         AssistantIntent resolved = intent.withDateAndArea(date, area.map(NamedArea::name).orElse(intent.area()));
 
         // A named city / district starts like "Rotalarım > Yeni rota > şehir / ilçe": at its best-known sight with
         // cafés around, else its centre. A neighbourhood (or nothing named) starts at its point / the user's position
-        String citySlug = area.filter(a -> a.kind() != NamedArea.Kind.AREA).map(NamedArea::citySlug).orElse(null);
+        // A named place starts right there
+        String citySlug = named != null ? null
+                : area.filter(a -> a.kind() != NamedArea.Kind.AREA).map(NamedArea::citySlug).orElse(null);
         String districtSlug = area.filter(a -> a.kind() == NamedArea.Kind.DISTRICT)
                 .map(NamedArea::districtSlug).orElse(null);
 
@@ -350,10 +470,17 @@ public class AssistantService {
         Route route = routeService.createRoute(userId, new RoutePlanRequest(
                 latitude, longitude, date, p.startTime(), null,
                 p.partySize(), p.budget(), p.walkingTolerance(), p.stops(), p.interests(), null,
-                areaStart ? citySlug : null, areaStart ? districtSlug : null, areaStart ? StartMode.AREA : null));
+                areaStart ? citySlug : null, areaStart ? districtSlug : null,
+                areaStart ? StartMode.AREA : named != null ? StartMode.LOCATION : null,
+                named != null ? named.name() : null));
 
         RouteResponse response = routeService.toResponse(route);
-        return withRoute(resolved, popularNote + composer.planCreated(response, areaName), response, List.of());
+        return withRoute(resolved, startNote + popularNote + composer.planCreated(response, areaName), response,
+                List.of());
+    }
+
+    // A place the user named as the start ("Anıtkabir")
+    private record StartPlace(double latitude, double longitude, String name) {
     }
 
     // The city (slug) the user is in, for "ünlü bir rota" without a place name
