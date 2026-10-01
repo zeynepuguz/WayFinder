@@ -104,6 +104,36 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("limit") int limit
     );
 
+    /**
+     * Like findCandidates, but only places whose name, cuisine or tags contain one of the words the user asked for
+     * when swapping a stop (planning/StopWish: "kebap" -> "%kebap%", comma separated). Turkish letters are folded.
+     */
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+              AND NOT p.hidden
+              AND NOT p.unconfirmed
+              AND NOT p.inside_institution
+              AND (p.category IN (:categories)
+                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+              AND lower(translate(p.name || ' ' || coalesce(p.cuisine, '') || ' ' || array_to_string(p.tags, ' '),
+                                  'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc'))
+                  LIKE ANY (string_to_array(CAST(:patterns AS text), ','))
+            ORDER BY "distanceMeters"
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PlaceDistance> findWishCandidates(
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("radius") double radiusMeters,
+            @Param("categories") Collection<String> categories,
+            @Param("tag") String tag,
+            @Param("patterns") String patterns,
+            @Param("limit") int limit
+    );
+
     // Visible, plannable places of these categories around a point (is the area worth planning a route in?)
     @Query(value = """
             SELECT count(*) FROM places p

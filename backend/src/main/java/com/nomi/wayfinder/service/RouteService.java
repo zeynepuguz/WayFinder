@@ -352,7 +352,7 @@ public class RouteService {
                 .map(s -> PlanningSlot.existing(s.getStopType(), s.getPlannedStart(), s.getPlace().getId()))
                 .toList());
 
-        Set<Long> excluded = new HashSet<>();
+        Set<Long> excluded = new HashSet<>(route.getRejectedPlaceIds());
         done.forEach(s -> excluded.add(s.getPlace().getId()));
 
         WalkingTolerance tolerance = route.getWalkingTolerance();
@@ -396,8 +396,13 @@ public class RouteService {
             }
             case REPLACE_STOP -> {
                 RouteStop target = findRemainingStop(remaining, request.stopId());
+                // "Neye göre?": the user's own words decide what the new place should be like
+                StopWish wish = StopWish.parse(request.wish());
+                StopWish replacing = wish == null ? null : wish.replacing(target.getPlace().getEstimatedCost());
                 slots.replaceAll(slot -> Objects.equals(slot.pinnedPlaceId(), target.getPlace().getId())
-                        ? slot.unpinned() : slot);
+                        ? slot.unpinned().withWish(replacing) : slot);
+                // Remembered for the route: a second swap must not bring this place back
+                route.rejectPlace(target.getPlace().getId());
                 excluded.add(target.getPlace().getId());
             }
             case ADD_STOP -> {

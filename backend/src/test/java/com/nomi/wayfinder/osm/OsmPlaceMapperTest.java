@@ -170,7 +170,10 @@ class OsmPlaceMapperTest {
         assertThat(map("man_made", "lighthouse", "name", "Ahırkapı Feneri", "wikidata", "Q4696188").tags())
                 .containsExactlyInAnyOrder("sea", "view");
         assertThat(map("man_made", "lighthouse", "name", "Mendirek Feneri")).isNull();
-        OsmPlace bazaar = map("amenity", "marketplace", "name", "Kadıköy Salı Pazarı");
+        // A weekly market is a place to shop; a historic bazaar is a sight
+        assertThat(map("amenity", "marketplace", "name", "Kadıköy Salı Pazarı").category())
+                .isEqualTo(PlaceCategory.MARKET);
+        OsmPlace bazaar = map("amenity", "marketplace", "name", "Mısır Çarşısı");
         assertThat(bazaar.category()).isEqualTo(PlaceCategory.ATTRACTION);
         assertThat(bazaar.tags()).contains("shopping");
     }

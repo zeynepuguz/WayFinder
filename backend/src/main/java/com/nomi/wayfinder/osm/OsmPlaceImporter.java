@@ -259,6 +259,11 @@ public class OsmPlaceImporter {
             String unrealistic = place == null ? null : PlaceRealismFilter.rejectElement(element, place);
             if (place == null) {
                 unusable++;
+                // No longer a kind we show (a cemetery once filed as a place of worship, a municipal market once a
+                // sight): the row an earlier import wrote for it goes, like an unrealistic one
+                if (element.type() != null) {
+                    unrealisticIds.add(element.type() + "/" + element.id());
+                }
             } else if (unrealistic != null) {
                 // A school canteen, a police club, a closed or private place, a generic "Kafe"
                 unrealisticIds.add(place.osmId());

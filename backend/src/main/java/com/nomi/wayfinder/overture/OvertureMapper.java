@@ -118,7 +118,7 @@ public final class OvertureMapper {
         List<String> hierarchy = row.hierarchy() == null ? List.of() : row.hierarchy();
         // A market chain is a market however its page is filed ("Mimar Sinan Hakmar" as a shopping mall)
         Kind kind = isMarketChain(name, hierarchy) ? new Kind(PlaceCategory.MARKET, List.of())
-                : classify(hierarchy, folded);
+                : classify(hierarchy, folded, name);
         if (kind == null || PlaceRealismFilter.rejectName(name, kind.category()) != null) {
             return null;
         }
@@ -131,12 +131,16 @@ public final class OvertureMapper {
                 trim(row.phone(), MAX_PHONE), website(row.website()), row.latitude(), row.longitude());
     }
 
-    static Kind classify(List<String> hierarchy, String folded) {
+    static Kind classify(List<String> hierarchy, String folded, String name) {
         // Places to pray at and to buy groceries (Explore only)
         if (hierarchy.contains("place_of_worship")) {
-            // "muslim_place_of_worship" -> muslim; the name ("... Kilisesi") wins over a wrong one
-            String religion = hierarchy.getLast().replace("_place_of_worship", "");
-            String worship = PlaceTags.worshipKind(folded, religion);
+            // Meta pages file villages, tombs, cemeteries, Quran courses and cafés as places of worship, with a
+            // religion picked at random ("Şair Ahmet Paşa Türbesi" as christian): only names that say "Camii",
+            // "Kilisesi", "Cemevi", ... count, and the kind comes from the name alone
+            if (!PlaceTags.placeToPray(name, true)) {
+                return null;
+            }
+            String worship = PlaceTags.worshipKind(name, null, null);
             return new Kind(PlaceCategory.WORSHIP,
                     worship == null ? List.of("religious") : List.of("religious", worship));
         }

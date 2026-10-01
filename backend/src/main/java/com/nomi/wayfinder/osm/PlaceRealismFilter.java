@@ -63,6 +63,41 @@ public final class PlaceRealismFilter {
     private static final List<String> DESCRIPTION_STEMS = List.of("kantin", "kafe", "cafe", "restoran", "lokanta",
             "park", "bahce", "bufe", "cay", "yemek", "okul", "lise", "fakulte", "pastane", "firin", "kahve");
 
+    // Folded word prefixes of other businesses / things that Meta pages and OSM file as cafés, restaurants or
+    // markets ("Ada Eczanesi", "Akbank ATM", "Gef İnşaat Malzemeleri", "Hastane Etimesgut Ankara", "Yazı Köyü")
+    private static final List<String> OTHER_BUSINESS_STEMS = List.of("eczane", "kuafor", "noter", "insaat", "emlak",
+            "gayrimenkul", "yikama", "otopark", "akaryakit", "benzinlik", "bankasi", "bankamatik", "hastane",
+            "lisesi", "okulu", "ilkokul", "ortaokul", "muhtarl", "dernek", "dernegi", "vakfi", "malzeme", "zabita",
+            "toptanci");
+    // Where a place is, not what it is: only a name made of these and no food word is no café ("Yazı Köyü",
+    // "Fidandibi Sitesi"); "Çırpı Kahvaltı Köyü" is a breakfast place
+    // Also lodging and branch places: "Venüs Restaurant ve Pansiyon", "Kampüs Midye", "Adiloğlu Pastane Camikebir"
+    private static final List<String> LOCATION_STEMS = List.of("mahallesi", "sitesi", "apartmani", "galeri",
+            "universite", "kampus", "otel", "hotel", "pansiyon", "cami", "mescid", "kilise", "ofisi", "limited");
+    private static final Set<String> LOCATION_WORDS = Set.of("ltd", "sti", "koyu", "koyleri");
+    // Whole words for food / drink ("bar" and "pub" would match "Barış" and "Pubertet" as prefixes)
+    private static final Set<String> FOOD_OR_MARKET_WORDS = Set.of("bar", "pub");
+    // "X - Hastane Şubesi": a branch of a chain, named after where it is
+    private static final List<String> BRANCH_STEMS = List.of("sube");
+    private static final Set<String> OTHER_BUSINESS_WORDS = Set.of("atm", "oto", "banka", "spa");
+    // Folded word prefixes that say food, drink or groceries (the place is what its last such word says)
+    private static final List<String> FOOD_OR_MARKET_STEMS = List.of("cafe", "kafe", "kahve", "coffee", "cay",
+            "kiraathane", "kahvehane", "restoran", "restaurant", "resto", "lokanta", "pastane", "pastahane",
+            "patisserie", "firin", "bakery", "simit", "borek", "kahvalti", "breakfast", "market", "bakkal", "gida",
+            "sarkuteri", "manav", "bufe", "kebap", "kebab", "doner", "pide", "lahmacun", "kofte", "dondurma", "tatli",
+            "baklava", "kunefe", "katmer", "lokma", "corba", "yemek", "mutfa", "bistro", "pizza", "burger", "sofra",
+            "ocakbasi", "tantuni", "manti", "balik", "mangal", "grill", "steak", "waffle", "kumpir", "cikolata",
+            "chocolate", "cafeteria", "kafeterya", "tea", "mezes", "meyhane", "tost", "sandvic", "gozleme",
+            "pazar", "kantin", "ekmek", "ekmeg", "boreg", "unlu", "yeri", "midye", "sushi", "food", "gastronomi", "resturant", "restorant", "lezzet", "kitchen", "lounge", "caffe", "aspava", "ciger", "iskembe",
+            "kelle", "kuzu", "ristorante", "trattoria", "sut", "kasap", "et", "tavuk", "pilav", "cigkofte", "durum", "kokorec");
+    // Chains are what they are, wherever their page says they are ("Espressolab Marmara Üniversitesi Kampüsü")
+    private static final List<String> FOOD_OR_MARKET_BRANDS = List.of("starbucks", "espressolab", "kahvedunyasi",
+            "simitsarayi", "gloriajean", "caribou", "mado", "tavukdunyasi", "burgerking", "mcdonald", "kfc", "popeyes",
+            "dominos", "littlecaesars", "arbys", "baydoner", "komagene", "oses", "davidpeople", "migros", "carrefour", "bim", "a101", "sok", "hakmar",
+            "file", "tarimkredi", "macrocenter", "metro");
+    // Not sights: associations, hotels, guest houses, ordinary weekly / municipal markets
+    private static final List<String> NOT_A_SIGHT_STEMS = List.of("dernek", "dernegi", "otel", "hotel", "pansiyon");
+
     private static final Set<String> NO_ACCESS = Set.of("private", "no");
     private static final List<String> LIFECYCLE_PREFIXES = List.of("disused:", "abandoned:", "was:");
     private static final List<String> MAIN_KEYS = List.of("amenity", "shop", "tourism", "leisure");
@@ -182,7 +217,58 @@ public final class PlaceRealismFilter {
         if (isInstitutionFacility(words)) {
             return "institution (sosyal tesis)";
         }
+        if ((food || category == PlaceCategory.MARKET) && otherBusiness(words)) {
+            return "another kind of business";
+        }
+        // Livestock and car markets are no grocery shopping
+        if (category == PlaceCategory.MARKET && (folded.contains("kurbanpazari") || folded.contains("hayvanpazari")
+                || folded.contains("otopazari") || folded.contains("hayvanborsasi"))) {
+            return "livestock / car market";
+        }
+        if (category == PlaceCategory.ATTRACTION && (firstStem(words, NOT_A_SIGHT_STEMS) != null
+                || isOrdinaryMarket(folded))) {
+            return "not a sight";
+        }
         return null;
+    }
+
+    /**
+     * The last telling word names another business or thing ("Ada Eczanesi", "Akbank ATM", "Kemer Pansiyon"),
+     * not food / groceries; "Petrol Fırın Cafe" and "Beyaz Ev Butik Otel Restaurant" are fine, and so is a chain.
+     */
+    static boolean otherBusiness(List<String> words) {
+        String joined = String.join("", words);
+        if (FOOD_OR_MARKET_BRANDS.stream().anyMatch(b -> words.contains(b) || b.length() > 5 && joined.contains(b))) {
+            return false;
+        }
+        if (words.stream().anyMatch(w -> BRANCH_STEMS.stream().anyMatch(w::startsWith))) {
+            return false;
+        }
+        int other = -1;
+        int food = -1;
+        boolean location = false;
+        for (int i = 0; i < words.size(); i++) {
+            String w = words.get(i);
+            if (OTHER_BUSINESS_WORDS.contains(w) || OTHER_BUSINESS_STEMS.stream().anyMatch(w::startsWith)) {
+                other = i;
+            }
+            if (LOCATION_WORDS.contains(w) || LOCATION_STEMS.stream().anyMatch(w::startsWith)) {
+                location = true;
+            }
+            // "Kampuscafe02": a food word inside a word written together counts too (from 4 letters)
+            if (w.equals("et") || FOOD_OR_MARKET_WORDS.contains(w) || FOOD_OR_MARKET_STEMS.stream().anyMatch(s -> !s.equals("et")
+                    && (w.startsWith(s) || s.length() >= 4 && w.contains(s)))) {
+                food = i;
+            }
+        }
+        return other >= 0 && other >= food || location && food < 0;
+    }
+
+    // "Orduyeri Mahallesi Semt Pazarı", "Lapseki Kapalı Pazar Yeri": a weekly or municipal market, not a sight
+    static boolean isOrdinaryMarket(String folded) {
+        return folded.contains("pazaryeri") || folded.contains("semtpazari") || folded.contains("halkpazari")
+                || folded.contains("kapalipazar") || folded.contains("koypazari") || folded.contains("kurbanpazari")
+                || folded.contains("hayvanpazari") || folded.contains("toptancihali") || folded.contains("pazaralani");
     }
 
     // "... Sosyal Tesisleri" of a directorate, company, bank or the police; municipal ones are public

@@ -340,6 +340,8 @@ export interface ReplanRequest {
   stopId?: number
   stopType?: StopType
   interest?: string
+  // REPLACE_STOP: what the new place should be like, in the user's words
+  wish?: string
 }
 
 export interface ReplanResponse {

@@ -342,6 +342,10 @@ public class RoutePlanner {
 
         // 1) nearby and within budget
         SearchOutcome near = search(slot, leg, request, forecast, used, maxLeg, maxLeg);
+        StopWish wish = slot.wish();
+        if (wish != null && wish.hasCriteria()) {
+            return wished(slot, wish, near, leg, request, forecast, used, expanded, maxLeg, notes);
+        }
         if (near.affordable().isPresent() && (!wantsInterestMatch || near.interestMatched())) {
             return near.affordable();
         }
@@ -396,6 +400,34 @@ public class RoutePlanner {
         return fallback;
     }
 
+    /**
+     * A swapped stop with a wish ("kebap", "daha ucuz"): a fitting place nearby, else a fitting one a bit further,
+     * else the best other place with a note that nothing fitting is open.
+     */
+    private Optional<PlannedStop> wished(PlanningSlot slot, StopWish wish, SearchOutcome near, LegContext leg,
+                                         PlanningRequest request, WeatherForecast forecast, Set<Long> used,
+                                         double expanded, double maxLeg, List<String> notes) {
+        if (near.wishMatched() && near.affordable().isPresent()) {
+            return near.affordable();
+        }
+        SearchOutcome far = search(slot, leg, request, forecast, used, expanded, maxLeg);
+        if (far.wishMatched() && far.affordable().isPresent()) {
+            return far.affordable();
+        }
+        if (near.wishMatched() && near.overBudget().isPresent()) {
+            return near.overBudget();
+        }
+        if (far.wishMatched() && far.overBudget().isPresent()) {
+            return far.overBudget();
+        }
+        notes.add(Texts.t("“" + wish.text() + "” isteğine uyan, bu saatte açık bir yer yakında bulunamadı; "
+                        + "yerine en uygun " + Texts.lower(slot.type().getLabel()) + " mekanı seçildi.",
+                "No place matching “" + wish.text() + "” is open nearby at this time; the best other "
+                        + Texts.lower(slot.type().getLabel()) + " place was chosen."));
+        Optional<PlannedStop> other = near.affordable().or(far::affordable);
+        return other.isPresent() ? other : near.overBudget().or(far::overBudget);
+    }
+
     private static String breakfastNote(Place place) {
         return Texts.t("Yakında bu saatte açık bir kahvaltı mekanı bulunamadı; kahvaltı için açık olan "
                         + place.getDisplayName() + " (kafe / fırın / pastane) seçildi.",
@@ -431,6 +463,16 @@ public class RoutePlanner {
                     searchRadius, categories, slot.searchTag(), interestTags, sea, INTEREST_CANDIDATE_LIMIT);
             if (matching != null) {
                 matching.stream().filter(p -> ids.add(p.getId())).forEach(found::add);
+            }
+        }
+        // "Başka bir yerle değiştir: kebap": places named / tagged so, a little further than the nearest ones
+        StopWish wish = slot.wish();
+        if (wish != null && !wish.words().isEmpty()) {
+            Set<Long> ids = found.stream().map(PlaceDistance::getId).collect(Collectors.toSet());
+            List<PlaceDistance> wished = placeRepository.findWishCandidates(leg.latitude(), leg.longitude(),
+                    searchRadius, categories, slot.searchTag(), wish.likePatterns(), INTEREST_CANDIDATE_LIMIT);
+            if (wished != null) {
+                wished.stream().filter(p -> ids.add(p.getId())).forEach(found::add);
             }
         }
 
@@ -529,14 +571,30 @@ public class RoutePlanner {
             }
         }
 
-        Comparator<PlaceScorer.ScoredPlace> byScore = Comparator.comparingDouble(PlaceScorer.ScoredPlace::score);
+        // The user's wish for a swapped stop: only fitting places when there are any
+        boolean wishMatched = false;
+        if (wish != null && wish.hasCriteria()) {
+            List<PlaceScorer.ScoredPlace> fitting = affordable.stream().filter(s -> wish.matches(s.place())).toList();
+            List<PlaceScorer.ScoredPlace> fittingOver = overBudget.stream().filter(s -> wish.matches(s.place())).toList();
+            if (!fitting.isEmpty() || !fittingOver.isEmpty()) {
+                affordable = fitting;
+                overBudget = fittingOver;
+                wishMatched = true;
+            }
+        }
+
+        // "Daha yakın": the nearest fitting place; otherwise the best scored one
+        Comparator<PlaceScorer.ScoredPlace> byScore = wish != null && wish.closer()
+                ? Comparator.comparingDouble(s -> -timings.get(s.place().getId()).distanceMeters())
+                : Comparator.comparingDouble(PlaceScorer.ScoredPlace::score);
 
         return new SearchOutcome(
                 affordable.stream().max(byScore)
                         .map(s -> toStop(slot, s.place(), timings.get(s.place().getId()), s.reasons())),
                 overBudget.stream().max(byScore)
                         .map(s -> toStop(slot, s.place(), timings.get(s.place().getId()), s.reasons())),
-                interestMatched
+                interestMatched,
+                wishMatched
         );
     }
 
@@ -566,7 +624,7 @@ public class RoutePlanner {
     }
 
     private record SearchOutcome(Optional<PlannedStop> affordable, Optional<PlannedStop> overBudget,
-                                 boolean interestMatched) {
+                                 boolean interestMatched, boolean wishMatched) {
     }
 
     private Optional<PlannedStop> planPinned(

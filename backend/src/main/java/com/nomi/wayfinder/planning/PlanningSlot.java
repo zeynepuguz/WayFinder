@@ -20,6 +20,7 @@ import java.util.Set;
  *                        (e.g. "view" for viewpoints); ignored when categories is null
  * @param keepInRain      a pinned outdoor place stays even when rain is expected (a popular route's famous sights
  *                        are the point of the route; the plan gets a rain note instead)
+ * @param wish            what the user asked for instead of the replaced place ("kebap", "daha ucuz"); null = none
  */
 public record PlanningSlot(
         StopType type,
@@ -29,8 +30,14 @@ public record PlanningSlot(
         boolean exactTime,
         Set<PlaceCategory> categories,
         String matchingTag,
-        boolean keepInRain
+        boolean keepInRain,
+        StopWish wish
 ) {
+
+    public PlanningSlot(StopType type, LocalTime targetTime, Long pinnedPlaceId, Integer durationMinutes,
+                        boolean exactTime, Set<PlaceCategory> categories, String matchingTag, boolean keepInRain) {
+        this(type, targetTime, pinnedPlaceId, durationMinutes, exactTime, categories, matchingTag, keepInRain, null);
+    }
 
     public PlanningSlot(StopType type, LocalTime targetTime, Long pinnedPlaceId, Integer durationMinutes,
                         boolean exactTime) {
@@ -66,7 +73,13 @@ public record PlanningSlot(
     }
 
     public PlanningSlot unpinned() {
-        return new PlanningSlot(type, targetTime, null, durationMinutes, exactTime, categories, matchingTag, false);
+        return new PlanningSlot(type, targetTime, null, durationMinutes, exactTime, categories, matchingTag, false, wish);
+    }
+
+    // The same stop, filled by a place that fits the user's wish when one is open nearby
+    public PlanningSlot withWish(StopWish wish) {
+        return new PlanningSlot(type, targetTime, pinnedPlaceId, durationMinutes, exactTime, categories, matchingTag,
+                keepInRain, wish);
     }
 
     // The categories the planner searches

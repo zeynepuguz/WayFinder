@@ -182,6 +182,9 @@ public final class OsmPlaceMapper {
      * amenity, shop, tourism, leisure, historic, natural, man_made: a cafe that is also tagged tourism=attraction
      * is still a cafe; a place of worship without Wikidata / heritage / historic tags falls through to the next key.
      */
+    // Names of historic bazaars (folded): "Kapalıçarşı", "Mısır Çarşısı", "Bedesten", "Arasta", "Bazaar"
+    static final List<String> HISTORIC_BAZAAR_WORDS = List.of("carsi", "bedesten", "arasta", "bazaar");
+
     static Kind classify(OverpassResponse.Element element, String foldedName, List<String> cuisines) {
         String amenity = element.tag("amenity");
         boolean notable = wikidata(element.tag("wikidata")) != null;
@@ -215,6 +218,10 @@ public final class OsmPlaceMapper {
                 || denomination.startsWith("alevi") || denomination.startsWith("bektashi")
                 || PlaceTags.namedCemeviOrSynagogue(element.tag("name")));
         if ("place_of_worship".equals(amenity) || worshipByOtherTags) {
+            // A cemetery, Quran course or association filed as a place of worship is not one
+            if (!PlaceTags.placeToPray(element.tag("name"), false)) {
+                return null;
+            }
             // Famous / historic mosques, churches and synagogues are sights; every other one is a place to pray at
             String kind = PlaceTags.worshipKind(element.tag("name"), element.tag("religion"),
                     element.tag("denomination"));
@@ -227,7 +234,13 @@ public final class OsmPlaceMapper {
             return new Kind(PlaceCategory.WORSHIP, religious, true);
         }
         if ("marketplace".equals(amenity)) {
-            return new Kind(PlaceCategory.ATTRACTION, List.of("shopping", "local"), false);
+            // Historic bazaars are sights (Kapalıçarşı, a bedesten, an arasta); a weekly / municipal market hall
+            // ("Adem Yavuz Kapalı Pazar Yeri") is a place to shop
+            boolean historicBazaar = notable || trimToNull(element.tag("historic")) != null
+                    || trimToNull(element.tag("heritage")) != null
+                    || HISTORIC_BAZAAR_WORDS.stream().anyMatch(foldedName::contains);
+            return historicBazaar ? new Kind(PlaceCategory.ATTRACTION, List.of("shopping", "local"), false)
+                    : new Kind(PlaceCategory.MARKET, List.of("local"), foldedName.contains("kapali"));
         }
 
         String shop = element.tag("shop");

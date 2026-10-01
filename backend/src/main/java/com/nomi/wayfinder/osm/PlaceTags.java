@@ -142,6 +142,50 @@ public final class PlaceTags {
     private static final Pattern NOT_A_WORSHIP_PLACE = Pattern.compile("(?<!\\p{L})(sokak|sokağı|cadde|caddesi|yolu|"
             + "geçidi|aralığı|meydanı|durağı|parkı|mahallesi|mah|mezarlığı|mezarlık|türbe|türbesi|yemekhanesi|ek bina)(?!\\p{L})");
 
+    // Folded word prefixes that name a place to pray at ("Camii", "Mescidi", "Kilisesi", "Cemevi", "Dergahı")
+    private static final List<String> WORSHIP_WORDS = List.of("cami", "mescid", "mescit", "kilise", "church",
+            "katedral", "cathedral", "sapel", "chapel", "manastir", "monastery", "sinagog", "synagogue", "cemev",
+            "dergah", "tekke", "mosque", "kulliye", "bazilika", "basilica");
+    // Folded word prefixes of what is filed as a place of worship but is not one: cemeteries, Quran courses,
+    // associations / foundations, condolence houses, schools, cafés, a village's or municipality's page
+    private static final List<String> NOT_WORSHIP_WORDS = List.of("mezarl", "kabrist", "kursu", "kurslar",
+            "hafizlik", "taziye", "dernek", "dernegi", "vakf", "okul", "lisesi", "yurdu", "restoran", "lokanta",
+            "market", "muhtarl", "belediye", "koyu", "mahallesi", "lojman", "otopark", "muftul", "temsilcilig",
+            "ofisi");
+    // Whole words only ("Cafer", "Kurşunlu" and "Vakıfbank" are names)
+    private static final Set<String> NOT_WORSHIP_EXACT = Set.of("kurs", "kafe", "cafe", "coffee", "vakif", "yurt",
+            "sube", "subesi", "ofis");
+
+    /**
+     * Is this name a place to pray at? The last telling word decides: "Fatih Camii Kuran Kursu" and "Cami Yaptırma
+     * Derneği" are not, "Hacı Bektaş Veli Kültür Vakfı Çınarlı Cemevi" and "Mezarlık Camii" are.
+     *
+     * @param requireWorshipWord true for sources that file many other things as worship places (Overture / Meta
+     *                           pages: "Sarıbey Köyü", "Altı Poğaça", "... Türbesi"); false for OSM place_of_worship
+     *                           ("Neve Şalom" has no such word but is a synagogue)
+     */
+    public static boolean placeToPray(String name, boolean requireWorshipWord) {
+        List<String> words = PlaceRealismFilter.words(name == null ? "" : name);
+        int worship = -1;
+        int other = -1;
+        for (int i = 0; i < words.size(); i++) {
+            String w = words.get(i);
+            boolean cemEvi = w.equals("cem") && i + 1 < words.size() && words.get(i + 1).startsWith("ev");
+            if (cemEvi || w.equals("havra") || w.equals("havrasi") || WORSHIP_WORDS.stream().anyMatch(w::startsWith)) {
+                worship = cemEvi ? i + 1 : i;
+                if (cemEvi) {
+                    i++;
+                }
+            } else if (NOT_WORSHIP_EXACT.contains(w) || NOT_WORSHIP_WORDS.stream().anyMatch(w::startsWith)) {
+                other = i;
+            }
+        }
+        if (requireWorshipWord && worship < 0) {
+            return false;
+        }
+        return worship > other || other < 0;
+    }
+
     /**
      * A cemevi or synagogue mapped without amenity=place_of_worship, known only by its name
      * ("Bağcılar Cemevi", "Bergama Yabets Sinagogu"); "Cemevi Sokağı", "Havran" and "Musevi Mezarlığı" are not.

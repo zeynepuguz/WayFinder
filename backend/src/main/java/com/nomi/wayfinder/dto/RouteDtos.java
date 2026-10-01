@@ -67,8 +67,15 @@ public final class RouteDtos {
             // ADD_STOP
             StopType stopType,
             // ADD_INTEREST
-            String interest
+            String interest,
+            // REPLACE_STOP (optional): what the new place should be like, in the user's words ("kebap", "daha ucuz")
+            @Size(max = 200) String wish
     ) {
+
+        public ReplanRequest(ReplanType type, Double latitude, Double longitude, Long stopId, StopType stopType,
+                             String interest) {
+            this(type, latitude, longitude, stopId, stopType, interest, null);
+        }
     }
 
     public record RouteUpdateRequest(

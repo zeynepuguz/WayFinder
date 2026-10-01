@@ -60,6 +60,11 @@ public class Route {
     @Column(columnDefinition = "text[]", nullable = false)
     private List<String> interests = new ArrayList<>();
 
+    // Places swapped out of this route by the user: never planned into it again
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(columnDefinition = "bigint[]", nullable = false)
+    private List<Long> rejectedPlaceIds = new ArrayList<>();
+
     @Column(length = 20)
     private String weatherCondition;
 
@@ -208,6 +213,17 @@ public class Route {
 
     public void setWalkingTolerance(WalkingTolerance walkingTolerance) {
         this.walkingTolerance = walkingTolerance;
+    }
+
+    public List<Long> getRejectedPlaceIds() {
+        return rejectedPlaceIds;
+    }
+
+    public void rejectPlace(Long placeId) {
+        if (placeId != null && !rejectedPlaceIds.contains(placeId)) {
+            rejectedPlaceIds = new ArrayList<>(rejectedPlaceIds);
+            rejectedPlaceIds.add(placeId);
+        }
     }
 
     public List<String> getInterests() {

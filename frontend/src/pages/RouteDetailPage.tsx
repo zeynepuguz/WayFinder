@@ -17,6 +17,15 @@ import { useAsync } from '../lib/useAsync'
 
 type Change = Omit<ReplanRequest, 'latitude' | 'longitude'>
 
+// Ready answers for "Neye göre değiştirelim?" by stop type (the backend reads any text: planning/StopWish)
+function swapWishes(type: StopType, t: (tr: string, en: string) => string): string[] {
+  const common = [t('Daha ucuz', 'Cheaper'), t('Daha yakın', 'Closer'), t('Kapalı alan', 'Indoors')]
+  if (type === 'LUNCH' || type === 'DINNER') return [...common, t('Kebap', 'Kebab'), t('Balık', 'Fish'), t('Ev yemekleri', 'Home cooking')]
+  if (type === 'SIGHTSEEING') return [t('Daha yakın', 'Closer'), t('Müze', 'Museum'), t('Tarihi yer', 'Historic'), t('Manzaralı', 'With a view'), t('Kapalı alan', 'Indoors')]
+  if (type === 'COFFEE' || type === 'BREAKFAST') return [...common, t('Bahçeli', 'With a garden'), t('Deniz kenarı', 'By the sea')]
+  return common
+}
+
 export function RouteDetailPage() {
   const { id } = useParams()
   const routeId = Number(id)
@@ -35,6 +44,9 @@ export function RouteDetailPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [menuStop, setMenuStop] = useState<RouteStop | null>(null)
+  // "Başka bir yerle değiştir": the stop being swapped and what the new place should be like
+  const [swapStop, setSwapStop] = useState<RouteStop | null>(null)
+  const [wish, setWish] = useState('')
 
   async function act(action: () => Promise<Route | { route: Route; changes: string[] }>, gated = true) {
     if (gated && !gate()) return
@@ -194,10 +206,30 @@ export function RouteDetailPage() {
         <AddSheet busy={busy} onPick={change => { setAddOpen(false); void replan(change) }} />
       </Sheet>
 
+      <Sheet open={swapStop !== null} onClose={() => setSwapStop(null)} label={t('Neye göre değiştirelim?', 'What should the new place be like?')}>
+        {swapStop && (
+          <form className="stack" onSubmit={e => { e.preventDefault(); const s = swapStop; setSwapStop(null); void replan({ type: 'REPLACE_STOP', stopId: s.id, wish: wish.trim() || undefined }) }}>
+            <p className="t-caption">{t(`${swapStop.place.name} yerine nasıl bir yer istersin? Yazabilir ya da bir seçenek seçebilirsin.`, `What would you like instead of ${swapStop.place.name}? Type it or pick an option.`)}</p>
+            <span className="input">
+              <input value={wish} onChange={e => setWish(e.target.value)} maxLength={200} autoFocus
+                aria-label={t('Nasıl bir yer', 'What kind of place')}
+                placeholder={swapStop.type === 'LUNCH' || swapStop.type === 'DINNER' ? t('Örn. kebap, balık, daha ucuz', 'E.g. kebab, fish, cheaper') : t('Örn. daha yakın, kapalı alan, manzaralı', 'E.g. closer, indoors, with a view')} />
+            </span>
+            <div className="chips">
+              {swapWishes(swapStop.type, t).map(w => (
+                <button key={w} type="button" className={`chip ${wish === w ? 'active' : ''}`} aria-pressed={wish === w} onClick={() => setWish(w)}>{w}</button>
+              ))}
+            </div>
+            <button type="submit" className="btn btn-primary btn-block" disabled={busy || !wish.trim()}>{t('Buna göre değiştir', 'Swap with this')}</button>
+            <button type="button" className="btn btn-ghost btn-block" disabled={busy} onClick={() => { const s = swapStop; setSwapStop(null); void replan({ type: 'REPLACE_STOP', stopId: s.id }) }}>{t('Fark etmez, başka bir yer öner', 'Anything else is fine')}</button>
+          </form>
+        )}
+      </Sheet>
+
       <Sheet open={menuStop !== null} onClose={() => setMenuStop(null)} label={menuStop?.place.name ?? ''}>
         {menuStop && (
           <div className="list-group">
-            <button className="list-item" disabled={busy} onClick={() => { const s = menuStop; setMenuStop(null); void replan({ type: 'REPLACE_STOP', stopId: s.id }) }}>
+            <button className="list-item" disabled={busy} onClick={() => { const s = menuStop; setMenuStop(null); setWish(''); setSwapStop(s) }}>
               <span className="list-item-icon"><Shuffle size={18} /></span>
               <span className="grow"><strong style={{ display: 'block' }}>{t('Başka bir yerle değiştir', 'Swap for another place')}</strong><span className="t-caption">{t(`Aynı saat için yakında başka bir ${menuStop.typeLabel.toLocaleLowerCase('tr')} önerisi`, `Another ${menuStop.typeLabel.toLocaleLowerCase(locale())} nearby at the same time`)}</span></span>
             </button>
