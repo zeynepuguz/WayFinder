@@ -57,6 +57,8 @@ public class RoutePlanner {
     static final int FLEXIBLE_MAX_WAIT_MINUTES = 20;
     // A second (third) mosque / church / tomb in one day loses this much (twice as much)
     static final double VARIETY_PENALTY = 35;
+    // Passes that pull every stop between its neighbours (each kept only when it walks less)
+    static final int BETWEEN_ROUNDS = 2;
     // A reordered meal may start at most this much after its target time
     static final int MEAL_LATE_MINUTES = 60;
     // Look-ahead: score points per maxLeg of distance from the centroid of the stops still to come
@@ -112,6 +114,15 @@ public class RoutePlanner {
             Pass lookAhead = greedy(request, forecast.orElse(null), anchors(pass), LOOKAHEAD_WEIGHT);
             if (better(lookAhead, pass, request.interests())) {
                 pass = lookAhead;
+            }
+            // No zig-zag: each stop pulled to lie between its neighbours (the first between the start and the second
+            // stop). A breakfast 500 m past the start sight, then back to the sight, becomes one next to it
+            for (int round = 0; round < BETWEEN_ROUNDS; round++) {
+                Pass between = greedy(request, forecast.orElse(null), betweenAnchors(pass, request), LOOKAHEAD_WEIGHT);
+                if (!better(between, pass, request.interests())) {
+                    break;
+                }
+                pass = between;
             }
         }
         List<Chosen> chosen = pass.chosen();
@@ -262,6 +273,24 @@ public class RoutePlanner {
             double lat = rest.stream().mapToDouble(o -> o.stop().place().getLatitude()).average().orElse(0);
             double lon = rest.stream().mapToDouble(o -> o.stop().place().getLongitude()).average().orElse(0);
             anchors.put(c.slotIndex(), new double[]{lat, lon});
+        }
+        return anchors;
+    }
+
+    // Slot index -> the midpoint of the stop's neighbours in this pass (the start before the first stop)
+    static Map<Integer, double[]> betweenAnchors(Pass pass, PlanningRequest request) {
+        Map<Integer, double[]> anchors = new HashMap<>();
+        List<Chosen> chosen = pass.chosen();
+        for (int i = 0; i < chosen.size(); i++) {
+            double prevLat = i == 0 ? request.startLatitude() : chosen.get(i - 1).stop().place().getLatitude();
+            double prevLon = i == 0 ? request.startLongitude() : chosen.get(i - 1).stop().place().getLongitude();
+            if (i + 1 < chosen.size()) {
+                Place next = chosen.get(i + 1).stop().place();
+                anchors.put(chosen.get(i).slotIndex(),
+                        new double[]{(prevLat + next.getLatitude()) / 2, (prevLon + next.getLongitude()) / 2});
+            } else {
+                anchors.put(chosen.get(i).slotIndex(), new double[]{prevLat, prevLon});
+            }
         }
         return anchors;
     }
@@ -422,8 +451,9 @@ public class RoutePlanner {
                     // A take-away bakery or a kıraathane is not a stop (still listed in Explore)
                     || !PlaceSuitability.isStop(place)
                     // Lunch / dinner at a tea house or coffee shop is not a meal
-                    || (slot.type() == StopType.LUNCH || slot.type() == StopType.DINNER)
-                    && !PlaceSuitability.servesMeals(place)) {
+                    || slot.type() == StopType.LUNCH && !PlaceSuitability.servesMeals(place)
+                    // Dinner is a sit-down meal, never a çiğ köfte counter
+                    || slot.type() == StopType.DINNER && !PlaceSuitability.isDinner(place)) {
                 continue;
             }
 

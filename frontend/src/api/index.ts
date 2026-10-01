@@ -44,14 +44,16 @@ export const api = {
 
   searchPlaces: (filter: {
     category?: PlaceCategory; city?: string; district?: string; q?: string; maxCost?: number; indoor?: boolean; page?: number; size?: number
+    // a sub-kind (İbadet > mosque / church / synagogue / cemevi)
+    tag?: string
   }) => http.get<Page<Place>>('/places', filter),
-  nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50, category?: PlaceCategory) =>
-    http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit, category }),
+  nearbyPlaces: (lat: number, lon: number, radius = 1500, limit = 50, category?: PlaceCategory, tag?: string) =>
+    http.get<NearbyPlace[]>('/places/nearby', { lat, lon, radius, limit, category, tag }),
   // Places inside the visible map box (max 0.6° per side, max 300 items); distance from lat/lon when given
-  placesInArea: (box: MapBox, options: { lat?: number; lon?: number; category?: PlaceCategory; limit?: number } = {},
+  placesInArea: (box: MapBox, options: { lat?: number; lon?: number; category?: PlaceCategory; tag?: string; limit?: number } = {},
     signal?: AbortSignal) =>
     http.get<NearbyPlace[]>('/places/in-area', {
-      ...box, lat: options.lat, lon: options.lon, category: options.category, limit: options.limit ?? 300,
+      ...box, lat: options.lat, lon: options.lon, category: options.category, tag: options.tag, limit: options.limit ?? 300,
     }, signal),
   cities: () => http.get<City[]>('/cities'),
   // The city at a position; 404 when it is not inside one of Türkiye's cities

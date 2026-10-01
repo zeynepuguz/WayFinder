@@ -20,6 +20,8 @@
 # Spring secrets
 application.properties
 **/application.properties
+# The test overrides keep tests from importing places / calling external APIs: they must be committed
+!backend/src/test/resources/config/application.properties
 
 # OS
 .DS_Store

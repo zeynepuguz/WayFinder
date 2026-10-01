@@ -141,7 +141,8 @@ class RouteShapeTest {
 
         assertThat(result.stops()).extracting(s -> s.place().getName()).containsExactly("Sabah Börekçisi");
         assertThat(result.stops().getFirst().type()).isEqualTo(StopType.BREAKFAST);
-        assertThat(result.notes()).anyMatch(n -> n.contains("kahvaltı için açık olan Sabah Börekçisi"));
+        // Cafés and bakery-cafés are ordinary breakfast places now (no "fallback" note)
+        assertThat(result.notes()).noneMatch(n -> n.contains("kahvaltı için açık olan"));
     }
 
     // ---------- interests ----------

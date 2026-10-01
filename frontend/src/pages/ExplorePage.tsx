@@ -14,7 +14,7 @@ import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { useDistricts } from '../lib/districts'
-import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, withinBudget } from '../lib/format'
+import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, withinBudget, WORSHIP_KINDS } from '../lib/format'
 import { useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
@@ -36,6 +36,8 @@ export function ExplorePage() {
   const t = useT()
   const slugCategory = slug ? CATEGORY_BY_SLUG[slug] ?? null : null
   const category = slugCategory ?? (params.get('category') as PlaceCategory | null) ?? null
+  // İbadet > Cami ve mescit / Kilise / ... (?tur=mosque); only with the İbadet category
+  const worshipKind = category === 'WORSHIP' ? params.get('tur') : null
   // Kept in the URL (?view=map) so the map is still there after opening a place and going back
   const view: View = params.get('view') === 'map' ? 'map' : 'list'
 
@@ -98,7 +100,8 @@ export function ExplorePage() {
     setParams(current => apply(new URLSearchParams(current)), { replace: true })
   }
 
-  const setCategory = (c: PlaceCategory | null) => updateParams({ category: c })
+  const setCategory = (c: PlaceCategory | null) => updateParams({ category: c, tur: null })
+  const setWorshipKind = (kind: string | null) => updateParams({ tur: kind })
   // The map and the popular routes exclude each other: each route card has its own map
   const setView = (v: View) => updateParams(v === 'map' ? { view: 'map', rotalar: null } : { view: null })
   const togglePopular = () => updateParams({ rotalar: popular ? null : '1', view: null })
@@ -124,7 +127,7 @@ export function ExplorePage() {
     const timer = setTimeout(() => void load(0), query ? 300 : 0)
     return () => clearTimeout(timer)
     // Reload from the first page whenever a filter changes (search is debounced)
-  }, [view, popular, mode, category, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
+  }, [view, popular, mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
 
   async function load(nextPage: number) {
     setLoading(true)
@@ -132,10 +135,13 @@ export function ExplorePage() {
     try {
       if (mode === 'nearby') {
         // Nearby list is sorted by PostGIS distance; filters are applied on that small result
-        const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500, 50, category || undefined)
+        const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500, 50, category || undefined,
+          worshipKind ?? undefined)
         const q = fold(query)
         setPlaces(nearby.filter(p =>
-          (!category || p.category === category)
+          // İbadet also lists the famous mosques / churches that are sights
+          (!category || p.category === category || category === 'WORSHIP' && p.tags.includes('religious'))
+          && (!worshipKind || p.tags.includes(worshipKind))
           && (!indoorOnly || p.indoor)
           && (!maxCost || withinBudget(p.estimatedCost, Number(maxCost)))
           && (!q || fold(p.name).includes(q))))
@@ -143,6 +149,7 @@ export function ExplorePage() {
       } else {
         const result = await api.searchPlaces({
           category: category ?? undefined,
+          tag: worshipKind ?? undefined,
           city: citySlug ?? undefined,
           district: districtSlug ?? undefined,
           q: query || undefined,
@@ -202,6 +209,19 @@ export function ExplorePage() {
       })}
     </HScroll>
   )
+  // Under İbadet: all, or one kind (cami and mescit together)
+  const worshipChips = category === 'WORSHIP' && (
+    <HScroll className="h-scroll chip-scroll" style={{ gap: 8 }} label={t('İbadet yeri türü', 'Kind of place of worship')}>
+      <button type="button" className={`chip ${worshipKind === null ? 'active' : ''}`} aria-pressed={worshipKind === null}
+              onClick={() => setWorshipKind(null)}>{t('Tümü', 'All')}</button>
+      {Object.keys(WORSHIP_KINDS).map(kind => (
+        <button type="button" key={kind} className={`chip ${worshipKind === kind ? 'active' : ''}`} aria-pressed={worshipKind === kind}
+                onClick={() => setWorshipKind(worshipKind === kind ? null : kind)}>
+          {WORSHIP_KINDS[kind]}
+        </button>
+      ))}
+    </HScroll>
+  )
 
   return (
     <main className={`screen ${view === 'map' ? 'screen-map' : ''}`}>
@@ -218,7 +238,8 @@ export function ExplorePage() {
       {view === 'map' ? (
         <>
           {categoryChips}
-          <LiveMap category={category} focusArea={district} focusCity={city} />
+          {worshipChips}
+          <LiveMap category={category} tag={worshipKind} focusArea={district} focusCity={city} />
         </>
       ) : popular ? (
         // Category chips, search and filters are about places: not shown for the routes
@@ -240,6 +261,7 @@ export function ExplorePage() {
           </div>
 
           {categoryChips}
+          {worshipChips}
 
           <Segmented value={mode} onChange={setMode}
                      options={[

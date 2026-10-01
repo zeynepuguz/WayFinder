@@ -116,10 +116,19 @@ public class AssistantService {
         messageRepository.save(new AssistantMessage(userId, conversation.getId(), route == null ? null : route.getId(),
                 MessageRole.USER, request.message()));
 
+        // The answer to "şimdi mi, başka bir gün mü?": read together with the plan request it answers
+        boolean dayAnswered = false;
+        String pendingPlan = pendingPlanRequest(conversation.getId());
+        if (pendingPlan != null) {
+            request = new AssistantRequest(pendingPlan + " " + request.message(), request.latitude(),
+                    request.longitude(), request.routeId(), request.conversationId());
+            dayAnswered = true;
+        }
+
         AssistantIntent intent = intentParser.parse(request.message(), context(route));
 
         AssistantReply reply = switch (intent.type()) {
-            case PLAN_ROUTE -> planRoute(userId, request, intent);
+            case PLAN_ROUTE -> planRoute(userId, request, intent, dayAnswered);
             // Only this chat's route; a past day's route is read-only
             case REPLAN -> route == null ? text(intent, composer.noRoute())
                     : routeService.isPast(route) ? text(intent, RouteService.pastRouteMessage())
@@ -268,9 +277,45 @@ public class AssistantService {
 
     // ============ intent handlers ============
 
-    private AssistantReply planRoute(Long userId, AssistantRequest request, AssistantIntent intent) {
+    /**
+     * The plan request the assistant's last message asked "now or another day?" about, or null. Messages are newest
+     * first: [this user message, the question, the request].
+     */
+    private String pendingPlanRequest(Long conversationId) {
+        List<AssistantMessage> recent = messageRepository.findByConversationIdOrderByCreatedAtDescIdDesc(
+                conversationId, PageRequest.of(0, 3));
+        if (recent == null || recent.size() < 3) {
+            return null;
+        }
+        AssistantMessage question = recent.get(1);
+        AssistantMessage plan = recent.get(2);
+        return question.getRole() == MessageRole.ASSISTANT && ResponseComposer.isWhenQuestion(question.getContent())
+                && plan.getRole() == MessageRole.USER ? plan.getContent() : null;
+    }
+
+    // Breakfast asked for without a day once breakfast time is over: the user may mean tomorrow, or a late breakfast now
+    static final LocalTime BREAKFAST_OVER = LocalTime.of(11, 30);
+
+    private boolean askWhen(AssistantIntent intent, AssistantRequest request, PlanParams p, boolean dayAnswered) {
+        if (dayAnswered || p.stops() == null || !p.stops().contains(StopType.BREAKFAST)) {
+            return false;
+        }
+        if (day(intent, request.message()) != null || IntentDates.parse(request.message(), LocalDate.now(clock)) != null) {
+            return false;
+        }
+        String text = request.message().toLowerCase(Texts.TURKISH);
+        boolean now = text.contains("şimdi") || text.contains("hemen") || text.contains("bugün")
+                || text.matches("(?s).*\\b(now|today|right away)\\b.*");
+        return !now && !LocalTime.now(clock).isBefore(BREAKFAST_OVER);
+    }
+
+    private AssistantReply planRoute(Long userId, AssistantRequest request, AssistantIntent intent, boolean dayAnswered) {
         PlanParams p = intent.plan() != null ? intent.plan()
                 : new PlanParams(null, null, null, List.of(), List.of(), null);
+        // "Kahvaltı" in the evening without a day: ask before planning (the answer comes back with this request)
+        if (askWhen(intent, request, p, dayAnswered)) {
+            return text(intent, composer.askWhenForBreakfast());
+        }
 
         // "üsküdarda gezeceğiz" / "Ankara'da": start there instead of at the user's GPS position (unknown names change
         // nothing). A name used in several cities means the one the user is in, unless the message names another city

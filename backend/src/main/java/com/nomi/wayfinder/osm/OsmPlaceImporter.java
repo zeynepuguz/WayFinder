@@ -41,8 +41,8 @@ public class OsmPlaceImporter {
 
     private static final String UPSERT = """
             INSERT INTO places (name, name_en, cuisine, location, category, indoor, tags, source, source_url, osm_id,
-                                address, neighborhood, wikidata, commons_file, created_at, updated_at)
-            VALUES (?, ?, ?, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?, ?, ?, 'OSM', ?, ?, ?, ?, ?, ?, now(), now())
+                                address, neighborhood, wikidata, commons_file, osm_stale, created_at, updated_at)
+            VALUES (?, ?, ?, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?, ?, ?, 'OSM', ?, ?, ?, ?, ?, ?, ?, now(), now())
             ON CONFLICT (osm_id) DO UPDATE SET
                 -- A new wikidata id / Commons file means the photo must be looked up again
                 image_checked_at = CASE
@@ -61,6 +61,7 @@ public class OsmPlaceImporter {
                 source_url = EXCLUDED.source_url,
                 address = EXCLUDED.address,
                 neighborhood = EXCLUDED.neighborhood,
+                osm_stale = EXCLUDED.osm_stale,
                 -- It passed the realism filter this time (PlaceRealismFilter); an element whose Wikidata item is an event
                 -- stays hidden while it keeps that item (PlacePopularityService)
                 hidden = (places.not_a_place AND places.wikidata IS NOT DISTINCT FROM EXCLUDED.wikidata),
@@ -319,6 +320,7 @@ public class OsmPlaceImporter {
             ps.setString(12, p.neighborhood());
             ps.setString(13, p.wikidata());
             ps.setString(14, p.commonsFile());
+            ps.setBoolean(15, p.stale());
         });
 
         // Opening hours: replace whatever the previous import wrote

@@ -31,16 +31,16 @@ class PlacesInAreaTest {
 
     @Test
     void usesTheUserLocationOrElseTheBoxCenter() {
-        when(repository.findInArea(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), anyInt()))
+        when(repository.findInArea(anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), anyDouble(), any(), any(), anyInt()))
                 .thenReturn(List.of());
         when(repository.findByIdIn(anyCollection())).thenReturn(List.of());
 
         service.getPlacesInArea(40.9, 29.0, 41.1, 29.2, null, null, PlaceCategory.CAFE, 200);
         verify(repository).findInArea(eq(40.9), eq(29.0), eq(41.1), eq(29.2),
-                doubleThat(v -> Math.abs(v - 41.0) < 1e-9), doubleThat(v -> Math.abs(v - 29.1) < 1e-9), eq("CAFE"), eq(200));
+                doubleThat(v -> Math.abs(v - 41.0) < 1e-9), doubleThat(v -> Math.abs(v - 29.1) < 1e-9), eq("CAFE"), isNull(), eq(200));
 
         service.getPlacesInArea(40.9, 29.0, 41.1, 29.2, 40.95, 29.05, null, 50);
-        verify(repository).findInArea(40.9, 29.0, 41.1, 29.2, 40.95, 29.05, null, 50);
+        verify(repository).findInArea(40.9, 29.0, 41.1, 29.2, 40.95, 29.05, null, null, 50);
     }
 
     private static void assertBadRequest(Runnable call) {

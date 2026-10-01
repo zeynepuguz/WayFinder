@@ -16,6 +16,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 import java.util.List;
 
 @RestController
@@ -40,11 +41,13 @@ public class PlaceController {
             @RequestParam(required = false) String city,
             // District slug from GET /api/v1/districts?city=, looked up in the city (istanbul when no city is given)
             @RequestParam(required = false) String district,
+            // A sub-kind: İbadet > mosque / church / synagogue / cemevi
+            @RequestParam(required = false) @Size(max = 30) String tag,
             @RequestParam(defaultValue = "0") @Min(0) int page,
             @RequestParam(defaultValue = "20") @Positive @Max(100) int size
     ) {
         return placeService.searchPlaces(
-                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q, verified, district, city), page, size);
+                new PlaceSearchFilter(category, neighborhood, maxCost, indoor, q, verified, district, city, tag), page, size);
     }
 
     // lat/lon = user's current location (from device GPS), not a place's
@@ -55,9 +58,10 @@ public class PlaceController {
             @RequestParam(defaultValue = "1000") @Positive @Max(5000) double radius,
             // Filter before the limit: otherwise 50 nearby cafes could hide every museum
             @RequestParam(required = false) PlaceCategory category,
+            @RequestParam(required = false) @Size(max = 30) String tag,
             @RequestParam(defaultValue = "20") @Positive @Max(50) int limit
     ) {
-        return placeService.getNearbyPlaces(lat, lon, radius, category, limit);
+        return placeService.getNearbyPlaces(lat, lon, radius, category, tag, limit);
     }
 
     /**
@@ -73,9 +77,10 @@ public class PlaceController {
             @RequestParam(required = false) @DecimalMin("-90.0") @DecimalMax("90.0") Double lat,
             @RequestParam(required = false) @DecimalMin("-180.0") @DecimalMax("180.0") Double lon,
             @RequestParam(required = false) PlaceCategory category,
+            @RequestParam(required = false) @Size(max = 30) String tag,
             @RequestParam(defaultValue = "200") @Positive @Max(300) int limit
     ) {
-        return placeService.getPlacesInArea(south, west, north, east, lat, lon, category, limit);
+        return placeService.getPlacesInArea(south, west, north, east, lat, lon, category, tag, limit);
     }
 
     @GetMapping("/{id}")

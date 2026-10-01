@@ -260,3 +260,22 @@ describe('ExplorePage popular routes', () => {
     expect(await screen.findByText('Bu bölge için henüz yeterli mekan yok')).toBeInTheDocument()
   })
 })
+
+describe('ExplorePage worship kinds', () => {
+  it('shows the kinds under İbadet (cami and mescit together) and filters by one', async () => {
+    renderPage('/explore?category=WORSHIP&ilce=uskudar')
+    const kinds = await screen.findByRole('region', { name: 'İbadet yeri türü' }).catch(() => null)
+    const scope = kinds ? within(kinds) : screen
+    await userEvent.click(scope.getByRole('button', { name: 'Kilise' }))
+
+    await waitFor(() => expect(searchPlaces).toHaveBeenLastCalledWith(
+      expect.objectContaining({ category: 'WORSHIP', tag: 'church', district: 'uskudar' })))
+    expect(search).toContain('tur=church')
+    expect(scope.getByRole('button', { name: 'Cami ve mescit' })).toBeInTheDocument()
+
+    // Another category drops the kind
+    await userEvent.click(screen.getByRole('button', { name: /Kafe/ }))
+    await waitFor(() => expect(search).not.toContain('tur='))
+    expect(screen.queryByRole('button', { name: 'Cami ve mescit' })).not.toBeInTheDocument()
+  })
+})

@@ -28,6 +28,9 @@ public final class PlaceSuitability {
             "sofra", "lokanta", "salonu",
             // Börek shops almost always have tables
             "borek");
+    // Street food eaten standing or on the go: fine for lunch, not a dinner
+    private static final List<String> SNACKS = List.of("cigkofte", "tantuni", "durum", "tost", "kumpir", "waffle",
+            "bufe", "kokorec", "midye", "hotdog", "sandvic", "sandwich", "borek", "pogaca", "simit", "gozleme");
     // Places for a drink, not a meal
     private static final List<String> DRINKS_ONLY = List.of("cayevi", "caybahce", "cayocag", "kahve", "coffee",
             "kiraathane", "kahvehane", "nargile", "espresso", "roastery");
@@ -55,6 +58,16 @@ public final class PlaceSuitability {
             }
             default -> false;
         };
+    }
+
+    // A dinner is a sit-down meal: never a çiğ köfte / tantuni / dürüm / tost / kumpir / waffle counter
+    public static boolean isDinner(Place place) {
+        // A restaurant: not a café or börek bakery, even on a budget day
+        if (place == null || place.getCategory() != PlaceCategory.RESTAURANT) {
+            return false;
+        }
+        String folded = OsmPlaceMapper.fold(place.getName());
+        return SNACKS.stream().noneMatch(folded::contains);
     }
 
     public static boolean isStop(Place place) {

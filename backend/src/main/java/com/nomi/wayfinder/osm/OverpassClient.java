@@ -39,10 +39,11 @@ public class OverpassClient {
     static final long ISTANBUL_RELATION_ID = 223474L;
 
     /*
-     * Places of one city, in two queries (each ~13k elements / ~4 MB for İstanbul; one query with everything runs
-     * into Overpass' time limit on busy servers); %d = the city's Overpass area id. Few statements with broad
-     * filters are much faster than many narrow ones: OsmPlaceMapper picks what to keep (e.g. only notable or
-     * historic places of worship, bakeries that are pastry / börek shops).
+     * Places of one city, in three smaller queries (one query with everything runs into Overpass' time limit on busy
+     * servers); %d = the city's Overpass area id. Few statements with broad filters are much faster than many narrow
+     * ones: OsmPlaceMapper picks what to keep (e.g. only notable or historic places of worship as sights, bakeries
+     * that are pastry / börek shops). "out center meta": tags plus when the element was last edited (old elements
+     * without contact / hours data that no other source knows are likely closed, see overture/OverturePlaceImporter).
      */
     // Food and drink: cafes, restaurants, fast food (döner, köfte, pide), dessert shops, bakeries, coffee shops
     static final String FOOD_QUERY = """
@@ -51,13 +52,27 @@ public class OverpassClient {
             (
               nwr["amenity"~"^(cafe|restaurant|fast_food|food_court|ice_cream)$"]["name"](area.city);
               nwr["shop"~"^(pastry|confectionery|bakery|coffee)$"]["name"](area.city);
-              nwr["shop"~"^(supermarket|convenience|grocery)$"]["name"](area.city);
             );
-            out center tags;
+            out center meta;
             """;
 
-    // Sights, culture and nature: museums, galleries, attractions, parks, gardens, historic sites, places of worship,
-    // bazaars, beaches, lighthouses, theatres
+    // Markets and places of worship: supermarkets, bakkal; mosques, churches, synagogues, cemevleri (also those
+    // mapped only by religion / denomination or by name: "... Cemevi" as a plain building)
+    static final String MARKETS_WORSHIP_QUERY = """
+            [out:json][timeout:300];
+            area(id:%d)->.city;
+            (
+              nwr["shop"~"^(supermarket|convenience|grocery)$"]["name"](area.city);
+              nwr["amenity"="place_of_worship"]["name"](area.city);
+              nwr["religion"="jewish"]["name"](area.city);
+              nwr["denomination"~"^(alevi|bektashi)"]["name"](area.city);
+              nwr["name"~"[Cc]em ?[Ee]v|CEM ?EV|[Ss]inagog|SİNAGOG|[Hh]avra|HAVRA"](area.city);
+            );
+            out center meta;
+            """;
+
+    // Sights, culture and nature: museums, galleries, attractions, parks, gardens, historic sites, bazaars, beaches,
+    // lighthouses, theatres (famous places of worship come with the worship query)
     static final String SIGHTS_QUERY = """
             [out:json][timeout:300];
             area(id:%d)->.city;
@@ -65,12 +80,12 @@ public class OverpassClient {
               nwr["tourism"~"^(museum|gallery|attraction|viewpoint|zoo|aquarium|theme_park)$"]["name"](area.city);
               nwr["leisure"~"^(park|garden|nature_reserve)$"]["name"](area.city);
               nwr["historic"]["name"](area.city);
-              nwr["amenity"~"^(theatre|arts_centre|place_of_worship|marketplace)$"]["name"](area.city);
+              nwr["amenity"~"^(theatre|arts_centre|marketplace)$"]["name"](area.city);
               nwr["natural"="beach"]["name"](area.city);
               nwr["man_made"="lighthouse"]["name"](area.city);
               nwr["tourism"="artwork"]["artwork_type"~"mural|graffiti"]["name"](area.city);
             );
-            out center tags;
+            out center meta;
             """;
     // A city's districts (ilçe boundaries) with their member ways' geometry, to build polygons from
     static final String DISTRICTS_QUERY = """
@@ -144,16 +159,21 @@ public class OverpassClient {
     }
 
     /**
-     * Food / drink and sights of a city (two Overpass queries with properties' callDelay in between), merged:
-     * an element both queries return (a historic cafe) is kept once.
+     * Food / drink, sights, markets and places of worship of a city (three Overpass queries with properties' callDelay
+     * in between), merged: an element several queries return (a historic cafe, a famous mosque) is kept once.
      *
      * @param relationId the city's (province's) OSM relation id, e.g. 223474 for İstanbul
      */
     public List<OverpassResponse.Element> fetchPlaces(long relationId) {
-        List<OverpassResponse.Element> food = fetch(placesQueries(relationId).get(0), true);
-        sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
-        List<OverpassResponse.Element> sights = fetch(placesQueries(relationId).get(1), true);
-        return merge(food, sights);
+        List<String> queries = placesQueries(relationId);
+        List<OverpassResponse.Element> all = new java.util.ArrayList<>();
+        for (int i = 0; i < queries.size(); i++) {
+            if (i > 0) {
+                sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
+            }
+            all = merge(all, fetch(queries.get(i), true));
+        }
+        return all;
     }
 
     static List<OverpassResponse.Element> merge(List<OverpassResponse.Element> first, List<OverpassResponse.Element> second) {
@@ -187,10 +207,10 @@ public class OverpassClient {
         return String.format(java.util.Locale.ROOT, "%.5f,%.5f,%.5f,%.5f", south, west, north, east);
     }
 
-    // The food / drink query and the sights query of a city
+    // The food / drink, the sights and the markets / worship queries of a city
     static List<String> placesQueries(long relationId) {
         long area = areaId(relationId);
-        return List.of(FOOD_QUERY.formatted(area), SIGHTS_QUERY.formatted(area));
+        return List.of(FOOD_QUERY.formatted(area), SIGHTS_QUERY.formatted(area), MARKETS_WORSHIP_QUERY.formatted(area));
     }
 
     static long areaId(long relationId) {
@@ -217,13 +237,16 @@ public class OverpassClient {
             for (String endpoint : endpoints) {
                 try {
                     log.info("OSM import: querying {} (round {}/{})", endpoint, round, attempts);
-                    String body = restClient.post()
+                    // Read as bytes: some servers (lz4.overpass-api.de) send the JSON as application/octet-stream,
+                    // which the String converter refuses; parse() rejects anything that is not Overpass JSON
+                    byte[] bytes = restClient.post()
                             .uri(endpoint.trim())
                             .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                            .accept(MediaType.APPLICATION_JSON)
+                            .accept(MediaType.APPLICATION_JSON, MediaType.APPLICATION_OCTET_STREAM, MediaType.ALL)
                             .body(form)
                             .retrieve()
-                            .body(String.class);
+                            .body(byte[].class);
+                    String body = bytes == null ? "" : new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
                     List<OverpassResponse.Element> elements = parse(body, jsonMapper);
                     if (requireElements && elements.isEmpty()) {
                         throw new IllegalStateException("Overpass answered without elements");

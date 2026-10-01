@@ -60,6 +60,18 @@ class OvertureMapperTest {
                 .isNull();
         assertThat(map(row("Atatürk Cad. No: 5", "food_and_drink/casual_eatery/cafe"))).isNull();
         assertThat(category("Mahalle Kahvesi Moda", "food_and_drink/casual_eatery/cafe")).isEqualTo(PlaceCategory.CAFE);
+        // Market chains however their page is filed; ordinary words that are also chain names only for shops
+        assertThat(category("Mimar Sinan Hakmar", "shopping/shopping_mall")).isEqualTo(PlaceCategory.MARKET);
+        assertThat(category("Migros Mjet Çayırova", "shopping/superstore")).isEqualTo(PlaceCategory.MARKET);
+        assertThat(category("A 101 Çayırova", "shopping/discount_store")).isEqualTo(PlaceCategory.MARKET);
+        assertThat(category("Onur Pastanesi", "food_and_drink/casual_eatery/bakery")).isEqualTo(PlaceCategory.DESSERT);
+        assertThat(category("Yunus Emre Camii", "cultural_and_historic/place_of_worship/muslim_place_of_worship"))
+                .isEqualTo(PlaceCategory.WORSHIP);
+        assertThat(map(row("Forum Istanbul", "shopping/shopping_mall"))).isNull();
+        // "<street> <district> <province>" is an address; a chain branch named that way is a market
+        assertThat(map(row("Yeni Bağdat Gebze Kocaeli", "shopping/food_and_beverage_store/grocery_store"))).isNull();
+        assertThat(category("BİM Gebze Kocaeli", "shopping/food_and_beverage_store/grocery_store"))
+                .isEqualTo(PlaceCategory.MARKET);
         // A market named after pide stays a market
         assertThat(category("Pide Market", "shopping/food_and_beverage_store/grocery_store"))
                 .isEqualTo(PlaceCategory.MARKET);

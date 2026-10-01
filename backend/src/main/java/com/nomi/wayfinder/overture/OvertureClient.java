@@ -40,6 +40,7 @@ public class OvertureClient {
             WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?
               AND (taxonomy.hierarchy[1] = 'food_and_drink'
                    OR list_has_any(taxonomy.hierarchy, ['grocery_store', 'supermarket', 'convenience_store',
+                                                        'superstore', 'discount_store', 'shopping_mall',
                                                         'place_of_worship']))
             """;
 

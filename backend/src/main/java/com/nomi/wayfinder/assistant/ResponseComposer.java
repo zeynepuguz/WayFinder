@@ -24,6 +24,21 @@ public class ResponseComposer {
     }
 
     // "ünlü bir rota": one of the area's popular routes (its famous sights, by Wikipedia popularity)
+    static final String WHEN_QUESTION_TR = "Kahvaltı saati geçti.";
+    static final String WHEN_QUESTION_EN = "Breakfast time is over for today.";
+
+    // Breakfast asked for in the evening without a day: the next message answers it (AssistantService)
+    public String askWhenForBreakfast() {
+        return Texts.t(WHEN_QUESTION_TR + " Bu rotayı şimdi için mi istiyorsun, yoksa başka bir gün için mi? "
+                        + "\"Şimdi\", \"yarın sabah\" ya da \"cumartesi\" gibi yazabilirsin.",
+                WHEN_QUESTION_EN + " Do you want this route for now, or for another day? "
+                        + "You can write \"now\", \"tomorrow morning\" or \"Saturday\".");
+    }
+
+    static boolean isWhenQuestion(String reply) {
+        return reply != null && (reply.startsWith(WHEN_QUESTION_TR) || reply.startsWith(WHEN_QUESTION_EN));
+    }
+
     public String popularPlanCreated(RouteResponse route, String area) {
         String intro = area == null
                 ? Texts.t("Buranın en bilinen yerlerinden geçen hazır bir rota seçtim. ",

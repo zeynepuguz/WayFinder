@@ -34,6 +34,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
                    OR p.category = CAST(:category AS text)
                    OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
+              -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
+              AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
             ORDER BY "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -42,6 +44,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("lon") double longitude,
             @Param("radius") double radiusMeters,
             @Param("category") String category,
+            @Param("tag") String tag,
             @Param("limit") int limit
     );
 
@@ -168,6 +171,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
                    OR p.category = CAST(:category AS text)
                    OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
+              -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
+              AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
             ORDER BY CASE WHEN p.source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END, "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -179,6 +184,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("lat") double latitude,
             @Param("lon") double longitude,
             @Param("category") String category,
+            @Param("tag") String tag,
             @Param("limit") int limit
     );
 

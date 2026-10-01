@@ -8,7 +8,10 @@ import java.util.Set;
 // What a route stop is for. Each type knows which place categories/tags can fill it,
 // its usual time of day and how long it usually takes.
 public enum StopType {
-    BREAKFAST(LocalTime.of(9, 30), 60, 0.20, Set.of(PlaceCategory.BREAKFAST), "breakfast", "Kahvaltı", "Breakfast"),
+    // Breakfast in Turkey is also at a café, a börek / simit bakery-café or a pastane (kahvaltı places rank first)
+    BREAKFAST(LocalTime.of(9, 30), 60, 0.20,
+            Set.of(PlaceCategory.BREAKFAST, PlaceCategory.CAFE, PlaceCategory.DESSERT), "breakfast", "Kahvaltı",
+            "Breakfast"),
     SIGHTSEEING(LocalTime.of(11, 0), 60, 0.05,
             Set.of(PlaceCategory.ATTRACTION, PlaceCategory.MUSEUM, PlaceCategory.PARK, PlaceCategory.CULTURE),
             null, "Gezi", "Sightseeing"),

@@ -27,6 +27,8 @@ public class PlaceScorer {
     static final double SECOND_INTEREST_BONUS = 12;
     static final double CAFE_MEAL_BUDGET_BONUS = 12;
     static final double KNOWN_PRICE_FITS_BONUS = 8;
+    static final double QUICK_DINNER_PENALTY = 25;
+    static final double BREAKFAST_PLACE_BONUS = 10;
     // Sights: points per popularity point (popularity is ~0..20; Ulu Cami 16, Koza Han 12, a mahalle mescidi none)
     static final double POPULARITY_WEIGHT = 2.5;
     static final double MAX_POPULARITY = 20;
@@ -102,6 +104,17 @@ public class PlaceScorer {
                 && place.getCategory() == PlaceCategory.CAFE && place.getEstimatedCost() == null) {
             score += CAFE_MEAL_BUDGET_BONUS;
             reasons.add(Texts.t("Uygun fiyat için restoran yerine kafe", "A café instead of a restaurant, to keep it cheap"));
+        }
+
+        // Breakfast: a kahvaltı place first, a café / pastane close by when the kahvaltı place is out of the way
+        if (c.slotType() == StopType.BREAKFAST && place.getCategory() == PlaceCategory.BREAKFAST) {
+            score += BREAKFAST_PLACE_BONUS;
+            reasons.add(Texts.t("Kahvaltı mekanı", "A breakfast place"));
+        }
+
+        // Dinner: a restaurant to sit down at beats a quick döner / pide counter
+        if (c.slotType() == StopType.DINNER && place.hasTag("quick")) {
+            score -= QUICK_DINNER_PENALTY;
         }
 
         // 5) Budget: reward places that leave room for the rest of the day.

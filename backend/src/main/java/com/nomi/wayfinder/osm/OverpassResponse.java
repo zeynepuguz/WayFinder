@@ -17,16 +17,22 @@ import java.util.Map;
 public record OverpassResponse(List<Element> elements, String remark) {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
+    // timestamp: when the element was last edited (ISO-8601, queries with "out meta"); null = not asked for
     public record Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags,
-                          List<Member> members, List<Center> geometry) {
+                          List<Member> members, List<Center> geometry, String timestamp) {
 
         public Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags) {
-            this(type, id, lat, lon, center, tags, null, null);
+            this(type, id, lat, lon, center, tags, null, null, null);
         }
 
         public Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags,
                        List<Member> members) {
-            this(type, id, lat, lon, center, tags, members, null);
+            this(type, id, lat, lon, center, tags, members, null, null);
+        }
+
+        public Element(String type, long id, Double lat, Double lon, Center center, Map<String, String> tags,
+                       List<Member> members, List<Center> geometry) {
+            this(type, id, lat, lon, center, tags, members, geometry, null);
         }
 
         public Double latitude() {

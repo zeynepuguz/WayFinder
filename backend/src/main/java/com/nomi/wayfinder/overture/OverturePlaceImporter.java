@@ -84,11 +84,12 @@ public class OverturePlaceImporter {
             UPDATE places SET hidden = TRUE, updated_at = now()
             WHERE source = 'OVERTURE' AND NOT hidden AND (overture_id IS NULL OR NOT (overture_id = ANY (?))) AND %s
             """.formatted(IN_BOX);
-    // Verified (hand-checked) places and notable ones (Wikidata) are never unconfirmed
+    // Unconfirmed (hidden as likely closed): an OSM place last edited years ago without phone / website / hours
+    // (osm_stale) that no Overture source knows. Verified (hand-checked) and notable (Wikidata) places never are
     private static final String FLAG_UNCONFIRMED = """
-            UPDATE places SET unconfirmed = NOT (id = ANY (?)), updated_at = now()
+            UPDATE places SET unconfirmed = (osm_stale AND NOT (id = ANY (?))), updated_at = now()
             WHERE source = 'OSM' AND wikidata IS NULL AND category IN %s AND %s
-              AND unconfirmed IS DISTINCT FROM NOT (id = ANY (?))
+              AND unconfirmed IS DISTINCT FROM (osm_stale AND NOT (id = ANY (?)))
             """.formatted(CONFIRMABLE, IN_BOX);
 
     private final OvertureClient client;

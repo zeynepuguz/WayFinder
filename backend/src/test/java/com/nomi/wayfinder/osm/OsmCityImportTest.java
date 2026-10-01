@@ -100,20 +100,27 @@ class OsmCityImportTest {
     }
 
     @Test
-    void perCityQueriesUseTheCityAreaInTwoQueries() {
+    void perCityQueriesUseTheCityAreaInThreeQueries() {
         assertThat(OverpassClient.areaId(223474)).isEqualTo(3600223474L);
         List<String> istanbul = OverpassClient.placesQueries(223474);
-        assertThat(istanbul).hasSize(2);
+        assertThat(istanbul).hasSize(3);
         assertThat(istanbul.get(0)).contains("area(id:3600223474)->.city;")
                 .contains("nwr[\"amenity\"~\"^(cafe|restaurant|fast_food|food_court|ice_cream)$\"][\"name\"](area.city);")
                 .contains("nwr[\"shop\"~\"^(pastry|confectionery|bakery|coffee)$\"][\"name\"](area.city);")
-                .contains("out center tags;");
+                // Last edit time for every element (stale places)
+                .contains("out center meta;");
         assertThat(istanbul.get(1)).contains("area(id:3600223474)->.city;")
                 .contains("nwr[\"tourism\"~\"^(museum|gallery|attraction|viewpoint|zoo|aquarium|theme_park)$\"][\"name\"](area.city);")
                 .contains("nwr[\"leisure\"~\"^(park|garden|nature_reserve)$\"][\"name\"](area.city);")
                 .contains("nwr[\"historic\"][\"name\"](area.city);")
-                .contains("nwr[\"amenity\"~\"^(theatre|arts_centre|place_of_worship|marketplace)$\"][\"name\"](area.city);")
-                .contains("out center tags;");
+                .contains("nwr[\"amenity\"~\"^(theatre|arts_centre|marketplace)$\"][\"name\"](area.city);")
+                .contains("out center meta;");
+        // Markets and every place of worship, also cemevleri / synagogues mapped by denomination, religion or name
+        assertThat(istanbul.get(2)).contains("nwr[\"shop\"~\"^(supermarket|convenience|grocery)$\"][\"name\"](area.city);")
+                .contains("nwr[\"amenity\"=\"place_of_worship\"][\"name\"](area.city);")
+                .contains("nwr[\"denomination\"~\"^(alevi|bektashi)\"][\"name\"](area.city);")
+                .contains("nwr[\"religion\"=\"jewish\"][\"name\"](area.city);")
+                .contains("out center meta;");
         assertThat(OverpassClient.placesQueries(223422)).allMatch(q -> q.contains("area(id:3600223422)"));
 
         // An element both queries return (a historic café) is kept once

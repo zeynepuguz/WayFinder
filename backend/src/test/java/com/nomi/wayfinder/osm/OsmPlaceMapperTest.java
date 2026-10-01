@@ -138,7 +138,7 @@ class OsmPlaceMapperTest {
                 "wikidata", "Q193617");
         assertThat(mosque.category()).isEqualTo(PlaceCategory.ATTRACTION);
         assertThat(mosque.indoor()).isTrue();
-        assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious", "architecture");
+        assertThat(mosque.tags()).containsExactlyInAnyOrder("history", "religious", "mosque", "architecture");
         assertThat(map("amenity", "place_of_worship", "name", "Tarihi Kilise", "heritage", "2").category())
                 .isEqualTo(PlaceCategory.ATTRACTION);
         // An ordinary mosque is not a sight but a place to pray at (Explore > İbadet)

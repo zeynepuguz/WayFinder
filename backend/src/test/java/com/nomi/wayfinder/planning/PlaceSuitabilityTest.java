@@ -47,4 +47,16 @@ class PlaceSuitabilityTest {
         assertThat(PlaceSuitability.servesMeals(
                 com.nomi.wayfinder.TestPlaces.place(4, "Kebapçı", PlaceCategory.RESTAURANT, true, 4.0, 0))).isTrue();
     }
+
+    @Test
+    void dinnerIsASitDownRestaurantMeal() {
+        assertThat(PlaceSuitability.isDinner(com.nomi.wayfinder.TestPlaces.place(1, "Tatlıses Cig Kofte",
+                PlaceCategory.RESTAURANT, true, 4.0, 0))).isFalse();
+        assertThat(PlaceSuitability.isDinner(com.nomi.wayfinder.TestPlaces.place(2, "Tarihi Yaşayanlar Börekçisi",
+                PlaceCategory.RESTAURANT, true, 4.0, 0))).isFalse();
+        assertThat(PlaceSuitability.isDinner(com.nomi.wayfinder.TestPlaces.place(3, "Abone Cafe",
+                PlaceCategory.CAFE, true, 4.0, 0))).isFalse();
+        assertThat(PlaceSuitability.isDinner(com.nomi.wayfinder.TestPlaces.place(4, "Tarihi Kozahan Kebapçısı",
+                PlaceCategory.RESTAURANT, true, 4.0, 0))).isTrue();
+    }
 }

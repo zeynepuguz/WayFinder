@@ -48,8 +48,10 @@ const liveIcon = L.divIcon({ className: '', html: '<div class="live-dot"></div>'
  * Full-height "around me" map: live position, places in the visible area and recommendations.
  * Places load for the map bounds after each move (debounced, stale answers ignored) when zoomed in enough.
  */
-export function LiveMap({ category, focusArea = null, focusCity = null }: {
+export function LiveMap({ category, tag = null, focusArea = null, focusCity = null }: {
   category: PlaceCategory | null
+  // A sub-kind (İbadet > mosque / church / ...); null = all of the category
+  tag?: string | null
   // A chosen district: the map moves there (and stops following the user)
   focusArea?: District | null
   // The chosen city (no district): the map flies to its centre when it changes,
@@ -112,7 +114,7 @@ export function LiveMap({ category, focusArea = null, focusCity = null }: {
     setLoading(true)
     setError(false)
     const { latitude, longitude } = originRef.current
-    api.placesInArea(box, { lat: latitude, lon: longitude, category: category ?? undefined, limit: MAX_MAP_PINS }, signal)
+    api.placesInArea(box, { lat: latitude, lon: longitude, category: category ?? undefined, tag: tag ?? undefined, limit: MAX_MAP_PINS }, signal)
       .then(result => {
         if (requests.isLatest(id)) setPlaces(result.slice(0, MAX_MAP_PINS))
       })
@@ -122,7 +124,7 @@ export function LiveMap({ category, focusArea = null, focusCity = null }: {
       .finally(() => {
         if (requests.isLatest(id)) setLoading(false)
       })
-  }, [map, category, requests])
+  }, [map, category, tag, requests])
 
   useEffect(() => {
     if (!map) return

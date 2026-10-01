@@ -131,8 +131,32 @@ public final class OsmPlaceMapper {
                 wikidata(element.tag("wikidata")),
                 commonsFile(element.tag("wikimedia_commons"), element.tag("image")),
                 truncate(PlaceNames.english(element.tag("name:en"), name), MAX_NAME),
-                truncate(trimToNull(cuisine), MAX_CUISINE)
+                truncate(trimToNull(cuisine), MAX_CUISINE),
+                stale(element, java.time.Instant.now())
         );
+    }
+
+    // Years without an edit after which a place without phone / website / opening hours counts as possibly closed
+    static final int STALE_YEARS = 4;
+    private static final List<String> CONTACT_KEYS = List.of("phone", "contact:phone", "website", "contact:website",
+            "opening_hours", "contact:instagram", "contact:facebook", "email", "contact:email");
+
+    /**
+     * Last edited more than STALE_YEARS before now and nothing that shows someone maintains it (phone, website, hours).
+     * Unknown edit time (no "out meta") is never stale.
+     */
+    static boolean stale(OverpassResponse.Element element, java.time.Instant now) {
+        if (element.timestamp() == null) {
+            return false;
+        }
+        java.time.Instant edited;
+        try {
+            edited = java.time.Instant.parse(element.timestamp());
+        } catch (java.time.format.DateTimeParseException e) {
+            return false;
+        }
+        boolean old = edited.isBefore(now.minus(java.time.Duration.ofDays(365L * STALE_YEARS)));
+        return old && CONTACT_KEYS.stream().noneMatch(k -> trimToNull(element.tag(k)) != null);
     }
 
     public static boolean plausibleCoordinates(double latitude, double longitude) {
@@ -181,12 +205,26 @@ public final class OsmPlaceMapper {
         if ("theatre".equals(amenity) || "arts_centre".equals(amenity)) {
             return new Kind(PlaceCategory.CULTURE, List.of(), null);
         }
-        if ("place_of_worship".equals(amenity)) {
+        // A cemevi or synagogue is sometimes mapped only by religion / denomination or its name (a plain building)
+        // (not streets, quarters, cemeteries or tombs that carry such a name / religion)
+        String denomination = fold(element.tag("denomination"));
+        boolean worshipByOtherTags = amenity == null && element.tag("shop") == null
+                && element.tag("highway") == null && element.tag("place") == null
+                && element.tag("landuse") == null && !PlaceTags.notAWorshipPlace(element.tag("name"))
+                && ("jewish".equals(element.tag("religion"))
+                || denomination.startsWith("alevi") || denomination.startsWith("bektashi")
+                || PlaceTags.namedCemeviOrSynagogue(element.tag("name")));
+        if ("place_of_worship".equals(amenity) || worshipByOtherTags) {
             // Famous / historic mosques, churches and synagogues are sights; every other one is a place to pray at
+            String kind = PlaceTags.worshipKind(element.tag("name"), element.tag("religion"),
+                    element.tag("denomination"));
+            List<String> religious = kind == null ? List.of("religious") : List.of("religious", kind);
             if (notable || trimToNull(element.tag("historic")) != null || trimToNull(element.tag("heritage")) != null) {
-                return new Kind(PlaceCategory.ATTRACTION, List.of("history", "religious"), true);
+                List<String> tags = new ArrayList<>(List.of("history"));
+                tags.addAll(religious);
+                return new Kind(PlaceCategory.ATTRACTION, tags, true);
             }
-            return new Kind(PlaceCategory.WORSHIP, List.of("religious"), true);
+            return new Kind(PlaceCategory.WORSHIP, religious, true);
         }
         if ("marketplace".equals(amenity)) {
             return new Kind(PlaceCategory.ATTRACTION, List.of("shopping", "local"), false);
@@ -402,7 +440,10 @@ public final class OsmPlaceMapper {
             // OSM name:en when it differs from name; null = none
             String nameEn,
             // OSM cuisine as tagged (lowercase), null = none
-            String cuisine
+            String cuisine,
+            // Last edited more than STALE_YEARS ago and no phone / website / opening hours: may be closed; only hidden
+            // when no other source (Overture) knows it either
+            boolean stale
     ) {
 
         public boolean hasMedia() {

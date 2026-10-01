@@ -14,6 +14,14 @@ export const CATEGORY_LABELS: Record<PlaceCategory, string> = bilingual({
   MARKET: ['Market', 'Groceries'],
 })
 
+// Explore > İbadet sub-kinds (place tags); cami and mescit are one kind
+export const WORSHIP_KINDS: Record<string, string> = bilingual({
+  mosque: ['Cami ve mescit', 'Mosques'],
+  church: ['Kilise', 'Churches'],
+  synagogue: ['Sinagog', 'Synagogues'],
+  cemevi: ['Cemevi', 'Cemevi'],
+})
+
 export const STOP_TYPE_LABELS: Record<StopType, string> = bilingual({
   BREAKFAST: ['Kahvaltı', 'Breakfast'],
   SIGHTSEEING: ['Gezi', 'Sightseeing'],

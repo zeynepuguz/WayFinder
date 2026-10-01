@@ -80,6 +80,13 @@ public class PlaceService {
                     ? root.get("source").in(Place.OSM_SOURCE, Place.OVERTURE_SOURCE).not()
                     : root.get("source").in(Place.OSM_SOURCE, Place.OVERTURE_SOURCE));
         }
+        String tag = blankToNull(filter.tag());
+        if (tag != null) {
+            // ",mosque,religious," contains ",mosque,": the tag itself, not a longer one
+            spec = spec.and((root, query, cb) -> cb.like(cb.concat(cb.concat(",",
+                            cb.function("array_to_string", String.class, root.get("tags"), cb.literal(","))), ","),
+                    "%," + tag + ",%"));
+        }
         if (filter.indoor() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("indoor"), filter.indoor()));
         }
@@ -136,15 +143,24 @@ public class PlaceService {
 
     // Distances and ordering come from PostGIS; here we only load the entities and keep that order
     @Transactional(readOnly = true)
+    public List<NearbyPlaceResponse> getNearbyPlaces(double latitude, double longitude, double radiusMeters,
+                                                     PlaceCategory category, int limit) {
+        return getNearbyPlaces(latitude, longitude, radiusMeters, category, null, limit);
+    }
+
+    /**
+     * @param tag a sub-kind (İbadet > "mosque", "church", "synagogue", "cemevi"); null = any
+     */
     public List<NearbyPlaceResponse> getNearbyPlaces(
             double latitude,
             double longitude,
             double radiusMeters,
             PlaceCategory category,
+            String tag,
             int limit
     ) {
         List<PlaceDistance> nearby = placeRepository.findNearby(latitude, longitude, radiusMeters,
-                category == null ? null : category.name(), limit);
+                category == null ? null : category.name(), blankToNull(tag), limit);
 
         Map<Long, Place> places = loadPlaces(nearby);
 
@@ -164,6 +180,14 @@ public class PlaceService {
             Double latitude, Double longitude,
             PlaceCategory category, int limit
     ) {
+        return getPlacesInArea(south, west, north, east, latitude, longitude, category, null, limit);
+    }
+
+    public List<NearbyPlaceResponse> getPlacesInArea(
+            double south, double west, double north, double east,
+            Double latitude, Double longitude,
+            PlaceCategory category, String tag, int limit
+    ) {
         if (south >= north || west >= east) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "south/west must be smaller than north/east");
         }
@@ -179,7 +203,7 @@ public class PlaceService {
         double refLon = longitude != null ? longitude : (west + east) / 2;
 
         List<PlaceDistance> found = placeRepository.findInArea(south, west, north, east, refLat, refLon,
-                category == null ? null : category.name(), limit);
+                category == null ? null : category.name(), blankToNull(tag), limit);
         Map<Long, Place> places = loadPlaces(found);
 
         return found.stream()
@@ -198,6 +222,10 @@ public class PlaceService {
                 .orElseThrow(() -> new PlaceNotFoundException(id));
     }
 
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toLowerCase(Locale.ROOT);
+    }
+
     public record PlaceSearchFilter(
             PlaceCategory category,
             String neighborhood,
@@ -209,8 +237,15 @@ public class PlaceService {
             // district slug from GET /api/v1/districts?city= ("uskudar"), looked up in the city; null = whole city
             String district,
             // city slug from GET /api/v1/cities ("ankara"); null = no city filter (Istanbul when a district is given)
-            String city
+            String city,
+            // a sub-kind tag (İbadet > "mosque", "church", ...); null = any
+            String tag
     ) {
+
+        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
+                                 String query, Boolean verified, String district, String city) {
+            this(category, neighborhood, maxCost, indoor, query, verified, district, city, null);
+        }
 
         public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
                                  String query, Boolean verified) {

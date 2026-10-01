@@ -5,8 +5,10 @@ import com.nomi.wayfinder.entity.PlaceCategory;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Interest tags (service/Interests vocabulary) derived from what OSM states about a place: its cuisine, tourism /
@@ -131,6 +133,70 @@ public final class PlaceTags {
             tags.add("history");
         }
         return new ArrayList<>(tags);
+    }
+
+    // Whole words only: "Eski Havra", "Ahrida Sinagogu", "CEMEVİ", "Cem Evi" - not "Havran" / "Havraniye Mah."
+    private static final Pattern SYNAGOGUE_NAME = Pattern.compile("(?<!\\p{L})(sinagog\\p{L}*|synagogue|havra(s[iı])?)(?!\\p{L})");
+    private static final Pattern CEMEVI_NAME = Pattern.compile("(?<!\\p{L})cem ?ev(i|leri)(?!\\p{L})");
+    // Named after a cemevi / synagogue but not one: streets, squares, stops, parks, quarters, cemeteries, tombs
+    private static final Pattern NOT_A_WORSHIP_PLACE = Pattern.compile("(?<!\\p{L})(sokak|sokağı|cadde|caddesi|yolu|"
+            + "geçidi|aralığı|meydanı|durağı|parkı|mahallesi|mah|mezarlığı|mezarlık|türbe|türbesi|yemekhanesi|ek bina)(?!\\p{L})");
+
+    /**
+     * A cemevi or synagogue mapped without amenity=place_of_worship, known only by its name
+     * ("Bağcılar Cemevi", "Bergama Yabets Sinagogu"); "Cemevi Sokağı", "Havran" and "Musevi Mezarlığı" are not.
+     */
+    public static boolean namedCemeviOrSynagogue(String name) {
+        String lower = lowerTr(name);
+        return (CEMEVI_NAME.matcher(lower).find() || SYNAGOGUE_NAME.matcher(lower).find()) && !notAWorshipPlace(name);
+    }
+
+    // Streets, cemeteries, tombs ... that only carry a religion / denomination or a cemevi / synagogue name
+    public static boolean notAWorshipPlace(String name) {
+        return NOT_A_WORSHIP_PLACE.matcher(lowerTr(name)).find();
+    }
+
+    private static String lowerTr(String name) {
+        return name == null ? "" : name.replace('İ', 'i').replace('I', 'ı').toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * The kind of a place of worship for Explore > İbadet: "mosque" (cami and mescit together), "church", "synagogue"
+     * or "cemevi". The name decides first ("... Camii", "... Kilisesi", "Cemevi"), then the religion
+     * (OSM religion=muslim / christian / jewish, Overture muslim_ / christian_ / jewish_place_of_worship); null = unknown.
+     */
+    public static String worshipKind(String name, String religion) {
+        return worshipKind(name, religion, null);
+    }
+
+    // denomination: OSM denomination=alevi / bektashi is a cemevi even when religion says muslim
+    public static String worshipKind(String name, String religion, String denomination) {
+        String folded = OsmPlaceMapper.fold(name == null ? "" : name);
+        String d = denomination == null ? "" : denomination.toLowerCase(java.util.Locale.ROOT);
+        if (folded.contains("cemevi") || folded.contains("cemevleri") || d.contains("alevi") || d.contains("bektashi")) {
+            return "cemevi";
+        }
+        if (folded.contains("cami") || folded.contains("mescid") || folded.contains("mescit") || folded.contains("mosque")) {
+            return "mosque";
+        }
+        if (folded.contains("kilise") || folded.contains("church") || folded.contains("katedral")
+                || folded.contains("sapel") || folded.contains("chapel") || folded.contains("manastir")) {
+            return "church";
+        }
+        if (SYNAGOGUE_NAME.matcher(lowerTr(name)).find()) {
+            return "synagogue";
+        }
+        String r = religion == null ? "" : religion.toLowerCase(java.util.Locale.ROOT);
+        if (r.contains("muslim")) {
+            return "mosque";
+        }
+        if (r.contains("christian")) {
+            return "church";
+        }
+        if (r.contains("jewish")) {
+            return "synagogue";
+        }
+        return null;
     }
 
     // Tags plus derived ones, each once, in a stable order

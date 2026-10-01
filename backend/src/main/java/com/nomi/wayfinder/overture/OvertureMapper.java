@@ -48,6 +48,26 @@ public final class OvertureMapper {
     // Address words as whole words: "Mah", "Mah.", "Mahallesi", "Sok", "Sokak", "Cad", "Caddesi", "Cd", "Sk", "No:"
     private static final Pattern ADDRESS_NAME = Pattern.compile(
             "(?iu)(?<!\\p{L})(?:mah\\.?|mahallesi|sok\\.?|sokak|sokağı|cad\\.?|caddesi|cd\\.?|sk\\.?|no\\s*:)(?!\\p{L})");
+    // Turkish grocery chains (folded first word, or first two words joined: "A 101", "Şok Market", "Tarım Kredi")
+    private static final Set<String> MARKET_CHAINS = Set.of("bim", "a101", "sokmarket", "hakmar", "migros",
+            "mmmigros", "carrefoursa", "carrefour", "tarimkredi", "macrocenter", "bizimtoptan", "happycenter",
+            "cagrimarket", "altunbilekler", "hakmarexpress");
+    // Chain names that are also ordinary words / names ("Şok", "Onur Pastanesi", "Yunus Emre Camii"): a chain only
+    // when Overture files the page as a shop
+    private static final Set<String> AMBIGUOUS_CHAINS = Set.of("sok", "file", "metro", "onur", "kiler", "yunus",
+            "gimsa", "ozdilek");
+    private static final Pattern WORD_SPLIT = Pattern.compile("[\\s\\-]+");
+    // The province names (folded): a page named "<street> <district> <province>" is an address, not a place
+    private static final Set<String> PROVINCES = Set.of("adana", "adiyaman", "afyonkarahisar", "agri", "amasya",
+            "ankara", "antalya", "artvin", "aydin", "balikesir", "bilecik", "bingol", "bitlis", "bolu",
+            "burdur", "bursa", "canakkale", "cankiri", "corum", "denizli", "diyarbakir", "edirne", "elazig",
+            "erzincan", "erzurum", "eskisehir", "gaziantep", "giresun", "gumushane", "hakkari", "hatay",
+            "isparta", "mersin", "istanbul", "izmir", "kars", "kastamonu", "kayseri", "kirklareli",
+            "kirsehir", "kocaeli", "konya", "kutahya", "malatya", "manisa", "kahramanmaras", "mardin",
+            "mugla", "mus", "nevsehir", "nigde", "ordu", "rize", "sakarya", "samsun", "siirt", "sinop",
+            "sivas", "tekirdag", "tokat", "trabzon", "tunceli", "sanliurfa", "usak", "van", "yozgat",
+            "zonguldak", "aksaray", "bayburt", "karaman", "kirikkale", "batman", "sirnak", "bartin",
+            "ardahan", "igdir", "yalova", "karabuk", "kilis", "osmaniye", "duzce");
     private static final Set<PlaceCategory> LIGHT_FOOD = Set.of(PlaceCategory.CAFE, PlaceCategory.DESSERT,
             PlaceCategory.BREAKFAST);
     private static final List<String> CAFE_WORDS = List.of("cafe", "kafe", "kahve", "coffee", "cayevi", "caybahce");
@@ -89,13 +109,16 @@ public final class OvertureMapper {
         if (name == null || name.length() > MAX_NAME) {
             return null;
         }
-        // A Meta page named after its address ("Hocaalizade Mah Osmangazi Bursa") is not a place name
-        if (ADDRESS_NAME.matcher(name).find()) {
+        // A Meta page named after its address ("Hocaalizade Mah Osmangazi Bursa", "Yeni Bağdat Gebze Kocaeli") is
+        // not a place name (a chain branch "Migros Gebze Kocaeli" is)
+        if (ADDRESS_NAME.matcher(name).find() || endsWithProvince(name)) {
             return null;
         }
         String folded = OsmPlaceMapper.fold(name);
         List<String> hierarchy = row.hierarchy() == null ? List.of() : row.hierarchy();
-        Kind kind = classify(hierarchy, folded);
+        // A market chain is a market however its page is filed ("Mimar Sinan Hakmar" as a shopping mall)
+        Kind kind = isMarketChain(name, hierarchy) ? new Kind(PlaceCategory.MARKET, List.of())
+                : classify(hierarchy, folded);
         if (kind == null || PlaceRealismFilter.rejectName(name, kind.category()) != null) {
             return null;
         }
@@ -111,11 +134,19 @@ public final class OvertureMapper {
     static Kind classify(List<String> hierarchy, String folded) {
         // Places to pray at and to buy groceries (Explore only)
         if (hierarchy.contains("place_of_worship")) {
-            return new Kind(PlaceCategory.WORSHIP, List.of("religious"));
+            // "muslim_place_of_worship" -> muslim; the name ("... Kilisesi") wins over a wrong one
+            String religion = hierarchy.getLast().replace("_place_of_worship", "");
+            String worship = PlaceTags.worshipKind(folded, religion);
+            return new Kind(PlaceCategory.WORSHIP,
+                    worship == null ? List.of("religious") : List.of("religious", worship));
         }
         if (hierarchy.contains("grocery_store") || hierarchy.contains("supermarket")
-                || hierarchy.contains("convenience_store")) {
+                || hierarchy.contains("convenience_store") || hierarchy.contains("discount_store")) {
             return new Kind(PlaceCategory.MARKET, List.of());
+        }
+        // Malls and superstores only as market chains (above); otherwise they are not a food / worship place
+        if (hierarchy.contains("shopping_mall") || hierarchy.contains("superstore")) {
+            return null;
         }
         Kind kind = classifyByTaxonomy(hierarchy, folded);
         // Meta pages are often filed wrongly ("Gözde Cağ Döner" as a coffee shop): a meal in the name wins over a
@@ -188,6 +219,31 @@ public final class OvertureMapper {
             }
         }
         return fixed.toString();
+    }
+
+    static boolean endsWithProvince(String name) {
+        String[] words = WORD_SPLIT.split(name.trim());
+        return words.length >= 2 && PROVINCES.contains(OsmPlaceMapper.fold(words[words.length - 1]))
+                && !isMarketChain(name, List.of("shopping"));
+    }
+
+    // The first word (or the first two joined) is a grocery chain; ambiguous names only for pages filed as shops
+    static boolean isMarketChain(String name, List<String> hierarchy) {
+        String[] words = WORD_SPLIT.split(name.trim());
+        if (words.length == 0) {
+            return false;
+        }
+        String first = OsmPlaceMapper.fold(words[0]);
+        // Any word, or two words together ("Mimar Sinan Hakmar", "BİM Gebze", "A 101 Çayırova", "Şok Market")
+        for (int i = 0; i < words.length; i++) {
+            String word = OsmPlaceMapper.fold(words[i]);
+            String pair = i + 1 < words.length ? word + OsmPlaceMapper.fold(words[i + 1]) : word;
+            if (MARKET_CHAINS.contains(word) || MARKET_CHAINS.contains(pair)) {
+                return true;
+            }
+        }
+        boolean shop = !hierarchy.isEmpty() && "shopping".equals(hierarchy.getFirst());
+        return shop && AMBIGUOUS_CHAINS.contains(first);
     }
 
     // Only plain http(s) links; shortened to the column

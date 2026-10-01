@@ -123,8 +123,8 @@ nomi:
     call-delay: ${OSM_CALL_DELAY:10s}
     # Cities imported more recently than this are skipped by non-forced runs (resume after a restart / failure)
     refresh-after: ${OSM_REFRESH_AFTER:20d}
-    # overpass-api.de's own servers (z., lz4.) often answer when the main address is overloaded
-    overpass-endpoints: ${OSM_OVERPASS_ENDPOINTS:https://overpass-api.de/api/interpreter,https://z.overpass-api.de/api/interpreter,https://lz4.overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter}
+    # z.overpass-api.de first: the most reliable of overpass-api.de's servers in Sept 2026; lz4. and the main address next
+    overpass-endpoints: ${OSM_OVERPASS_ENDPOINTS:https://z.overpass-api.de/api/interpreter,https://overpass-api.de/api/interpreter,https://lz4.overpass-api.de/api/interpreter,https://overpass.private.coffee/api/interpreter,https://overpass.kumi.systems/api/interpreter}
     connect-timeout: 15s
     # The Istanbul place query takes 1-3 minutes on the server side (the provinces query ~15 s)
     read-timeout: 5m
