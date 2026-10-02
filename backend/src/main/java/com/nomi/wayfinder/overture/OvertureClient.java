@@ -35,7 +35,8 @@ public class OvertureClient {
     private static final String QUERY = """
             SELECT id, names.primary AS name, array_to_string(taxonomy.hierarchy, '/') AS hierarchy,
                    coalesce(confidence, 0) AS confidence, operating_status, phones[1] AS phone,
-                   websites[1] AS website, (bbox.ymin + bbox.ymax) / 2 AS lat, (bbox.xmin + bbox.xmax) / 2 AS lon
+                   websites[1] AS website, (bbox.ymin + bbox.ymax) / 2 AS lat, (bbox.xmin + bbox.xmax) / 2 AS lon,
+                   brand.names.primary AS brand, brand.wikidata AS brand_wikidata
             FROM read_parquet(?, hive_partitioning = 1)
             WHERE bbox.xmin BETWEEN ? AND ? AND bbox.ymin BETWEEN ? AND ?
               AND (taxonomy.hierarchy[1] = 'food_and_drink'
@@ -100,7 +101,8 @@ public class OvertureClient {
                         rows.add(new OvertureRow(rs.getString("id"), rs.getString("name"),
                                 hierarchy == null ? List.of() : Arrays.asList(hierarchy.split("/")),
                                 rs.getDouble("confidence"), rs.getString("operating_status"), rs.getString("phone"),
-                                rs.getString("website"), rs.getDouble("lat"), rs.getDouble("lon")));
+                                rs.getString("website"), rs.getDouble("lat"), rs.getDouble("lon"),
+                                rs.getString("brand"), rs.getString("brand_wikidata")));
                     }
                 }
             }

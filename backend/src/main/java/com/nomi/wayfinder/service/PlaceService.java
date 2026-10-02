@@ -59,6 +59,12 @@ public class PlaceService {
             spec = spec.and((root, query, cb) -> cb.or(cb.equal(root.get("category"), PlaceCategory.WORSHIP),
                     cb.like(cb.function("array_to_string", String.class, root.get("tags"), cb.literal(",")),
                             "%religious%")));
+        } else if (filter.category() == PlaceCategory.BREAKFAST || filter.category() == PlaceCategory.CAFE) {
+            // A café serving breakfast is in both lists (osm/PlaceTags.breakfastAware)
+            String crossTag = filter.category() == PlaceCategory.BREAKFAST ? "breakfast" : "cafe";
+            spec = spec.and((root, query, cb) -> cb.or(cb.equal(root.get("category"), filter.category()),
+                    cb.like(cb.function("array_to_string", String.class, root.get("tags"), cb.literal(",")),
+                            "%" + crossTag + "%")));
         } else if (filter.category() != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("category"), filter.category()));
         } else {

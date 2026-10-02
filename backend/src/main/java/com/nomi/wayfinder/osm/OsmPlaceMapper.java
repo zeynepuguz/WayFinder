@@ -83,9 +83,11 @@ public final class OsmPlaceMapper {
         if (cuisines.contains("seafood") || cuisines.contains("fish")) {
             tags.add("seafood");
         }
-        if (category == PlaceCategory.BREAKFAST) {
-            tags.add("breakfast");
+        // A café serving breakfast stays in the Kafe list too; börek shops / savoury bakeries are breakfast places
+        if (kind.category() == PlaceCategory.CAFE && category == PlaceCategory.BREAKFAST) {
+            tags.add("cafe");
         }
+        category = PlaceTags.breakfastAware(category, foldedName, tags);
         if ("viewpoint".equals(tourism)) {
             tags.add("view");
         }

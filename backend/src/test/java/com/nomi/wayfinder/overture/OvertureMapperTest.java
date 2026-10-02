@@ -21,8 +21,9 @@ class OvertureMapperTest {
         assertThat(category("Gümüş Dondurma", "food_and_drink/casual_eatery/dessert_shop/ice_cream_shop"))
                 .isEqualTo(PlaceCategory.DESSERT);
         assertThat(category("Çiğdem Pastanesi", "food_and_drink/casual_eatery/bakery")).isEqualTo(PlaceCategory.DESSERT);
+        // Savoury bakeries are breakfast places
         assertThat(category("Bayındır Unlu Mamülleri", "food_and_drink/casual_eatery/bakery"))
-                .isEqualTo(PlaceCategory.CAFE);
+                .isEqualTo(PlaceCategory.BREAKFAST);
         assertThat(category("Serpme Keyfi", "food_and_drink/restaurant/breakfast_and_brunch_restaurant"))
                 .isEqualTo(PlaceCategory.BREAKFAST);
     }

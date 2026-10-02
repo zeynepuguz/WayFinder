@@ -135,6 +135,40 @@ public final class PlaceTags {
         return new ArrayList<>(tags);
     }
 
+    // Börek / poğaça / simit shops and savoury bakeries: where people have breakfast (Explore > Kahvaltı)
+    private static final List<String> BREAKFAST_FOOD_WORDS = List.of("borek", "pogaca", "simit", "acma", "gevrek",
+            "unlumamul", "katmer");
+    private static final List<String> CAFE_NAME_WORDS = List.of("cafe", "kafe", "caffe", "coffee", "kahve");
+
+    /**
+     * Breakfast places and the lists they show in: a savoury bakery or börek shop is a breakfast place (not a café);
+     * every breakfast place gets the "breakfast" tag and, when it is also a café ("Ayaz Cafe & Restaurant", an OSM
+     * café serving breakfast), the "cafe" tag, so Explore lists it under both Kahvaltı and Kafe.
+     *
+     * @param tags the place's tags; "breakfast" / "cafe" are added here
+     * @return the category to use
+     */
+    public static PlaceCategory breakfastAware(PlaceCategory category, String foldedName, List<String> tags) {
+        String folded = foldedName == null ? "" : foldedName;
+        boolean breakfastFood = BREAKFAST_FOOD_WORDS.stream().anyMatch(folded::contains);
+        boolean cafeName = CAFE_NAME_WORDS.stream().anyMatch(folded::contains);
+        PlaceCategory result = category;
+        if (category == PlaceCategory.CAFE && (tags.contains("bakery") || breakfastFood || folded.contains("firin"))) {
+            result = PlaceCategory.BREAKFAST;
+        } else if (category == PlaceCategory.RESTAURANT && tags.contains("quick") && breakfastFood) {
+            result = PlaceCategory.BREAKFAST;
+        }
+        if (result == PlaceCategory.BREAKFAST) {
+            if (!tags.contains("breakfast")) {
+                tags.add("breakfast");
+            }
+            if (cafeName && !tags.contains("cafe")) {
+                tags.add("cafe");
+            }
+        }
+        return result;
+    }
+
     // Whole words only: "Eski Havra", "Ahrida Sinagogu", "CEMEVİ", "Cem Evi" - not "Havran" / "Havraniye Mah."
     private static final Pattern SYNAGOGUE_NAME = Pattern.compile("(?<!\\p{L})(sinagog\\p{L}*|synagogue|havra(s[iı])?)(?!\\p{L})");
     private static final Pattern CEMEVI_NAME = Pattern.compile("(?<!\\p{L})cem ?ev(i|leri)(?!\\p{L})");

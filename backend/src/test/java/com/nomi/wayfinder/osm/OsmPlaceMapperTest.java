@@ -108,7 +108,8 @@ class OsmPlaceMapperTest {
         assertThat(places.get("node/8").tags()).containsExactly("art");
 
         assertThat(places.get("node/12").category()).isEqualTo(PlaceCategory.BREAKFAST);
-        assertThat(places.get("node/12").tags()).containsExactlyInAnyOrder("coffee", "breakfast");
+        // A café serving breakfast: listed under Kahvaltı and Kafe
+        assertThat(places.get("node/12").tags()).containsExactlyInAnyOrder("coffee", "breakfast", "cafe");
     }
 
     @Test
@@ -126,11 +127,11 @@ class OsmPlaceMapperTest {
         assertThat(map("amenity", "cafe", "name", "Ada Çay", "cuisine", "tea").tags()).containsExactly("tea", "budget");
         assertThat(map("shop", "coffee", "name", "Kurukahveci Mehmet Efendi").category()).isEqualTo(PlaceCategory.CAFE);
 
-        // Bakeries: pastry shops are desserts, börek / simit shops cafes, bread ovens are not places to go
+        // Bakeries: pastry shops are desserts, börek / simit shops breakfast places, bread ovens are not places to go
         assertThat(map("shop", "bakery", "name", "Divan Pastanesi").category()).isEqualTo(PlaceCategory.DESSERT);
         OsmPlace borek = map("shop", "bakery", "name", "Meşhur Sarıyer Börekçisi");
-        assertThat(borek.category()).isEqualTo(PlaceCategory.CAFE);
-        assertThat(borek.tags()).containsExactly("bakery", "local", "budget");
+        assertThat(borek.category()).isEqualTo(PlaceCategory.BREAKFAST);
+        assertThat(borek.tags()).containsExactlyInAnyOrder("bakery", "breakfast", "local", "budget");
         assertThat(map("shop", "bakery", "name", "Yıldız Ekmek Fırını")).isNull();
 
         // Places of worship only when notable (Wikidata) or historic

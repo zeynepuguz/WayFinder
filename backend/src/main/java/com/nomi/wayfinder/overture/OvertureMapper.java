@@ -82,10 +82,17 @@ public final class OvertureMapper {
      * @param hierarchy       taxonomy.hierarchy, e.g. [food_and_drink, restaurant, middle_eastern_restaurant,
      *                        turkish_restaurant]
      * @param operatingStatus open / temporarily_closed / permanently_closed; usually null
+     * @param brand           the chain ("A101"), null for most places
+     * @param brandWikidata   the chain's Wikidata item ("Q6034496"): a brand Overture is sure about
      */
     public record OvertureRow(String id, String name, List<String> hierarchy, double confidence,
                               String operatingStatus, String phone, String website, double latitude,
-                              double longitude) {
+                              double longitude, String brand, String brandWikidata) {
+
+        public OvertureRow(String id, String name, List<String> hierarchy, double confidence, String operatingStatus,
+                           String phone, String website, double latitude, double longitude) {
+            this(id, name, hierarchy, confidence, operatingStatus, phone, website, latitude, longitude, null, null);
+        }
     }
 
     public record OverturePlace(String overtureId, String name, PlaceCategory category, List<String> tags,
@@ -109,9 +116,14 @@ public final class OvertureMapper {
         if (name == null || name.length() > MAX_NAME) {
             return null;
         }
-        // A Meta page named after its address ("Hocaalizade Mah Osmangazi Bursa", "Yeni Bağdat Gebze Kocaeli") is
-        // not a place name (a chain branch "Migros Gebze Kocaeli" is)
-        if (ADDRESS_NAME.matcher(name).find() || endsWithProvince(name)) {
+        // A chain's branch page named after its street or quarter ("Yeni Bağdat Gebze Kocaeli", brand A101 with
+        // its Wikidata item) is that chain's shop: "A101 Yeni Bağdat Gebze"
+        String branded = withBrand(name, row.brand(), row.brandWikidata());
+        if (branded != null) {
+            name = branded;
+        } else if (ADDRESS_NAME.matcher(name).find() || endsWithProvince(name)) {
+            // A Meta page named after its address ("Hocaalizade Mah Osmangazi Bursa") is not a place name (a chain
+            // branch "Migros Gebze Kocaeli" is)
             return null;
         }
         String folded = OsmPlaceMapper.fold(name);
@@ -123,12 +135,22 @@ public final class OvertureMapper {
             return null;
         }
         List<String> cuisines = hierarchy.stream().map(CUISINES::get).filter(Objects::nonNull).toList();
+        // Börek shops / savoury bakeries are breakfast places; breakfast places that are cafés are listed under both
+        List<String> kindTags = new ArrayList<>(kind.tags());
+        if (h(hierarchy, "breakfast_and_brunch_restaurant") && (h(hierarchy, "cafe") || h(hierarchy, "coffee_shop"))) {
+            kindTags.add("cafe");
+        }
+        kind = new Kind(PlaceTags.breakfastAware(kind.category(), folded, kindTags), List.copyOf(kindTags));
         List<String> tags = PlaceTags.merge(kind.tags(),
                 PlaceTags.derive(name, kind.category(), cuisines, Map.of(), kind.tags()));
         // A tea garden is outside; everything else here is a shop / restaurant room
         boolean indoor = !(folded.contains("caybahce") || folded.contains("bahcesi") && tags.contains("tea"));
         return new OverturePlace(row.id(), name, kind.category(), tags, indoor, row.confidence(),
                 trim(row.phone(), MAX_PHONE), website(row.website()), row.latitude(), row.longitude());
+    }
+
+    private static boolean h(List<String> hierarchy, String value) {
+        return hierarchy.contains(value);
     }
 
     static Kind classify(List<String> hierarchy, String folded, String name) {
@@ -223,6 +245,27 @@ public final class OvertureMapper {
             }
         }
         return fixed.toString();
+    }
+
+    /**
+     * The chain's name in front of a branch page's address name ("A101 Yeni Bağdat Gebze"), without the province;
+     * null when the brand is unsure (no Wikidata item) or the name already says it ("BİM Gebze").
+     */
+    static String withBrand(String name, String brand, String brandWikidata) {
+        if (brand == null || brand.isBlank() || brandWikidata == null || brandWikidata.isBlank()) {
+            return null;
+        }
+        String cleanBrand = brand.trim();
+        if (OsmPlaceMapper.fold(name).contains(OsmPlaceMapper.fold(cleanBrand))) {
+            return null;
+        }
+        List<String> words = new ArrayList<>(List.of(WORD_SPLIT.split(name.trim())));
+        while (!words.isEmpty() && PROVINCES.contains(OsmPlaceMapper.fold(words.getLast()))) {
+            words.removeLast();
+        }
+        String branch = String.join(" ", words).trim();
+        String result = branch.isEmpty() ? cleanBrand : cleanBrand + " " + branch;
+        return result.length() > MAX_NAME ? cleanBrand : result;
     }
 
     static boolean endsWithProvince(String name) {

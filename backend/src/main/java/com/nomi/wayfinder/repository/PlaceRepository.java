@@ -33,7 +33,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               -- the famous mosques / churches that are sights (ATTRACTION tagged religious)
               AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
                    OR p.category = CAST(:category AS text)
-                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
+                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags)
+                   -- A café serving breakfast is in both lists (osm/PlaceTags.breakfastAware)
+                   OR CAST(:category AS text) = 'BREAKFAST' AND 'breakfast' = ANY (p.tags)
+                   OR CAST(:category AS text) = 'CAFE' AND 'cafe' = ANY (p.tags))
               -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
               AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
             ORDER BY "distanceMeters"
@@ -200,7 +203,10 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               -- the famous mosques / churches that are sights (ATTRACTION tagged religious)
               AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
                    OR p.category = CAST(:category AS text)
-                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags))
+                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags)
+                   -- A café serving breakfast is in both lists (osm/PlaceTags.breakfastAware)
+                   OR CAST(:category AS text) = 'BREAKFAST' AND 'breakfast' = ANY (p.tags)
+                   OR CAST(:category AS text) = 'CAFE' AND 'cafe' = ANY (p.tags))
               -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
               AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
             ORDER BY CASE WHEN p.source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END, "distanceMeters"
