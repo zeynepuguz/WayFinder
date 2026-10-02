@@ -149,7 +149,9 @@ nomi:
     refresh-cron: ${OVERTURE_REFRESH_CRON:0 30 5 28 * *}
     catalog-url: https://stac.overturemaps.org/catalog.json
     data-url: s3://overturemaps-us-west-2/release/%s/theme=places/type=place/*
-    min-confidence: ${OVERTURE_MIN_CONFIDENCE:0.7}
+    # Places below this certainty are not added (most of 0.5-0.7 are real businesses); sights need 0.7
+    # (OvertureMapper.SIGHT_MIN_CONFIDENCE)
+    min-confidence: ${OVERTURE_MIN_CONFIDENCE:0.5}
     memory-limit: ${OVERTURE_MEMORY_LIMIT:1GB}
     city-delay: 5s
   images:

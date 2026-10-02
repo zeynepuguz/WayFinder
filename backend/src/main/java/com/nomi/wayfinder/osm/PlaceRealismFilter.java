@@ -305,7 +305,7 @@ public final class PlaceRealismFilter {
     }
 
     // Folded words: "Tıp Fakültesi kantini" -> [tip, fakultesi, kantini]
-    static List<String> words(String name) {
+    public static List<String> words(String name) {
         return Arrays.stream(name.split("[^\\p{L}\\p{N}]+"))
                 .map(OsmPlaceMapper::fold)
                 .filter(w -> !w.isEmpty())

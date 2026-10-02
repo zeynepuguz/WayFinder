@@ -131,6 +131,10 @@ public final class OvertureMapper {
         // A market chain is a market however its page is filed ("Mimar Sinan Hakmar" as a shopping mall)
         Kind kind = isMarketChain(name, hierarchy) ? new Kind(PlaceCategory.MARKET, List.of())
                 : classify(hierarchy, folded, name);
+        // Sights from Meta pages are often something else ("Ünal Sahil Sitesi" as a beach): only certain ones
+        if (kind != null && SIGHTS.contains(kind.category()) && row.confidence() < SIGHT_MIN_CONFIDENCE) {
+            return null;
+        }
         if (kind == null || PlaceRealismFilter.rejectName(name, kind.category()) != null) {
             return null;
         }
@@ -143,10 +147,82 @@ public final class OvertureMapper {
         kind = new Kind(PlaceTags.breakfastAware(kind.category(), folded, kindTags), List.copyOf(kindTags));
         List<String> tags = PlaceTags.merge(kind.tags(),
                 PlaceTags.derive(name, kind.category(), cuisines, Map.of(), kind.tags()));
-        // A tea garden is outside; everything else here is a shop / restaurant room
-        boolean indoor = !(folded.contains("caybahce") || folded.contains("bahcesi") && tags.contains("tea"));
+        // Parks, beaches and historic sites are outside, museums / culture venues inside; a tea garden is outside;
+        // everything else here is a shop / restaurant room
+        boolean indoor = switch (kind.category()) {
+            case PARK, ATTRACTION -> false;
+            case MUSEUM, CULTURE -> true;
+            default -> !(folded.contains("caybahce") || folded.contains("bahcesi") && tags.contains("tea"));
+        };
         return new OverturePlace(row.id(), name, kind.category(), tags, indoor, row.confidence(),
                 trim(row.phone(), MAX_PHONE), website(row.website()), row.latitude(), row.longitude());
+    }
+
+    static final double SIGHT_MIN_CONFIDENCE = 0.7;
+    private static final Set<PlaceCategory> SIGHTS = Set.of(PlaceCategory.MUSEUM, PlaceCategory.CULTURE,
+            PlaceCategory.ATTRACTION, PlaceCategory.PARK);
+    // Folded word prefixes of historic buildings / sites: a "historic_site" page must name one ("Tarihi Taş Köprü",
+    // "Kocaeli Saat Kulesi"; not "Samanlı Tüneli" or a village)
+    private static final List<String> HISTORIC_WORDS = List.of("kale", "kopru", "cesme", "hamam", "kervansaray",
+            "kosk", "konak", "antik", "harabe", "kule", "anit", "medrese", "kulliye", "sarnic", "bedesten", "arasta",
+            "saray", "tarihi", "surlar", "orenyeri", "sukemer", "kemeri", "turbe", "hisar", "castle", "bridge",
+            "fountain", "monument", "ancient", "ruins", "tower", "palace");
+    private static final Set<String> HISTORIC_EXACT = Set.of("han", "hani", "sur", "oren");
+    private static final List<String> PARK_WORDS = List.of("park", "bahce", "tabiat", "orman", "mesire", "garden");
+    private static final List<String> BEACH_WORDS = List.of("plaj", "beach");
+    // Folded word prefixes of what Meta pages file as sights but is not one ("Elit Park Evleri", "Nesli-Han
+    // Apartmanı", "Park ve Bahçeler Müdürlüğü", "Sel Auto Galeri", "Göktaş Mutfak Banyo Kapı")
+    private static final List<String> NOT_A_SIGHT_STEMS = List.of("apartman", "evleri", "sitesi", "siteler", "konut",
+            "rezidans", "residence", "tower", "plaza", "mudurlug", "mudurluk", "baskanlig", "ticaret", "sanayi",
+            "insaat", "emlak", "gayrimenkul", "mobilya", "mutfak", "banyo", "otomotiv", "dekorasyon", "matbaa",
+            "reklam", "organizasyon", "dugun", "cemev", "kursu", "akademi", "okulu", "lisesi", "dernek", "konaklar",
+            "saraylar", "adliye", "yikama", "halisaha", "saha", "tesis", "otopark", "temsilcilig", "subesi", "dernegi",
+            "kafe", "cafe", "kahve");
+    // A culture venue says so: "Kültür Merkezi", "Sanat Galerisi", "Bölge Tiyatrosu", "Bilim Merkezi"
+    private static final List<String> CULTURE_WORDS = List.of("kultur", "sanat", "tiyatro", "theat", "galeri",
+            "gallery", "konser", "sahne", "opera", "konservatuvar", "bilim", "akm", "performing", "sergi", "art");
+    private static final Set<String> NOT_A_SIGHT_EXACT = Set.of("oto", "auto", "ltd", "sti", "kapi", "as");
+
+    /**
+     * Museums, culture venues, historic sites and parks Overture knows (OSM has most; matching keeps them once).
+     * Meta pages are filed loosely, so historic sites, parks and beaches must say what they are in their name.
+     */
+    static Kind sight(List<String> hierarchy, String name) {
+        List<String> words = PlaceRealismFilter.words(name == null ? "" : name);
+        // Housing estates, offices, directorates and shops filed as parks / galleries / historic sites
+        boolean museumName = words.stream().anyMatch(w -> w.startsWith("muze") || w.startsWith("museum"));
+        if (!museumName && words.stream().anyMatch(w -> NOT_A_SIGHT_EXACT.contains(w)
+                || NOT_A_SIGHT_STEMS.stream().anyMatch(w::startsWith))) {
+            return null;
+        }
+        boolean historicName = words.stream().anyMatch(w -> HISTORIC_EXACT.contains(w)
+                || HISTORIC_WORDS.stream().anyMatch(w::startsWith));
+        if (hierarchy.contains("museum") || hierarchy.stream().anyMatch(c -> c.endsWith("_museum"))) {
+            // "Umut Gözleme ve Mantı Evi" is filed as a museum too: a museum says so, a mansion is a sight
+            return museumName ? new Kind(PlaceCategory.MUSEUM, List.of("museum"))
+                    : historicName ? new Kind(PlaceCategory.ATTRACTION, List.of("history")) : null;
+        }
+        if (hierarchy.contains("art_gallery") || hierarchy.contains("theatre_venue")
+                || hierarchy.contains("cultural_center")) {
+            boolean cultureName = words.stream().anyMatch(w -> CULTURE_WORDS.stream().anyMatch(w::startsWith));
+            return cultureName ? new Kind(PlaceCategory.CULTURE, List.of("art")) : null;
+        }
+        if (hierarchy.contains("historic_site") || hierarchy.contains("castle") || hierarchy.contains("monument")
+                || hierarchy.contains("memorial_site")) {
+            return historicName ? new Kind(PlaceCategory.ATTRACTION, List.of("history")) : null;
+        }
+        if (hierarchy.contains("beach")) {
+            boolean named = words.stream().anyMatch(w -> BEACH_WORDS.stream().anyMatch(w::startsWith));
+            return named ? new Kind(PlaceCategory.PARK, List.of("sea", "nature")) : null;
+        }
+        if (hierarchy.contains("park") || hierarchy.contains("national_park") || hierarchy.contains("botanical_garden")
+                || hierarchy.contains("nature_reserve")) {
+            // A tea garden ("Çınaraltı Çay Bahçesi") is a café
+            boolean teaGarden = words.contains("cay") && words.stream().anyMatch(w -> w.startsWith("bahce"));
+            boolean named = words.stream().anyMatch(w -> PARK_WORDS.stream().anyMatch(w::startsWith));
+            return named && !teaGarden ? new Kind(PlaceCategory.PARK, List.of("nature")) : null;
+        }
+        return null;
     }
 
     private static boolean h(List<String> hierarchy, String value) {
@@ -165,6 +241,10 @@ public final class OvertureMapper {
             String worship = PlaceTags.worshipKind(name, null, null);
             return new Kind(PlaceCategory.WORSHIP,
                     worship == null ? List.of("religious") : List.of("religious", worship));
+        }
+        Kind sight = sight(hierarchy, name);
+        if (sight != null) {
+            return sight;
         }
         if (hierarchy.contains("grocery_store") || hierarchy.contains("supermarket")
                 || hierarchy.contains("convenience_store") || hierarchy.contains("discount_store")) {

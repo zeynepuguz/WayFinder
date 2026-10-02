@@ -37,7 +37,8 @@ public class OverturePlaceImporter {
 
     private static final String FOOD = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT')";
     // What Overture places may confirm: food, markets, places of worship and sights (a famous mosque is an ATTRACTION)
-    private static final String MATCHABLE = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT', 'MARKET', 'WORSHIP', 'ATTRACTION')";
+    private static final String MATCHABLE = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT', 'MARKET', 'WORSHIP', 'ATTRACTION', "
+            + "'MUSEUM', 'CULTURE', 'PARK')";
     // What may be unconfirmed: food places and markets (Overture knows too few of the mosques to judge those)
     private static final String CONFIRMABLE = "('BREAKFAST', 'RESTAURANT', 'CAFE', 'DESSERT', 'MARKET')";
     private static final Set<String> FOOD_CATEGORIES = Set.of("BREAKFAST", "RESTAURANT", "CAFE", "DESSERT");

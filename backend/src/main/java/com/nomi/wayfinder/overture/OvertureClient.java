@@ -42,7 +42,11 @@ public class OvertureClient {
               AND (taxonomy.hierarchy[1] = 'food_and_drink'
                    OR list_has_any(taxonomy.hierarchy, ['grocery_store', 'supermarket', 'convenience_store',
                                                         'superstore', 'discount_store', 'shopping_mall',
-                                                        'place_of_worship']))
+                                                        'place_of_worship', 'museum', 'art_gallery',
+                                                        'theatre_venue', 'cultural_center', 'historic_site',
+                                                        'castle', 'monument', 'memorial_site', 'park',
+                                                        'national_park', 'botanical_garden', 'nature_reserve',
+                                                        'beach']))
             """;
 
     private final OvertureProperties properties;
