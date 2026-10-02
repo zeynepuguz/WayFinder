@@ -59,6 +59,18 @@ public class OverturePlaceImporter {
                               updated_at = now()
             WHERE source <> 'OVERTURE' AND overture_id IS NOT NULL AND NOT (id = ANY (?)) AND %s
             """.formatted(IN_BOX);
+    // An id this import confirms may still sit on a row outside the box: a place on the border a neighbouring
+    // city's import matched (their Overture boxes overlap). That row lets go of it (the column is unique)
+    private static final String RELEASE_CONFIRMING_IDS_ELSEWHERE = """
+            UPDATE places SET overture_id = NULL, overture_confidence = NULL, phone = NULL, website = NULL,
+                              updated_at = now()
+            WHERE source <> 'OVERTURE' AND overture_id = ANY (?) AND NOT (id = ANY (?))
+            """;
+    // The rows this import confirms let go of their old ids first: ids can swap between them (A had Y and now gets X
+    // while B gets Y), and the unique column would refuse B before A is updated
+    private static final String CLEAR_IDS_OF_CONFIRMED_ROWS = """
+            UPDATE places SET overture_id = NULL WHERE id = ANY (?) AND overture_id IS NOT NULL
+            """;
     private static final String RETIRE_OVERTURE_ROWS_NOW_CONFIRMING = """
             UPDATE places SET overture_id = NULL, hidden = TRUE, updated_at = now()
             WHERE source = 'OVERTURE' AND overture_id = ANY (?)
@@ -155,6 +167,17 @@ public class OverturePlaceImporter {
                 var ps = con.prepareStatement(RELEASE_IDS_OF_OTHER_ROWS);
                 ps.setArray(1, con.createArrayOf("bigint", confirmedIds));
                 bindBox(ps, 2, city);
+                return ps;
+            });
+            jdbc.update(con -> {
+                var ps = con.prepareStatement(CLEAR_IDS_OF_CONFIRMED_ROWS);
+                ps.setArray(1, con.createArrayOf("bigint", confirmedIds));
+                return ps;
+            });
+            jdbc.update(con -> {
+                var ps = con.prepareStatement(RELEASE_CONFIRMING_IDS_ELSEWHERE);
+                ps.setArray(1, con.createArrayOf("text", confirmingOvertureIds));
+                ps.setArray(2, con.createArrayOf("bigint", confirmedIds));
                 return ps;
             });
             jdbc.update(con -> {

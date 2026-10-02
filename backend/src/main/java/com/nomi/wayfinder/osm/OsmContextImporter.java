@@ -76,13 +76,13 @@ public class OsmContextImporter {
             WHERE p.id = x.id AND p.near_sea <> x.near
             """;
 
-    private final OverpassClient overpassClient;
+    private final OsmSource overpassClient;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public OsmContextImporter(OverpassClient overpassClient, JdbcTemplate jdbc, TransactionTemplate transactions,
+    public OsmContextImporter(OsmSource overpassClient, JdbcTemplate jdbc, TransactionTemplate transactions,
                               ApplicationEventPublisher events) {
         this.overpassClient = overpassClient;
         this.jdbc = jdbc;

@@ -109,12 +109,12 @@ public class OsmPlaceImporter {
             UPDATE places SET city_id = ? WHERE city_id IS NULL AND osm_id = ANY (?)
             """;
 
-    private final OverpassClient overpassClient;
+    private final OsmSource overpassClient;
     private final OsmAreaImporter areaImporter;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
-    public OsmPlaceImporter(OverpassClient overpassClient, OsmAreaImporter areaImporter, JdbcTemplate jdbc,
+    public OsmPlaceImporter(OsmSource overpassClient, OsmAreaImporter areaImporter, JdbcTemplate jdbc,
                             TransactionTemplate transactions) {
         this.overpassClient = overpassClient;
         this.areaImporter = areaImporter;
@@ -131,13 +131,23 @@ public class OsmPlaceImporter {
     public ImportResult importCity(OsmCity city) {
         long started = System.currentTimeMillis();
         log.info("OSM import ({}): downloading places from Overpass...", city.name());
-        List<OverpassResponse.Element> elements = overpassClient.fetchPlaces(city.relationId());
+        // District by district (small queries a busy server still answers); the whole city when it has no districts
+        List<OverpassResponse.Element> elements = overpassClient.fetchPlaces(city.relationId(), districtRelations(city));
         log.info("OSM import ({}): {} elements downloaded, writing to the database...", city.name(), elements.size());
 
         ImportResult result = importElements(elements, city);
         log.info("OSM import ({}) places finished in {} s: {}", city.name(),
                 (System.currentTimeMillis() - started) / 1000, result);
         return result;
+    }
+
+    // "relation/1211033" -> 1211033, for the districts of the city (written by OsmAreaImporter just before)
+    List<Long> districtRelations(OsmCity city) {
+        return jdbc.query("SELECT osm_id FROM districts WHERE city_id = ? ORDER BY name", (rs, i) -> rs.getString(1),
+                        city.id()).stream()
+                .filter(id -> id != null && id.startsWith("relation/"))
+                .map(id -> Long.parseLong(id.substring("relation/".length())))
+                .toList();
     }
 
     ImportResult importElements(List<OverpassResponse.Element> elements, OsmCity city) {

@@ -54,7 +54,7 @@ public class OsmCityImporter {
                 updated_at = now()
             """;
 
-    private final OverpassClient overpassClient;
+    private final OsmSource overpassClient;
     private final OsmAreaImporter areaImporter;
     private final OsmPlaceImporter placeImporter;
     private final OsmContextImporter contextImporter;
@@ -62,7 +62,7 @@ public class OsmCityImporter {
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
 
-    public OsmCityImporter(OverpassClient overpassClient, OsmAreaImporter areaImporter, OsmPlaceImporter placeImporter,
+    public OsmCityImporter(OsmSource overpassClient, OsmAreaImporter areaImporter, OsmPlaceImporter placeImporter,
                            OsmContextImporter contextImporter, JdbcTemplate jdbc, TransactionTemplate transactions,
                            ApplicationEventPublisher events) {
         this.contextImporter = contextImporter;

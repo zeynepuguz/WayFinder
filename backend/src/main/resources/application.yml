@@ -111,6 +111,15 @@ nomi:
   rate-limit:
     # Requests per minute per user for expensive endpoints (route planning, assistant)
     requests-per-minute: 30
+  osm-pbf:
+    # OpenStreetMap from a Geofabrik extract of Türkiye instead of the Overpass API: all 81 cities in minutes, no
+    # rate limits; Geofabrik publishes it daily. Download download.geofabrik.de/europe/turkey-latest.osm.pbf
+    # (~650 MB; it redirects to turkey-YYMMDD.osm.pbf) and point path to it; it is prepared once into cache-path
+    # (rebuilt when the file changes)
+    enabled: ${OSM_PBF_ENABLED:false}
+    path: ${OSM_PBF_PATH:}
+    cache-path: ${OSM_PBF_CACHE_PATH:}
+    memory-limit: ${OSM_PBF_MEMORY_LIMIT:2GB}
   osm:
     # Cities of Turkey from OpenStreetMap, city by city. After startup, in the background: the 81 provinces when
     # they are missing, then every selected city that was never imported (Istanbul first, then by population)

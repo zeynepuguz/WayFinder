@@ -24,7 +24,7 @@ import java.util.List;
  * runtime error in "remark": such answers are treated as failures and the next endpoint is tried.
  */
 @Component
-public class OverpassClient {
+public class OverpassClient implements OsmSource {
 
     private static final Logger log = LoggerFactory.getLogger(OverpassClient.class);
 
@@ -176,6 +176,32 @@ public class OverpassClient {
         return all;
     }
 
+    /**
+     * Like fetchPlaces(relationId), but district by district: a busy public Overpass server cannot finish a whole
+     * province's food query in time (Adana / Balıkesir timed out for hours in Oct 2026) while a district's answers
+     * in seconds. Elements on a district border come back twice and are kept once.
+     *
+     * @param districtRelationIds the city's district relations (OsmAreaImporter wrote them); empty = the city at once
+     */
+    @Override
+    public List<OverpassResponse.Element> fetchPlaces(long relationId, List<Long> districtRelationIds) {
+        if (districtRelationIds == null || districtRelationIds.isEmpty()) {
+            return fetchPlaces(relationId);
+        }
+        List<OverpassResponse.Element> all = new java.util.ArrayList<>();
+        boolean first = true;
+        for (long district : districtRelationIds) {
+            for (String query : districtQueries(district)) {
+                if (!first) {
+                    sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
+                }
+                first = false;
+                all = merge(all, fetch(query, false));
+            }
+        }
+        return all;
+    }
+
     static List<OverpassResponse.Element> merge(List<OverpassResponse.Element> first, List<OverpassResponse.Element> second) {
         java.util.Map<String, OverpassResponse.Element> byId = new java.util.LinkedHashMap<>();
         for (List<OverpassResponse.Element> list : List.of(first, second)) {
@@ -211,6 +237,16 @@ public class OverpassClient {
     static List<String> placesQueries(long relationId) {
         long area = areaId(relationId);
         return List.of(FOOD_QUERY.formatted(area), SIGHTS_QUERY.formatted(area), MARKETS_WORSHIP_QUERY.formatted(area));
+    }
+
+    // A district's queries end on the server after DISTRICT_QUERY_TIMEOUT_SECONDS: a query we gave up on must not
+    // keep one of this IP's few slots busy for minutes (read-timeout must stay longer than this)
+    static final int DISTRICT_QUERY_TIMEOUT_SECONDS = 120;
+
+    static List<String> districtQueries(long districtRelationId) {
+        return placesQueries(districtRelationId).stream()
+                .map(q -> q.replace("[timeout:300]", "[timeout:" + DISTRICT_QUERY_TIMEOUT_SECONDS + "]"))
+                .toList();
     }
 
     static long areaId(long relationId) {

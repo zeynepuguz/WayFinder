@@ -96,11 +96,11 @@ public class OsmAreaImporter {
                 updated_at = now()
             """;
 
-    private final OverpassClient overpassClient;
+    private final OsmSource overpassClient;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
-    public OsmAreaImporter(OverpassClient overpassClient, JdbcTemplate jdbc, TransactionTemplate transactions) {
+    public OsmAreaImporter(OsmSource overpassClient, JdbcTemplate jdbc, TransactionTemplate transactions) {
         this.overpassClient = overpassClient;
         this.jdbc = jdbc;
         this.transactions = transactions;
