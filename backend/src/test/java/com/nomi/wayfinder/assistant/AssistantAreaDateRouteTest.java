@@ -144,7 +144,7 @@ class AssistantAreaDateRouteTest {
                 "yarın 2 kişi 700 tl ile gezeceğiz, rota önerir misin", 41.0262, 29.0165, null));
 
         assertThat(reply.route()).isNull();
-        assertThat(reply.reply()).startsWith("Rotaya nereden başlayalım?");
+        assertThat(reply.reply()).startsWith("Rotayı hangi şehirde planlayalım ve nereden başlayalım?");
     }
 
     @Test

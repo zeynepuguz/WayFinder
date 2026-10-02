@@ -409,7 +409,11 @@ public class AssistantService {
         boolean startNamed = area.isPresent() && area.get().kind() != NamedArea.Kind.CITY;
         if (startAnswer == null && !startNamed && !p.wantsPopular() && !mentions(request.message(), HERE_WORDS)
                 && !mentions(request.message(), ANY_WORDS)) {
-            return text(intent, composer.askStart(area.map(NamedArea::name).orElse(null)));
+            if (area.isEmpty()) {
+                return text(intent, composer.askCityAndStart(currentCityName(request)));
+            }
+            List<String> examples = startService == null ? List.of() : startService.startExamples(area.get().citySlug());
+            return text(intent, composer.askStart(area.get().name(), examples));
         }
 
         // The answer: "buradan" = the user's position, "fark etmez" = the usual start, else a neighbourhood /
@@ -481,6 +485,18 @@ public class AssistantService {
 
     // A place the user named as the start ("Anıtkabir")
     private record StartPlace(double latitude, double longitude, String name) {
+    }
+
+    // The city the user is in ("Kocaeli"), for "hangi şehirde?"; null when unknown
+    private String currentCityName(AssistantRequest request) {
+        if (cityService == null || request.latitude() == null || request.longitude() == null) {
+            return null;
+        }
+        try {
+            return cityService.findCityAt(request.latitude(), request.longitude()).map(CityService.City::name).orElse(null);
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     // The city (slug) the user is in, for "ünlü bir rota" without a place name
@@ -648,6 +664,11 @@ public class AssistantService {
             // The chat this message was added to (a new one when the request had none)
             Long conversationId
     ) {
+
+        // Writing rules: every sentence of an answer starts with a capital letter
+        public AssistantReply {
+            reply = com.nomi.wayfinder.i18n.Sentences.capitalize(reply);
+        }
 
         public AssistantReply(String reply, AssistantIntent intent, RouteResponse route, List<Recommendation> recommendations,
                               List<Recommendation> fartherRecommendations, List<String> changes) {

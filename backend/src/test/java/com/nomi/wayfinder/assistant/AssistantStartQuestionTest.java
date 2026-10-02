@@ -54,7 +54,8 @@ class AssistantStartQuestionTest {
         });
         when(routeService.createRoute(anyLong(), any())).thenReturn(new Route());
         ResponseComposer composer = mock(ResponseComposer.class);
-        when(composer.askStart(any())).thenCallRealMethod();
+        when(composer.askStart(any(), any())).thenCallRealMethod();
+        when(composer.askCityAndStart(any())).thenCallRealMethod();
         when(composer.planCreated(any(), any())).thenReturn("plan");
         AreaResolver areas = mock(AreaResolver.class);
         when(areas.resolve(any(), any(), any(), any())).thenReturn(Optional.empty());
@@ -69,7 +70,7 @@ class AssistantStartQuestionTest {
     @Test
     void asksWhereToStartThenStartsAtTheNamedPlace() {
         AssistantReply question = service.handle(1L, new AssistantRequest("2 kişiyiz, 5000 TL, tarih ve müze", 39.9, 32.8, null));
-        assertThat(question.reply()).startsWith("Rotaya nereden başlayalım?");
+        assertThat(question.reply()).startsWith("Rotayı hangi şehirde planlayalım ve nereden başlayalım?");
         verify(routeService, never()).createRoute(anyLong(), any());
 
         service.handle(1L, new AssistantRequest("Anıtkabir'den başlayalım", 39.9, 32.8, null, question.conversationId()));

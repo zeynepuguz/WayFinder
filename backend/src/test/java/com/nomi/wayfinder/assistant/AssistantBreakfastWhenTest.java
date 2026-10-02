@@ -53,7 +53,8 @@ class AssistantBreakfastWhenTest {
         when(routeService.createRoute(anyLong(), any())).thenReturn(new Route());
         ResponseComposer composer = mock(ResponseComposer.class);
         when(composer.askWhenForBreakfast()).thenCallRealMethod();
-        when(composer.askStart(any())).thenCallRealMethod();
+        when(composer.askStart(any(), any())).thenCallRealMethod();
+        when(composer.askCityAndStart(any())).thenCallRealMethod();
         when(composer.planCreated(any(), any())).thenReturn("plan");
         AreaResolver areas = mock(AreaResolver.class);
         when(areas.resolve(any(), anyString(), any(), any())).thenReturn(Optional.empty());
@@ -74,7 +75,7 @@ class AssistantBreakfastWhenTest {
         AssistantReply where = service.handle(1L, new AssistantRequest("yarın sabah", 40.8, 29.37, null, conversation));
 
         // Then where to start (no place named): both answers are read with the first request
-        assertThat(where.reply()).startsWith("Rotaya nereden başlayalım?");
+        assertThat(where.reply()).startsWith("Rotayı hangi şehirde planlayalım ve nereden başlayalım?");
         verify(routeService, never()).createRoute(anyLong(), any());
         service.handle(1L, new AssistantRequest("buradan", 40.8, 29.37, null, conversation));
 
@@ -91,7 +92,7 @@ class AssistantBreakfastWhenTest {
     void sayingNowPlansRightAway() {
         AssistantReply reply = service.handle(1L, new AssistantRequest("şimdi buradan " + REQUEST, 40.8, 29.37, null));
 
-        assertThat(reply.reply()).isEqualTo("plan");
+        assertThat(reply.reply()).isEqualTo("Plan");
         verify(routeService).createRoute(eq(1L), any());
     }
 }

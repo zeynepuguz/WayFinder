@@ -70,7 +70,7 @@ class AssistantCityTripTest {
 
         AssistantReply reply = service.handle(1L, new AssistantRequest(MESSAGE, GPS_LAT, GPS_LON, null));
 
-        assertThat(reply.reply()).isEqualTo("popular");
+        assertThat(reply.reply()).isEqualTo("Popular");
         assertThat(reply.route()).isSameAs(popular);
         verify(routeService, never()).createRoute(anyLong(), any());
     }
@@ -89,6 +89,6 @@ class AssistantCityTripTest {
         assertThat(request.getValue().latitude()).isEqualTo(40.1826);
         assertThat(request.getValue().partySize()).isEqualTo(4);
         assertThat(request.getValue().budget()).isEqualTo(4000);
-        assertThat(reply.reply()).startsWith("none. ");
+        assertThat(reply.reply()).startsWith("None. ");
     }
 }

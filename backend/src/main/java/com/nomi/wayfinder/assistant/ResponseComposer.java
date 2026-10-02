@@ -42,17 +42,34 @@ public class ResponseComposer {
     static final String START_QUESTION_TR = "rotaya nereden başlayalım?";
     static final String START_QUESTION_EN = "where should the route start?";
 
-    // No start named (or only a city): the next message answers it (AssistantService)
-    public String askStart(String city) {
-        return city == null
-                ? Texts.t("Rotaya nereden başlayalım? Bulunduğun yerden başlayabilirim ya da bir semt veya yer adı "
-                        + "yazabilirsin (örneğin \"Kızılay\", \"Anıtkabir\").",
-                "Where should the route start? I can start where you are, or you can write a neighbourhood or a place "
-                        + "(for example \"Kızılay\", \"Anıtkabir\").")
-                : Texts.t(city + " içinde " + START_QUESTION_TR + " Bir semt ya da yer adı yazabilirsin (örneğin "
-                        + "\"Kızılay\", \"Anıtkabir\"); \"fark etmez\" dersen en bilinen yerinden başlarım.",
-                "In " + city + ", " + START_QUESTION_EN + " Write a neighbourhood or a place (for example "
-                        + "\"Kızılay\", \"Anıtkabir\"); if you say \"anywhere\" I will start at its best-known sight.");
+    /**
+     * No city named: which city, and where in it (the next message answers it, AssistantService).
+     *
+     * @param currentCity the city the user is in (from their position), null when unknown
+     */
+    public String askCityAndStart(String currentCity) {
+        String here = currentCity == null ? ""
+                : Texts.t(" Şu an bulunduğun şehir " + currentCity + "; \"buradan\" yazarsan bulunduğun yerden başlarım.",
+                " You are in " + currentCity + " now; write \"here\" and I will start where you are.");
+        return Texts.t("Rotayı hangi şehirde planlayalım ve nereden başlayalım?" + here
+                        + " Başka bir yer için şehir ve semt adını yazabilirsin, örneğin \"Bursa, Nilüfer\".",
+                "Which city should the route be in, and " + START_QUESTION_EN + here
+                        + " For another place write the city and the neighbourhood, for example \"Bursa, Nilüfer\".");
+    }
+
+    /**
+     * Only a city named: where in it.
+     *
+     * @param examples real places of that city for the hint (its best-known sight, a district); may be empty
+     */
+    public String askStart(String city, List<String> examples) {
+        String hint = examples == null || examples.isEmpty() ? ""
+                : " (" + Texts.t("örneğin ", "for example ") + String.join(", ",
+                examples.stream().map(e -> "\"" + e + "\"").toList()) + ")";
+        return Texts.t(city + " içinde " + START_QUESTION_TR + " Bir semt ya da yer adı yazabilirsin" + hint
+                        + "; \"fark etmez\" dersen en bilinen yerinden başlarım.",
+                "In " + city + ", " + START_QUESTION_EN + " Write a neighbourhood or a place" + hint
+                        + "; if you say \"anywhere\" I will start at its best-known sight.");
     }
 
     static boolean isStartQuestion(String reply) {

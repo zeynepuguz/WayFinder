@@ -43,6 +43,10 @@ public final class AreaMatcher {
             "dayim", "deyim", "tayim", "teyim", "dayiz", "deyiz", "tayiz", "teyiz",
             "dir", "dur", "tir", "tur", "s");
 
+    // Question particles that look like a place name with an ending: "oluşturur musun" is not "Muş'un"
+    static final Set<String> NOT_PLACES = Set.of("mu", "mi", "musun", "musunuz", "misin", "misiniz", "muyum",
+            "miyim", "muyuz", "miyiz", "mudur", "midir", "mudir", "musunuzdur");
+
     // District / neighbourhood names that are everyday words (city names are always kept)
     static final Set<String> COMMON_WORDS = Set.of(
             "merkez", "cumhuriyet", "yeni", "eski", "carsi", "sahil", "iskele", "istasyon", "liman", "kale",
@@ -90,6 +94,9 @@ public final class AreaMatcher {
         // Every name the message contains, grouped by name ("konak" -> the Konak districts of all cities)
         Map<String, List<Entry>> found = new LinkedHashMap<>();
         for (int i = 0; i < tokens.size(); i++) {
+            if (NOT_PLACES.contains(tokens.get(i))) {
+                continue;
+            }
             for (String stem : stems(tokens.get(i))) {
                 for (Entry entry : byFirstWord.getOrDefault(stem, List.of())) {
                     if (matchesAt(tokens, i, entry.tokens())) {

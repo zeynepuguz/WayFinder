@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -128,6 +129,29 @@ public class RouteStartService {
                 (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
                 longitude, latitude, PLACE_SEARCH_RADIUS_METERS, "%" + text + "%", text, longitude, latitude);
         return found.stream().findFirst();
+    }
+
+    /**
+     * Real places of a city for the assistant's "nereden başlayalım?" hint: its best-known sight and its busiest
+     * district (most places), so a user in Muş is not told "Kızılay".
+     */
+    public List<String> startExamples(String citySlug) {
+        Optional<CityService.City> city = citySlug == null ? Optional.empty() : cityService.findBySlug(citySlug);
+        if (city.isEmpty()) {
+            return List.of();
+        }
+        List<String> examples = new ArrayList<>();
+        bestSight("p.city_id", city.get().id()).map(Start::label).ifPresent(examples::add);
+        jdbc.query("""
+                        SELECT d.name FROM districts d JOIN places p ON p.district_id = d.id
+                        WHERE d.city_id = ? AND NOT p.hidden GROUP BY d.name ORDER BY count(*) DESC LIMIT 1
+                        """, rs -> {
+                    String name = rs.getString(1);
+                    if (name != null && !name.isBlank() && !"Merkez".equalsIgnoreCase(name) && !examples.contains(name)) {
+                        examples.add(name);
+                    }
+                }, city.get().id());
+        return examples;
     }
 
     // Package-private for tests

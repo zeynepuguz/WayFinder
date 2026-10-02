@@ -188,16 +188,19 @@ public class OverpassClient implements OsmSource {
         if (districtRelationIds == null || districtRelationIds.isEmpty()) {
             return fetchPlaces(relationId);
         }
+        // Food (thousands of places in a big city) district by district: seconds each. Sights and markets / worship
+        // once for the city, one statement per query: a busy server turns away a query by its load at that moment
+        // (504 even for "all supermarkets"), so small queries get through and a refused one is retried alone
+        long cityArea = areaId(relationId);
         List<OverpassResponse.Element> all = new java.util.ArrayList<>();
-        boolean first = true;
         for (long district : districtRelationIds) {
-            for (String query : districtQueries(district)) {
-                if (!first) {
-                    sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
-                }
-                first = false;
-                all = merge(all, fetch(query, false));
-            }
+            all = merge(all, fetch(withTimeout(FOOD_QUERY.formatted(areaId(district)), DISTRICT_QUERY_TIMEOUT_SECONDS),
+                    false));
+            sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
+        }
+        for (String query : statementQueries(List.of(SIGHTS_QUERY, MARKETS_WORSHIP_QUERY), cityArea)) {
+            all = merge(all, fetch(query, false));
+            sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
         }
         return all;
     }
@@ -243,10 +246,26 @@ public class OverpassClient implements OsmSource {
     // keep one of this IP's few slots busy for minutes (read-timeout must stay longer than this)
     static final int DISTRICT_QUERY_TIMEOUT_SECONDS = 120;
 
-    static List<String> districtQueries(long districtRelationId) {
-        return placesQueries(districtRelationId).stream()
-                .map(q -> q.replace("[timeout:300]", "[timeout:" + DISTRICT_QUERY_TIMEOUT_SECONDS + "]"))
-                .toList();
+    // The city-wide sights / markets queries end on the server before our read timeout (5 min) gives up on them
+    static final int CITY_QUERY_TIMEOUT_SECONDS = 240;
+
+    // Each "nwr[...](area.city);" statement of the queries as a query of its own for the area
+    static List<String> statementQueries(List<String> queries, long area) {
+        List<String> result = new java.util.ArrayList<>();
+        for (String query : queries) {
+            for (String line : query.split("\n")) {
+                String statement = line.trim();
+                if (statement.startsWith("nwr")) {
+                    result.add("[out:json][timeout:" + CITY_QUERY_TIMEOUT_SECONDS + "];\narea(id:" + area
+                            + ")->.city;\n(\n  " + statement + "\n);\nout center meta;\n");
+                }
+            }
+        }
+        return result;
+    }
+
+    static String withTimeout(String query, int seconds) {
+        return query.replace("[timeout:300]", "[timeout:" + seconds + "]");
     }
 
     static long areaId(long relationId) {
