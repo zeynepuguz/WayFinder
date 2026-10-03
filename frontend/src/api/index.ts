@@ -1,7 +1,7 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceCategory,
+  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
@@ -60,6 +60,7 @@ export const api = {
   cityAt: (lat: number, lon: number) => http.get<City>('/cities/at', { lat, lon }),
   districts: (city: string) => http.get<District[]>('/districts', { city }),
   place: (id: number) => http.get<Place>(`/places/${id}`),
+  placeAvailability: (id: number) => http.get<PlaceAvailability>(`/places/${id}/availability`),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
   // Close-by picks plus better fits that are farther away

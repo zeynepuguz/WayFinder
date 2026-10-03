@@ -111,6 +111,12 @@ nomi:
   rate-limit:
     # Requests per minute per user for expensive endpoints (route planning, assistant)
     requests-per-minute: 30
+  google-places:
+    # Places API (New) key: the place page asks Google whether a place is still there (closed for good -> hidden).
+    # Empty = no check: "Google Haritalar'da aç" searches the name around our pin
+    api-key: ${GOOGLE_PLACES_API_KEY:}
+    radius-meters: 300
+    timeout: 5s
   osm-pbf:
     # OpenStreetMap from a Geofabrik extract of Türkiye instead of the Overpass API: all 81 cities in minutes, no
     # rate limits; Geofabrik publishes it daily. Download download.geofabrik.de/europe/turkey-latest.osm.pbf

@@ -76,6 +76,14 @@ export interface OpeningHours {
   closesAt: string
 }
 
+// GET /places/{id}/availability: Google Places says whether the place is still there (when the backend has a key)
+export interface PlaceAvailability {
+  status: 'OPEN' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'NOT_FOUND' | 'UNCHECKED'
+  // The exact Google place, else a Google Maps search around our pin
+  mapsUrl: string
+  googleName: string | null
+}
+
 export interface Place {
   id: number
   name: string

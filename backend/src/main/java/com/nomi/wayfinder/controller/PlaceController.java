@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.google.PlaceAvailabilityService;
 import com.nomi.wayfinder.dto.NearbyPlaceResponse;
 import com.nomi.wayfinder.dto.PageResponse;
 import com.nomi.wayfinder.dto.PlaceCreateRequest;
@@ -24,9 +25,12 @@ import java.util.List;
 public class PlaceController {
 
     private final PlaceService placeService;
+    private final PlaceAvailabilityService availabilityService;
 
-    public PlaceController(PlaceService placeService) {
+    public PlaceController(PlaceService placeService,
+                           PlaceAvailabilityService availabilityService) {
         this.placeService = placeService;
+        this.availabilityService = availabilityService;
     }
 
     @GetMapping
@@ -81,6 +85,15 @@ public class PlaceController {
             @RequestParam(defaultValue = "200") @Positive @Max(300) int limit
     ) {
         return placeService.getPlacesInArea(south, west, north, east, lat, lon, category, tag, limit);
+    }
+
+    /**
+     * Is the place still there (Google Places, when a key is set) and where "Google Haritalar'da aç" should go:
+     * the exact Google place, else a search around our pin. A place closed for good on Google is hidden from Nomi.
+     */
+    @GetMapping("/{id}/availability")
+    public PlaceAvailabilityService.Availability availability(@PathVariable Long id) {
+        return availabilityService.check(id);
     }
 
     @GetMapping("/{id}")

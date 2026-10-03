@@ -49,7 +49,9 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(rateLimitInterceptor)
                 // auth: slows down password guessing and reset-code spam
                 .addPathPatterns("/api/v1/routes", "/api/v1/routes/*/replan", "/api/v1/routes/popular/start",
-                        "/api/v1/assistant/**", "/api/v1/auth/**");
+                        "/api/v1/assistant/**", "/api/v1/auth/**",
+                        // Each call is a paid Google Places request
+                        "/api/v1/places/*/availability");
 
         // Paid features
         registry.addInterceptor(accessInterceptor)

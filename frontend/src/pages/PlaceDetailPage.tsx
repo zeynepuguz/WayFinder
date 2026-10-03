@@ -4,7 +4,7 @@ import { api } from '../api'
 import { useGate } from '../components/gate'
 import { OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { RouteMap } from '../components/RouteMap'
-import { BackButton, ErrorState, Skeleton } from '../components/ui'
+import { Alert, BackButton, ErrorState, Skeleton } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
@@ -18,6 +18,8 @@ export function PlaceDetailPage() {
   const gate = useGate()
   const t = useT()
   const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id])
+  // Is it still there (Google Places)? Never blocks the page: without an answer the search around our pin is used
+  const { data: availability } = useAsync(() => api.placeAvailability(Number(id)).catch(() => null), [id])
   const photo = usePlacePhoto(place?.image)
 
   if (loading) {
@@ -40,9 +42,13 @@ export function PlaceDetailPage() {
   // Google Maps searches "<city> <place name>": Google opens its own listing of the place, which says when it is
   // "Kalıcı olarak kapalı" (a pin from OSM / Overture can be wrong: "Akdağ Çayevi" sat in Suluova, the real one
   // closed in Amasya Merkez). Without a city, the point we show
-  const mapsUrl = place.city
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.city} ${place.name}`)}`
-    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${place.latitude},${place.longitude}`)}&travelmode=walking`
+  const searchQuery = place.city && !place.name.toLocaleLowerCase('tr').includes(place.city.toLocaleLowerCase('tr'))
+    ? `${place.city} ${place.name}` : place.name
+  // Around our pin, so a namesake elsewhere in the city does not come first; the backend may know the exact place
+  const mapsUrl = availability?.mapsUrl
+    ?? `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}/@${place.latitude},${place.longitude},17z`
+  const closed = availability?.status === 'CLOSED_PERMANENTLY'
+  const notFound = availability?.status === 'NOT_FOUND'
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
@@ -156,10 +162,15 @@ export function PlaceDetailPage() {
         </p>
       </div>
 
-      <div className="sticky-cta">
-        <a className="btn btn-primary btn-lg grow" href={mapsUrl} target="_blank" rel="noreferrer">
-          <Navigation size={18} /> {t('Google Haritalar’da aç', 'Open in Google Maps')}
-        </a>
+      <div className="sticky-cta" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+        {closed && <Alert tone="danger">{t('Google Haritalar’a göre bu yer kalıcı olarak kapanmış. Artık Nomi’de önerilmeyecek.', 'According to Google Maps this place has closed for good. Nomi will not suggest it any more.')}</Alert>}
+        {notFound && <Alert tone="warning">{t('Bu yer ile eşleşen bir konum bulunamadı. Kapanmış olabilir.', 'No matching place was found here. It may have closed.')}</Alert>}
+        {availability?.status === 'CLOSED_TEMPORARILY' && <Alert tone="warning">{t('Google Haritalar’a göre bu yer geçici olarak kapalı.', 'According to Google Maps this place is temporarily closed.')}</Alert>}
+        {!closed && (
+          <a className={`btn ${notFound ? 'btn-secondary' : 'btn-primary'} btn-lg grow`} href={mapsUrl} target="_blank" rel="noreferrer">
+            <Navigation size={18} /> {notFound ? t('Haritada yine de ara', 'Search the map anyway') : t('Google Haritalar’da aç', 'Open in Google Maps')}
+          </a>
+        )}
       </div>
     </main>
   )
