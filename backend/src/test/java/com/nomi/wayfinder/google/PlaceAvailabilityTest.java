@@ -28,11 +28,13 @@ class PlaceAvailabilityTest {
     private final PlaceRepository places = mock(PlaceRepository.class);
     private final JdbcTemplate jdbc = mock(JdbcTemplate.class);
     private final ApplicationEventPublisher events = mock(ApplicationEventPublisher.class);
+    private final GooglePlacesBudget budget = mock(GooglePlacesBudget.class);
     private PlaceAvailabilityService service;
 
     @BeforeEach
     void setUp() {
         when(client.enabled()).thenReturn(true);
+        when(budget.tryAcquire()).thenReturn(true);
         when(jdbc.update(anyString(), anyLong())).thenReturn(1);
         Place place = new Place();
         ReflectionTestUtils.setField(place, "id", 7L);
@@ -42,7 +44,7 @@ class PlaceAvailabilityTest {
         ReflectionTestUtils.setField(place, "cityName", "Amasya");
         when(places.findById(7L)).thenReturn(Optional.of(place));
         service = new PlaceAvailabilityService(client, new GooglePlacesProperties("key", 300, Duration.ofSeconds(5)),
-                places, jdbc, events);
+                places, jdbc, events, budget);
     }
 
     @Test
@@ -90,6 +92,14 @@ class PlaceAvailabilityTest {
 
         assertThat(result.status()).isEqualTo(Status.UNCHECKED);
         assertThat(result.mapsUrl()).contains("@40.647200,35.820600,17z");
+        verify(client, never()).search(anyString(), anyDouble(), anyDouble());
+    }
+
+    @Test
+    void whenTheFreeShareIsUsedUpGoogleIsNotAsked() {
+        when(budget.tryAcquire()).thenReturn(false);
+
+        assertThat(service.check(7L).status()).isEqualTo(Status.UNCHECKED);
         verify(client, never()).search(anyString(), anyDouble(), anyDouble());
     }
 

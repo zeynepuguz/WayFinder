@@ -57,10 +57,12 @@ public class PlaceAvailabilityService {
     private final PlaceRepository placeRepository;
     private final JdbcTemplate jdbc;
     private final ApplicationEventPublisher events;
+    private final GooglePlacesBudget budget;
 
     public PlaceAvailabilityService(GooglePlacesClient client, GooglePlacesProperties properties,
                                     PlaceRepository placeRepository, JdbcTemplate jdbc,
-                                    ApplicationEventPublisher events) {
+                                    ApplicationEventPublisher events, GooglePlacesBudget budget) {
+        this.budget = budget;
         this.client = client;
         this.properties = properties;
         this.placeRepository = placeRepository;
@@ -72,7 +74,8 @@ public class PlaceAvailabilityService {
         Place place = placeRepository.findById(placeId)
                 .orElseThrow(() -> new ResourceNotFoundException("Place not found: " + placeId));
         String nearPin = searchAroundPin(place);
-        if (!client.enabled()) {
+        // No key, or today's / this month's free share is used up: never a billed call
+        if (!client.enabled() || !budget.tryAcquire()) {
             return new Availability(Status.UNCHECKED, nearPin, null);
         }
         List<GooglePlace> found;
