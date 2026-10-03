@@ -53,15 +53,15 @@ describe('PlaceDetailPage Overture place', () => {
     expect(screen.queryByText(/OpenStreetMap katkıcılarından/)).not.toBeInTheDocument()
   })
 
-  // A search by name made Google pick another place with a similar name: directions always go to the point shown
-  it('sends directions to the point of the place, not a search by its name', async () => {
-    current = place(8, 'Devran Kebap', { source: 'OVERTURE', district: 'Çayırova', city: 'Kocaeli',
-      latitude: 40.817, longitude: 29.374 })
+  // Google opens its own listing of the place (and says when it is closed): "<city> <name>", not our pin
+  it('searches Google Maps for the city and the name of the place', async () => {
+    current = place(8, 'Akdağ Çayevi', { source: 'OSM', district: 'Suluova', city: 'Amasya',
+      latitude: 40.822, longitude: 35.655 })
     renderPage()
-    await screen.findByRole('heading', { name: 'Devran Kebap' })
-    const href = screen.getByRole('link', { name: /Yol tarifi al/ }).getAttribute('href')
-    expect(href).toContain('destination=40.817%2C29.374')
-    expect(href).not.toContain('Devran')
+    await screen.findByRole('heading', { name: 'Akdağ Çayevi' })
+    const href = screen.getByRole('link', { name: /Google Haritalar’da aç/ }).getAttribute('href')
+    expect(href).toContain('/maps/search/?api=1&query=Amasya%20Akda%C4%9F%20%C3%87ayevi')
+    expect(href).not.toContain('40.822')
   })
 
   it('never links a website that is not http(s)', async () => {

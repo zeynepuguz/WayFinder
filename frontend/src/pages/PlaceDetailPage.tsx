@@ -37,10 +37,12 @@ export function PlaceDetailPage() {
   const isSaved = saved.isSaved(place.id)
   const today = (new Date().getDay() + 6) % 7 + 1
   const todayHours = place.openingHours.filter(h => h.dayOfWeek === today)
-  // Always the point we show: a search by name made Google pick another place with a similar name
-  // ("Çayırova Kızılay Çay Bahçesi" -> "Kardeşler Çay Evi")
-  const destination = `${place.latitude},${place.longitude}`
-  const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`
+  // Google Maps searches "<city> <place name>": Google opens its own listing of the place, which says when it is
+  // "Kalıcı olarak kapalı" (a pin from OSM / Overture can be wrong: "Akdağ Çayevi" sat in Suluova, the real one
+  // closed in Amasya Merkez). Without a city, the point we show
+  const mapsUrl = place.city
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.city} ${place.name}`)}`
+    : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${place.latitude},${place.longitude}`)}&travelmode=walking`
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
@@ -156,7 +158,7 @@ export function PlaceDetailPage() {
 
       <div className="sticky-cta">
         <a className="btn btn-primary btn-lg grow" href={mapsUrl} target="_blank" rel="noreferrer">
-          <Navigation size={18} /> {t('Yol tarifi al', 'Get directions')}
+          <Navigation size={18} /> {t('Google Haritalar’da aç', 'Open in Google Maps')}
         </a>
       </div>
     </main>
