@@ -279,3 +279,17 @@ describe('ExplorePage worship kinds', () => {
     expect(screen.queryByRole('button', { name: 'Cami ve mescit' })).not.toBeInTheDocument()
   })
 })
+
+describe('ExplorePage market kinds', () => {
+  it('shows the chains and local shops under Market and filters by one', async () => {
+    renderPage('/explore?category=MARKET&ilce=uskudar')
+    const kinds = await screen.findByRole('region', { name: 'Market türü' }).catch(() => null)
+    const scope = kinds ? within(kinds) : screen
+    expect(scope.getByRole('button', { name: 'Bakkal ve diğer' })).toBeInTheDocument()
+    await userEvent.click(scope.getByRole('button', { name: 'BİM' }))
+
+    await waitFor(() => expect(searchPlaces).toHaveBeenLastCalledWith(
+      expect.objectContaining({ category: 'MARKET', tag: 'bim', district: 'uskudar' })))
+    expect(search).toContain('tur=bim')
+  })
+})

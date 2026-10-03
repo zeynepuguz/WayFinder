@@ -135,6 +135,34 @@ public final class PlaceTags {
         return new ArrayList<>(tags);
     }
 
+    // Explore > Market sub-kinds: the big grocery chains by name, everything else (bakkal, local markets) "independent"
+    public static final List<String> MARKET_CHAINS = List.of("bim", "a101", "sok", "migros", "hakmar");
+
+    /**
+     * The Market sub-kind tag of a market: "bim", "a101", "sok", "migros", "hakmar" or "independent".
+     * Names are matched as words ("Şok Mini", "A-101", "MMM Migros", "Hakmar Express"; not "Sokak").
+     */
+    public static String marketKind(String name) {
+        List<String> words = PlaceRealismFilter.words(name == null ? "" : name);
+        String joined = String.join("", words);
+        if (words.contains("bim")) {
+            return "bim";
+        }
+        if (joined.contains("a101")) {
+            return "a101";
+        }
+        if (words.contains("sok") || joined.startsWith("sokmarket") || joined.contains("sokmini")) {
+            return "sok";
+        }
+        if (joined.contains("migros")) {
+            return "migros";
+        }
+        if (joined.contains("hakmar")) {
+            return "hakmar";
+        }
+        return "independent";
+    }
+
     // Börek / poğaça / simit shops and savoury bakeries: where people have breakfast (Explore > Kahvaltı)
     private static final List<String> BREAKFAST_FOOD_WORDS = List.of("borek", "pogaca", "simit", "acma", "gevrek",
             "unlumamul", "katmer");

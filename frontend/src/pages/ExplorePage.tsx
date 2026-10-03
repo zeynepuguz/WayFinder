@@ -14,7 +14,7 @@ import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { useDistricts } from '../lib/districts'
-import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, withinBudget, WORSHIP_KINDS } from '../lib/format'
+import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, MARKET_KINDS, withinBudget, WORSHIP_KINDS } from '../lib/format'
 import { useT } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
@@ -36,8 +36,9 @@ export function ExplorePage() {
   const t = useT()
   const slugCategory = slug ? CATEGORY_BY_SLUG[slug] ?? null : null
   const category = slugCategory ?? (params.get('category') as PlaceCategory | null) ?? null
-  // İbadet > Cami ve mescit / Kilise / ... (?tur=mosque); only with the İbadet category
-  const worshipKind = category === 'WORSHIP' ? params.get('tur') : null
+  // İbadet > Cami ve mescit / Kilise / ... and Market > BİM / A101 / ... (?tur=mosque, ?tur=bim): a place tag
+  const subKinds = category === 'WORSHIP' ? WORSHIP_KINDS : category === 'MARKET' ? MARKET_KINDS : null
+  const worshipKind = subKinds ? params.get('tur') : null
   // Kept in the URL (?view=map) so the map is still there after opening a place and going back
   const view: View = params.get('view') === 'map' ? 'map' : 'list'
 
@@ -209,15 +210,15 @@ export function ExplorePage() {
       })}
     </HScroll>
   )
-  // Under İbadet: all, or one kind (cami and mescit together)
-  const worshipChips = category === 'WORSHIP' && (
-    <HScroll className="h-scroll chip-scroll" style={{ gap: 8 }} label={t('İbadet yeri türü', 'Kind of place of worship')}>
+  // Under İbadet: all, or one kind (cami and mescit together); under Market: all, a chain, or bakkal / local shops
+  const worshipChips = subKinds && (
+    <HScroll className="h-scroll chip-scroll" style={{ gap: 8 }} label={category === 'MARKET' ? t('Market türü', 'Kind of market') : t('İbadet yeri türü', 'Kind of place of worship')}>
       <button type="button" className={`chip ${worshipKind === null ? 'active' : ''}`} aria-pressed={worshipKind === null}
               onClick={() => setWorshipKind(null)}>{t('Tümü', 'All')}</button>
-      {Object.keys(WORSHIP_KINDS).map(kind => (
+      {Object.keys(subKinds).map(kind => (
         <button type="button" key={kind} className={`chip ${worshipKind === kind ? 'active' : ''}`} aria-pressed={worshipKind === kind}
                 onClick={() => setWorshipKind(worshipKind === kind ? null : kind)}>
-          {WORSHIP_KINDS[kind]}
+          {subKinds[kind]}
         </button>
       ))}
     </HScroll>

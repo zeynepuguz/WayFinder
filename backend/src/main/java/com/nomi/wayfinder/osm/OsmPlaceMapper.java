@@ -88,6 +88,10 @@ public final class OsmPlaceMapper {
             tags.add("cafe");
         }
         category = PlaceTags.breakfastAware(category, foldedName, tags);
+        // Explore > Market > BİM / A101 / ŞOK / Migros / Hakmar / Diğer
+        if (category == PlaceCategory.MARKET) {
+            tags.add(PlaceTags.marketKind(name));
+        }
         if ("viewpoint".equals(tourism)) {
             tags.add("view");
         }

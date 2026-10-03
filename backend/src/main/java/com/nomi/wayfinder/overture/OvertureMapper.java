@@ -144,7 +144,12 @@ public final class OvertureMapper {
         if (h(hierarchy, "breakfast_and_brunch_restaurant") && (h(hierarchy, "cafe") || h(hierarchy, "coffee_shop"))) {
             kindTags.add("cafe");
         }
-        kind = new Kind(PlaceTags.breakfastAware(kind.category(), folded, kindTags), List.copyOf(kindTags));
+        PlaceCategory category = PlaceTags.breakfastAware(kind.category(), folded, kindTags);
+        // Explore > Market > BİM / A101 / ŞOK / Migros / Hakmar / Diğer
+        if (category == PlaceCategory.MARKET) {
+            kindTags.add(PlaceTags.marketKind(name));
+        }
+        kind = new Kind(category, List.copyOf(kindTags));
         List<String> tags = PlaceTags.merge(kind.tags(),
                 PlaceTags.derive(name, kind.category(), cuisines, Map.of(), kind.tags()));
         // Parks, beaches and historic sites are outside, museums / culture venues inside; a tea garden is outside;

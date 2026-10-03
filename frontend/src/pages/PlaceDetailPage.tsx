@@ -37,11 +37,9 @@ export function PlaceDetailPage() {
   const isSaved = saved.isSaved(place.id)
   const today = (new Date().getDay() + 6) % 7 + 1
   const todayHours = place.openingHours.filter(h => h.dayOfWeek === today)
-  // Overture pins come from the business' own page and can be a few hundred meters off: let Google find the place
-  // by name there. OSM / verified places are mapped precisely: go to the point
-  const destination = place.source === 'OVERTURE'
-    ? [place.name, place.district, place.city].filter(Boolean).join(', ')
-    : `${place.latitude},${place.longitude}`
+  // Always the point we show: a search by name made Google pick another place with a similar name
+  // ("Çayırova Kızılay Çay Bahçesi" -> "Kardeşler Çay Evi")
+  const destination = `${place.latitude},${place.longitude}`
   const mapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`
 
   return (
@@ -133,7 +131,7 @@ export function PlaceDetailPage() {
           <Info size={14} style={{ marginTop: 2, flexShrink: 0 }} />
           {!place.verified && place.source === 'OVERTURE' ? (
             <span>
-              {t('Bu mekanın bilgileri Overture Maps’ten (Foursquare, Meta ve diğer kaynaklar) geliyor ve güncel olmayabilir. Konumu işletmenin kendi sayfasından geldiği için haritada biraz kayabilir; yol tarifi mekanı adıyla bulur.', 'This place’s details come from Overture Maps (Foursquare, Meta and other sources) and may be out of date. Its pin comes from the business’ own page and can be a little off; directions find the place by name.')}
+              {t('Bu mekanın bilgileri Overture Maps’ten (Foursquare, Meta ve diğer kaynaklar) geliyor ve güncel olmayabilir. Konumu işletmenin kendi sayfasından geldiği için haritada biraz kayabilir.', 'This place’s details come from Overture Maps (Foursquare, Meta and other sources) and may be out of date. Its pin comes from the business’ own page and can be a little off.')}
             </span>
           ) : !place.verified ? (
             <span>

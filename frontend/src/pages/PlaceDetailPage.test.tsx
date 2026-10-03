@@ -53,12 +53,15 @@ describe('PlaceDetailPage Overture place', () => {
     expect(screen.queryByText(/OpenStreetMap katkıcılarından/)).not.toBeInTheDocument()
   })
 
-  it('finds an Overture place by name for directions, an OSM place by its point', async () => {
-    current = place(8, 'Devran Kebap', { source: 'OVERTURE', district: 'Çayırova', city: 'Kocaeli' })
+  // A search by name made Google pick another place with a similar name: directions always go to the point shown
+  it('sends directions to the point of the place, not a search by its name', async () => {
+    current = place(8, 'Devran Kebap', { source: 'OVERTURE', district: 'Çayırova', city: 'Kocaeli',
+      latitude: 40.817, longitude: 29.374 })
     renderPage()
     await screen.findByRole('heading', { name: 'Devran Kebap' })
-    expect(screen.getByRole('link', { name: /Yol tarifi al/ }).getAttribute('href'))
-      .toContain('destination=Devran%20Kebap%2C%20%C3%87ay%C4%B1rova%2C%20Kocaeli')
+    const href = screen.getByRole('link', { name: /Yol tarifi al/ }).getAttribute('href')
+    expect(href).toContain('destination=40.817%2C29.374')
+    expect(href).not.toContain('Devran')
   })
 
   it('never links a website that is not http(s)', async () => {

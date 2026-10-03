@@ -22,6 +22,16 @@ export const WORSHIP_KINDS: Record<string, string> = bilingual({
   cemevi: ['Cemevi', 'Cemevi'],
 })
 
+// Explore > Market sub-kinds (place tags, backend osm/PlaceTags.marketKind): the big chains, then bakkal / local markets
+export const MARKET_KINDS: Record<string, string> = bilingual({
+  bim: ['BİM', 'BİM'],
+  a101: ['A101', 'A101'],
+  sok: ['ŞOK', 'ŞOK'],
+  migros: ['Migros', 'Migros'],
+  hakmar: ['Hakmar', 'Hakmar'],
+  independent: ['Bakkal ve diğer', 'Local shops'],
+})
+
 export const STOP_TYPE_LABELS: Record<StopType, string> = bilingual({
   BREAKFAST: ['Kahvaltı', 'Breakfast'],
   SIGHTSEEING: ['Gezi', 'Sightseeing'],
