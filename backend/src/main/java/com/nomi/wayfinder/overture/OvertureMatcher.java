@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.overture;
 
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 import com.nomi.wayfinder.overture.OvertureMapper.OverturePlace;
 
@@ -25,7 +26,6 @@ public final class OvertureMatcher {
     static final int MIN_CONTAINED_LENGTH = 4;
     private static final double CELL_LAT = 0.0015;
     private static final double CELL_LON = 0.002;
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     // Words that say what kind of place it is, not which one ("Kelebek Cafe" = "Kelebek Kafe ve Restaurant")
     private static final Set<String> GENERIC_WORDS = Set.of("cafe", "kafe", "cafeteria", "kafeterya", "restaurant",
@@ -260,17 +260,7 @@ public final class OvertureMatcher {
     }
 
     private static double meters(OverturePlace place, double latitude, double longitude) {
-        return meters(place.latitude(), place.longitude(), latitude, longitude);
-    }
-
-    // Haversine; plenty accurate for 100 m
-    static double meters(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(a));
+        return GeoMath.meters(place.latitude(), place.longitude(), latitude, longitude);
     }
 
     private record Named<T>(T value, String core) {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type DependencyList } from 'react'
+import { errorMessage } from './format'
 import { tr } from './i18n'
 
 // Loads data for a page and tracks loading / error, with a reload function
@@ -20,7 +21,7 @@ export function useAsync<T>(load: () => Promise<T>, deps: DependencyList) {
       const result = await run()
       if (call === latestCall.current) setData(result)
     } catch (e) {
-      if (call === latestCall.current) setError(e instanceof Error ? e.message : tr('Bir hata oluştu', 'Something went wrong'))
+      if (call === latestCall.current) setError(errorMessage(e, tr('Bir hata oluştu', 'Something went wrong')))
     } finally {
       if (call === latestCall.current) setLoading(false)
     }

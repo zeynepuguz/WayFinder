@@ -270,9 +270,14 @@ public class PopularRouteService {
         return day;
     }
 
+    // Every day is planned and cached on its own: today up to a year ahead
     private void requireNotPast(LocalDate date) {
-        if (date.isBefore(LocalDate.now(clock))) {
+        LocalDate today = LocalDate.now(clock);
+        if (date.isBefore(today)) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "Route date cannot be in the past");
+        }
+        if (date.isAfter(today.plusYears(1))) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, "Route date is too far ahead");
         }
     }
 

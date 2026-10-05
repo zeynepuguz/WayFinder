@@ -4,6 +4,7 @@ import com.nomi.wayfinder.dto.RouteDtos.*;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.*;
 import com.nomi.wayfinder.repository.RouteRepository;
@@ -24,7 +25,7 @@ public class RouteService {
     private static final LocalTime DEFAULT_START = LocalTime.of(9, 0);
     private static final LocalTime DEFAULT_END = LocalTime.of(22, 0);
     private static final DateTimeFormatter TITLE_DATE =
-            DateTimeFormatter.ofPattern("d MMMM EEEE", Locale.forLanguageTag("tr-TR"));
+            DateTimeFormatter.ofPattern("d MMMM EEEE", Texts.TURKISH);
     private static final DateTimeFormatter TITLE_DATE_EN =
             DateTimeFormatter.ofPattern("EEEE, d MMMM", Locale.ENGLISH);
 
@@ -484,8 +485,8 @@ public class RouteService {
         double startLat = route.getStartLocation().getY();
         double startLon = route.getStartLocation().getX();
         if (latitude != null && longitude != null) {
-            boolean onRoute = PopularRouteBuilder.meters(latitude, longitude, startLat, startLon) <= ON_ROUTE_METERS
-                    || route.getStops().stream().anyMatch(s -> PopularRouteBuilder.meters(latitude, longitude,
+            boolean onRoute = GeoMath.meters(latitude, longitude, startLat, startLon) <= ON_ROUTE_METERS
+                    || route.getStops().stream().anyMatch(s -> GeoMath.meters(latitude, longitude,
                     s.getPlace().getLatitude(), s.getPlace().getLongitude()) <= ON_ROUTE_METERS);
             if (onRoute) {
                 return new double[]{latitude, longitude};

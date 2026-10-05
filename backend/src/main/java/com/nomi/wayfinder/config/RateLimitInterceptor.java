@@ -36,7 +36,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
-        if (!"POST".equals(request.getMethod())) {
+        // Writes, and the reads that cost money (each GET /places/{id}/availability is a paid Google call)
+        if (!"POST".equals(request.getMethod()) && !request.getRequestURI().endsWith("/availability")) {
             return true;
         }
 

@@ -16,10 +16,9 @@ import logging
 from typing import Literal, Protocol
 from urllib.parse import urlparse
 
-from openai import OpenAI
 from pydantic import BaseModel, Field, field_validator
 
-from .config import Settings
+from .config import Settings, openai_client
 
 log = logging.getLogger(__name__)
 
@@ -151,11 +150,7 @@ class OpenAIPhotoVerifier:
     def __init__(self, settings: Settings):
         self._model = settings.photo_verify_model or settings.openai_model
         self._moderation_model = settings.moderation_model
-        self._client = OpenAI(
-            api_key=settings.openai_api_key,
-            timeout=settings.photo_verify_timeout_seconds,
-            max_retries=1,
-        )
+        self._client = openai_client(settings, settings.photo_verify_timeout_seconds)
 
     def verify(self, request: PhotoVerifyRequest) -> PhotoVerdict:
         image = data_url(request.image_base64)

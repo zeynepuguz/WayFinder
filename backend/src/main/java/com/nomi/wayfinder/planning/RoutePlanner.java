@@ -4,6 +4,7 @@ import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 import com.nomi.wayfinder.repository.PlaceDistance;
@@ -529,7 +530,7 @@ public class RoutePlanner {
             ));
             // Look-ahead: stay close to where the rest of the day goes
             if (leg.anchor() != null && leg.anchorWeight() > 0) {
-                double off = PopularRouteBuilder.meters(place.getLatitude(), place.getLongitude(),
+                double off = GeoMath.meters(place.getLatitude(), place.getLongitude(),
                         leg.anchor()[0], leg.anchor()[1]);
                 double penalty = off / maxLegForScoring * leg.anchorWeight();
                 scored = new PlaceScorer.ScoredPlace(place, scored.score() - penalty, scored.fitScore(), scored.reasons());
@@ -611,7 +612,7 @@ public class RoutePlanner {
     static boolean samePlaceAsChosen(Place place, List<Place> chosen) {
         String name = OsmPlaceMapper.fold(place.getName());
         for (Place other : chosen) {
-            if (PopularRouteBuilder.meters(place.getLatitude(), place.getLongitude(), other.getLatitude(),
+            if (GeoMath.meters(place.getLatitude(), place.getLongitude(), other.getLatitude(),
                     other.getLongitude()) > SAME_PLACE_METERS) {
                 continue;
             }
@@ -733,7 +734,7 @@ public class RoutePlanner {
         double lat = request.startLatitude();
         double lon = request.startLongitude();
         for (Chosen c : stops) {
-            meters += PopularRouteBuilder.meters(lat, lon, c.stop().place().getLatitude(), c.stop().place().getLongitude());
+            meters += GeoMath.meters(lat, lon, c.stop().place().getLatitude(), c.stop().place().getLongitude());
             lat = c.stop().place().getLatitude();
             lon = c.stop().place().getLongitude();
         }
@@ -752,7 +753,7 @@ public class RoutePlanner {
         double lon = request.startLongitude();
         for (Chosen c : order) {
             Place place = c.stop().place();
-            double meters = PopularRouteBuilder.meters(lat, lon, place.getLatitude(), place.getLongitude());
+            double meters = GeoMath.meters(lat, lon, place.getLatitude(), place.getLongitude());
             Timing timing = timing(c.slot(), place, clock, meters);
             Integer target = upcomingTarget(c.slot().targetTime(), clock);
             if (c.slot().type().isMeal() && target != null && timing.arrival() > target + MEAL_LATE_MINUTES) {

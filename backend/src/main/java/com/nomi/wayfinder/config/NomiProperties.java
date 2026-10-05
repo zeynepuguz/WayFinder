@@ -121,12 +121,16 @@ public record NomiProperties(
         }
     }
 
+    /**
+     * @param ownerEmails the owner's accounts (OWNER_EMAILS in .env): ADMIN when they register or sign in
+     */
     public record Security(
             String jwtSecret,
             long jwtExpirationMinutes,
             String adminEmail,
             String adminPassword,
-            List<String> corsAllowedOrigins
+            List<String> corsAllowedOrigins,
+            List<String> ownerEmails
     ) {
     }
 

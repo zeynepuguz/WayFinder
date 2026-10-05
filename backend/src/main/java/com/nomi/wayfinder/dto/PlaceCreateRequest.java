@@ -11,13 +11,17 @@ import java.util.List;
 public class PlaceCreateRequest {
 
     @NotBlank
+    @Size(max = 200)
     private String name;
 
+    @Size(max = 4000)
     private String description;
 
     // Optional English description (shown to English requests)
+    @Size(max = 4000)
     private String descriptionEn;
 
+    @Size(max = 500)
     private String address;
 
     private String neighborhood;

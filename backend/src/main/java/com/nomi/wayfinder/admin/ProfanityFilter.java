@@ -1,8 +1,9 @@
 package com.nomi.wayfinder.admin;
 
+import com.nomi.wayfinder.i18n.TurkishFold;
+
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 
 /**
@@ -52,7 +53,7 @@ public final class ProfanityFilter {
     }
 
     static List<String> words(String text) {
-        String lower = text.replace('İ', 'i').replace('I', 'ı').toLowerCase(Locale.forLanguageTag("tr"));
+        String lower = TurkishFold.lower(text);
         StringBuilder sb = new StringBuilder();
         for (char c : lower.toCharArray()) {
             sb.append(switch (c) {

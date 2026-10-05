@@ -61,12 +61,6 @@ public record PlanningSlot(
         return new PlanningSlot(type, null, null, durationMinutes, false);
     }
 
-    // A stop filled only from these categories (or places with the tag), at targetTime (null = after the previous)
-    public static PlanningSlot restricted(StopType type, LocalTime targetTime, Set<PlaceCategory> categories,
-                                          String matchingTag) {
-        return new PlanningSlot(type, targetTime, null, null, false, Set.copyOf(categories), matchingTag, false);
-    }
-
     // A stop that already exists in a route: keep its place and time if still possible
     public static PlanningSlot existing(StopType type, LocalTime plannedStart, Long placeId) {
         return new PlanningSlot(type, plannedStart, placeId, null, true);

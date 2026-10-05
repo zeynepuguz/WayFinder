@@ -1,5 +1,6 @@
-package com.nomi.wayfinder.admin;
+package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.admin.PlaceReviewService;
 import com.nomi.wayfinder.admin.PlaceReviewService.ReportReason;
 import com.nomi.wayfinder.security.CurrentUser;
 import jakarta.validation.Valid;

@@ -1,11 +1,11 @@
 package com.nomi.wayfinder.osm;
 
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClient;
@@ -14,7 +14,11 @@ import tools.jackson.databind.json.JsonMapper;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * Downloads OpenStreetMap data from the Overpass API: Turkey's provinces (cities), and per city its districts,
@@ -35,8 +39,6 @@ public class OverpassClient implements OsmSource {
     static final long AREA_ID_OFFSET = 3_600_000_000L;
     // Turkey (relation 174737)
     static final long TURKEY_RELATION_ID = 174737L;
-    // İstanbul province (relation 223474)
-    static final long ISTANBUL_RELATION_ID = 223474L;
 
     /*
      * Places of one city, in three smaller queries (one query with everything runs into Overpass' time limit on busy
@@ -144,12 +146,7 @@ public class OverpassClient implements OsmSource {
         this.properties = nomiProperties.osm();
         this.jsonMapper = jsonMapper;
 
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(properties.connectTimeout());
-        requestFactory.setReadTimeout(properties.readTimeout());
-
-        this.restClient = RestClient.builder()
-                .requestFactory(requestFactory)
+        this.restClient = HttpClients.restClient(properties.connectTimeout(), properties.readTimeout())
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
     }
@@ -166,7 +163,7 @@ public class OverpassClient implements OsmSource {
      */
     public List<OverpassResponse.Element> fetchPlaces(long relationId) {
         List<String> queries = placesQueries(relationId);
-        List<OverpassResponse.Element> all = new java.util.ArrayList<>();
+        List<OverpassResponse.Element> all = new ArrayList<>();
         for (int i = 0; i < queries.size(); i++) {
             if (i > 0) {
                 sleep(properties.callDelay() == null ? Duration.ZERO : properties.callDelay());
@@ -192,7 +189,7 @@ public class OverpassClient implements OsmSource {
         // once for the city, one statement per query: a busy server turns away a query by its load at that moment
         // (504 even for "all supermarkets"), so small queries get through and a refused one is retried alone
         long cityArea = areaId(relationId);
-        List<OverpassResponse.Element> all = new java.util.ArrayList<>();
+        List<OverpassResponse.Element> all = new ArrayList<>();
         for (long district : districtRelationIds) {
             all = merge(all, fetch(withTimeout(FOOD_QUERY.formatted(areaId(district)), DISTRICT_QUERY_TIMEOUT_SECONDS),
                     false));
@@ -206,11 +203,11 @@ public class OverpassClient implements OsmSource {
     }
 
     static List<OverpassResponse.Element> merge(List<OverpassResponse.Element> first, List<OverpassResponse.Element> second) {
-        java.util.Map<String, OverpassResponse.Element> byId = new java.util.LinkedHashMap<>();
+        Map<String, OverpassResponse.Element> byId = new LinkedHashMap<>();
         for (List<OverpassResponse.Element> list : List.of(first, second)) {
             list.forEach(e -> byId.putIfAbsent(e.type() + "/" + e.id(), e));
         }
-        return new java.util.ArrayList<>(byId.values());
+        return new ArrayList<>(byId.values());
     }
 
     public List<OverpassResponse.Element> fetchDistricts(long relationId) {
@@ -233,7 +230,7 @@ public class OverpassClient implements OsmSource {
     }
 
     static String bbox(double south, double west, double north, double east) {
-        return String.format(java.util.Locale.ROOT, "%.5f,%.5f,%.5f,%.5f", south, west, north, east);
+        return String.format(Locale.ROOT, "%.5f,%.5f,%.5f,%.5f", south, west, north, east);
     }
 
     // The food / drink, the sights and the markets / worship queries of a city
@@ -251,7 +248,7 @@ public class OverpassClient implements OsmSource {
 
     // Each "nwr[...](area.city);" statement of the queries as a query of its own for the area
     static List<String> statementQueries(List<String> queries, long area) {
-        List<String> result = new java.util.ArrayList<>();
+        List<String> result = new ArrayList<>();
         for (String query : queries) {
             for (String line : query.split("\n")) {
                 String statement = line.trim();
@@ -270,10 +267,6 @@ public class OverpassClient implements OsmSource {
 
     static long areaId(long relationId) {
         return AREA_ID_OFFSET + relationId;
-    }
-
-    List<OverpassResponse.Element> fetch(String query) {
-        return fetch(query, false);
     }
 
     /**
@@ -333,7 +326,7 @@ public class OverpassClient implements OsmSource {
                     + trimmed.substring(0, Math.min(120, trimmed.length())).replaceAll("\\s+", " "));
         }
         OverpassResponse response = jsonMapper.readValue(trimmed, OverpassResponse.class);
-        if (response.remark() != null && response.remark().toLowerCase(java.util.Locale.ROOT).contains("error")) {
+        if (response.remark() != null && response.remark().toLowerCase(Locale.ROOT).contains("error")) {
             throw new IllegalStateException("Overpass reported an error: " + response.remark());
         }
         if (response.elements() == null) {

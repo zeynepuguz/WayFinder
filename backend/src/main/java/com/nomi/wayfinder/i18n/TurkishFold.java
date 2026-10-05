@@ -30,6 +30,14 @@ public final class TurkishFold {
         return withoutMarks.toLowerCase(Locale.ROOT);
     }
 
+    /**
+     * Turkish lowercase that does not depend on the JVM locale: "IŞIK" -> "ışık", "İstanbul" -> "istanbul".
+     * After "İ" and "I" are mapped by hand, the root locale lowercases the rest exactly like the Turkish one.
+     */
+    public static String lower(String text) {
+        return text.replace('İ', 'i').replace('I', 'ı').toLowerCase(Locale.ROOT);
+    }
+
     // "Büyükçekmece" -> "buyukcekmece", "Bahçelievler Merkez" -> "bahcelievler-merkez"
     public static String slug(String text) {
         return ascii(text).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");

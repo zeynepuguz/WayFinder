@@ -76,22 +76,6 @@ public class OsmPlaceImporter {
             WHERE id = ? AND source NOT IN ('OSM', 'OVERTURE') AND wikidata IS NULL AND commons_file IS NULL
             """;
 
-    // Rows of earlier imports; kept when a route, a saved place or a user photo points at them
-    // (user_photos would be deleted with the place: ON DELETE CASCADE)
-    static final String DELETE_UNREFERENCED = """
-            DELETE FROM places p
-            WHERE p.source = 'OSM' AND p.osm_id = ANY (?)
-              AND NOT EXISTS (SELECT 1 FROM route_stops rs WHERE rs.place_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM saved_places sp WHERE sp.place_id = p.id)
-              AND NOT EXISTS (SELECT 1 FROM user_photos up WHERE up.place_id = p.id)
-            """;
-
-    // Rows of earlier imports that are no longer realistic places but are still referenced: hidden, not deleted
-    private static final String HIDE = """
-            UPDATE places SET hidden = TRUE, updated_at = now()
-            WHERE source = 'OSM' AND osm_id = ANY (?) AND NOT hidden
-            """;
-
     // Places inside the city polygon; the padded bounding box lets the geography GiST index pre-filter
     // Also used by overture/OverturePlaceImporter for the places it adds
     public static final String ASSIGN_CITY = """
@@ -113,18 +97,15 @@ public class OsmPlaceImporter {
     private final OsmAreaImporter areaImporter;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
+    private final PlaceRemoval removal;
 
     public OsmPlaceImporter(OsmSource overpassClient, OsmAreaImporter areaImporter, JdbcTemplate jdbc,
-                            TransactionTemplate transactions) {
+                            TransactionTemplate transactions, PlaceRemoval removal) {
         this.overpassClient = overpassClient;
         this.areaImporter = areaImporter;
         this.jdbc = jdbc;
         this.transactions = transactions;
-    }
-
-    public boolean hasOsmPlaces() {
-        return Boolean.TRUE.equals(jdbc.queryForObject(
-                "SELECT EXISTS (SELECT 1 FROM places WHERE source = 'OSM')", Boolean.class));
+        this.removal = removal;
     }
 
     // Downloads and writes the city's places, then assigns city / district to them (the caller serializes runs)
@@ -192,20 +173,15 @@ public class OsmPlaceImporter {
             log.info("OSM import: photo references copied to {} verified places", copied);
         }
 
-        int removed = 0;
+        // Rows of earlier imports for the dropped copies; kept when a route, a saved place or a user photo uses them
+        int removed = removal.deleteUnreferencedOsm(prepared.osmDuplicateIds());
         if (!prepared.osmDuplicateIds().isEmpty()) {
-            String[] ids = prepared.osmDuplicateIds().toArray(String[]::new);
-            Integer deleted = transactions.execute(status -> jdbc.update(con -> {
-                var ps = con.prepareStatement(DELETE_UNREFERENCED);
-                ps.setArray(1, con.createArrayOf("text", ids));
-                return ps;
-            }));
-            removed = deleted == null ? 0 : deleted;
             log.info("OSM import: {} elements were another copy of a place; {} rows of earlier imports removed",
-                    ids.length, removed);
+                    prepared.osmDuplicateIds().size(), removed);
         }
 
-        RemovedRows unrealistic = removeOrHide(prepared.unrealisticIds());
+        // Rows of earlier imports that are no longer realistic places: deleted, or hidden while still referenced
+        PlaceRemoval.RemovedRows unrealistic = removal.removeOrHideOsm(prepared.unrealisticIds());
         if (!prepared.unrealisticIds().isEmpty()) {
             log.info("OSM import ({}): {} elements are not realistic places (e.g. {}); {} rows of earlier imports "
                             + "removed, {} hidden (still referenced)", city.slug(), prepared.unrealisticIds().size(),
@@ -229,30 +205,6 @@ public class OsmPlaceImporter {
                 prepared.skippedUnusable(), skippedEdited, copied, prepared.osmDuplicateIds().size(), removed,
                 inCity, withDistrict, prepared.unrealisticIds().size(), unrealistic.removed(), unrealistic.hidden(),
                 prepared.unrealisticExamples(), null);
-    }
-
-    // Deletes the OSM rows of these elements that nothing references and hides the others
-    RemovedRows removeOrHide(List<String> osmIds) {
-        if (osmIds.isEmpty()) {
-            return new RemovedRows(0, 0);
-        }
-        String[] ids = osmIds.toArray(String[]::new);
-        return transactions.execute(status -> {
-            int deleted = jdbc.update(con -> {
-                var ps = con.prepareStatement(DELETE_UNREFERENCED);
-                ps.setArray(1, con.createArrayOf("text", ids));
-                return ps;
-            });
-            int hidden = jdbc.update(con -> {
-                var ps = con.prepareStatement(HIDE);
-                ps.setArray(1, con.createArrayOf("text", ids));
-                return ps;
-            });
-            return new RemovedRows(deleted, hidden);
-        });
-    }
-
-    record RemovedRows(int removed, int hidden) {
     }
 
     // Maps elements to places, drops unusable ones and duplicates of verified places (no database writes)

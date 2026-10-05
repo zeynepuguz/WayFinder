@@ -1,9 +1,8 @@
 package com.nomi.wayfinder.assistant;
 
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
-import org.slf4j.MDC;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -23,28 +22,7 @@ public class AiServiceIntentParser implements IntentParser {
 
     public AiServiceIntentParser(NomiProperties nomiProperties) {
         this.properties = nomiProperties.ai();
-
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(properties.connectTimeout());
-        requestFactory.setReadTimeout(properties.readTimeout());
-
-        RestClient.Builder builder = RestClient.builder()
-                .requestFactory(requestFactory)
-                // Forward our request id so one user request can be followed in both services' logs
-                .requestInterceptor((request, body, execution) -> {
-                    String requestId = MDC.get("requestId");
-                    if (requestId != null) {
-                        request.getHeaders().add("X-Request-Id", requestId);
-                    }
-                    return execution.execute(request, body);
-                });
-        if (properties.enabled()) {
-            builder.baseUrl(properties.baseUrl());
-        }
-        if (properties.apiKey() != null && !properties.apiKey().isBlank()) {
-            builder.defaultHeader("X-API-Key", properties.apiKey());
-        }
-        this.restClient = builder.build();
+        this.restClient = HttpClients.aiService(properties, properties.readTimeout()).build();
     }
 
     public boolean isEnabled() {

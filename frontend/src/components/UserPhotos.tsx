@@ -6,12 +6,12 @@ import { api } from '../api'
 import { mediaUrl } from '../api/client'
 import type { MyPhoto, PhotoStatus, PhotoTarget, UserPhoto } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { formatDateTime } from '../lib/format'
+import { errorMessage, formatDateTime } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { checkPhotoFile, currentPosition, PHOTO_ACCEPT, uploadErrorMessage } from '../lib/photos'
 import { useAsync } from '../lib/useAsync'
 import { HScroll } from './HScroll'
-import { Alert, Sheet, Skeleton, Spinner, useToast } from './ui'
+import { Alert, ConfirmSheet, Sheet, Skeleton, Spinner, useToast } from './ui'
 
 // Rendered on <body>: the place page's sheet is its own stacking context and would cover overlays
 function Portal({ children }: { children: ReactNode }) {
@@ -129,7 +129,7 @@ function PhotoThumb({ photo, alt, onOpen, onError }: { photo: UserPhoto; alt: st
 const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
 /** Full-screen viewer: arrows / swipe to move, Esc or the close button to leave; focus stays inside. */
-export function PhotoLightbox({ photos, index, onIndex, onClose, alt }: {
+function PhotoLightbox({ photos, index, onIndex, onClose, alt }: {
   photos: UserPhoto[]
   index: number
   onIndex: (index: number) => void
@@ -360,7 +360,7 @@ export function MyPhotos() {
       setConfirm(null)
       toast(t('Fotoğraf silindi', 'Photo deleted'))
     } catch (e) {
-      setDeleteError(e instanceof Error && e.message ? e.message : t('Fotoğraf silinemedi', 'Couldn’t delete the photo'))
+      setDeleteError(errorMessage(e, t('Fotoğraf silinemedi', 'Couldn’t delete the photo')))
     } finally {
       setDeleting(false)
     }
@@ -411,18 +411,9 @@ export function MyPhotos() {
         </div>
       )}
 
-      <Sheet open={confirm != null} onClose={() => setConfirm(null)} label={t('Fotoğraf silinsin mi?', 'Delete this photo?')}>
-        <div className="stack">
-          <p className="ink-2">{t('Fotoğraf kalıcı olarak silinir ve artık gösterilmez.', 'The photo is deleted permanently and no longer shown.')}</p>
-          {deleteError && <Alert tone="danger"><span>{deleteError}</span></Alert>}
-          <div className="row">
-            <button type="button" className="btn btn-secondary grow" onClick={() => setConfirm(null)}>{t('Vazgeç', 'Cancel')}</button>
-            <button type="button" className="btn btn-danger grow" disabled={deleting} onClick={() => confirm && void remove(confirm)}>
-              {deleting ? <Spinner /> : t('Sil', 'Delete')}
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet open={confirm != null} onClose={() => setConfirm(null)} label={t('Fotoğraf silinsin mi?', 'Delete this photo?')}
+                    text={t('Fotoğraf kalıcı olarak silinir ve artık gösterilmez.', 'The photo is deleted permanently and no longer shown.')}
+                    confirmLabel={t('Sil', 'Delete')} busy={deleting} error={deleteError} onConfirm={() => confirm && void remove(confirm)} />
     </section>
   )
 }

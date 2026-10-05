@@ -30,7 +30,7 @@ export function wheelToHorizontal(
  * press-and-drag scrolls it (without firing a click on the card under the mouse) and the
  * returned flags tell whether there is more content to the left / right. Touch keeps native swiping.
  */
-export function useHorizontalScroll(ref: RefObject<HTMLElement | null>) {
+function useHorizontalScroll(ref: RefObject<HTMLElement | null>) {
   const [edges, setEdges] = useState({ left: false, right: false })
 
   const measure = useCallback(() => {

@@ -2,11 +2,11 @@ package com.nomi.wayfinder.google;
 
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.google.GooglePlacesClient.GooglePlace;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 import com.nomi.wayfinder.osm.PlaceRealismFilter;
 import com.nomi.wayfinder.osm.PlacesChangedEvent;
-import com.nomi.wayfinder.planning.PopularRouteBuilder;
 import com.nomi.wayfinder.repository.PlaceRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -111,9 +111,9 @@ public class PlaceAvailabilityService {
     static Optional<GooglePlace> bestMatch(String name, double latitude, double longitude, List<GooglePlace> found,
                                            int radiusMeters) {
         return found.stream()
-                .filter(g -> PopularRouteBuilder.meters(latitude, longitude, g.latitude(), g.longitude()) <= radiusMeters)
+                .filter(g -> GeoMath.meters(latitude, longitude, g.latitude(), g.longitude()) <= radiusMeters)
                 .filter(g -> sameName(name, g.name()))
-                .min(Comparator.comparingDouble(g -> PopularRouteBuilder.meters(latitude, longitude, g.latitude(),
+                .min(Comparator.comparingDouble(g -> GeoMath.meters(latitude, longitude, g.latitude(),
                         g.longitude())));
     }
 

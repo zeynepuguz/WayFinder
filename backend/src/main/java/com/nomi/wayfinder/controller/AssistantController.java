@@ -1,10 +1,11 @@
 package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.assistant.AssistantConversationService;
+import com.nomi.wayfinder.assistant.AssistantConversationService.ConversationSummary;
+import com.nomi.wayfinder.assistant.AssistantConversationService.MessageResponse;
 import com.nomi.wayfinder.assistant.AssistantService;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantReply;
 import com.nomi.wayfinder.assistant.AssistantService.AssistantRequest;
-import com.nomi.wayfinder.assistant.AssistantService.ConversationSummary;
-import com.nomi.wayfinder.assistant.AssistantService.MessageResponse;
 import com.nomi.wayfinder.security.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
@@ -21,9 +22,11 @@ import java.util.List;
 public class AssistantController {
 
     private final AssistantService assistantService;
+    private final AssistantConversationService conversationService;
 
-    public AssistantController(AssistantService assistantService) {
+    public AssistantController(AssistantService assistantService, AssistantConversationService conversationService) {
         this.assistantService = assistantService;
+        this.conversationService = conversationService;
     }
 
     // Without conversationId a new chat is started (never the latest one continued); the reply says which chat
@@ -40,7 +43,7 @@ public class AssistantController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "50") @Positive @Max(200) int limit
     ) {
-        return assistantService.history(CurrentUser.id(jwt), limit);
+        return conversationService.history(CurrentUser.id(jwt), limit);
     }
 
     // "Sohbetler": newest first
@@ -49,13 +52,13 @@ public class AssistantController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(defaultValue = "50") @Positive @Max(50) int limit
     ) {
-        return assistantService.conversations(CurrentUser.id(jwt), limit);
+        return conversationService.conversations(CurrentUser.id(jwt), limit);
     }
 
     @PostMapping("/conversations")
     @ResponseStatus(HttpStatus.CREATED)
     public ConversationSummary createConversation(@AuthenticationPrincipal Jwt jwt) {
-        return assistantService.createConversation(CurrentUser.id(jwt));
+        return conversationService.createConversation(CurrentUser.id(jwt));
     }
 
     @GetMapping("/conversations/{id}/messages")
@@ -64,7 +67,7 @@ public class AssistantController {
             @PathVariable Long id,
             @RequestParam(defaultValue = "200") @Positive @Max(500) int limit
     ) {
-        return assistantService.conversationMessages(CurrentUser.id(jwt), id, limit);
+        return conversationService.conversationMessages(CurrentUser.id(jwt), id, limit);
     }
 
     @PatchMapping("/conversations/{id}")
@@ -73,13 +76,13 @@ public class AssistantController {
             @PathVariable Long id,
             @Valid @RequestBody RenameConversationRequest request
     ) {
-        return assistantService.renameConversation(CurrentUser.id(jwt), id, request.title());
+        return conversationService.renameConversation(CurrentUser.id(jwt), id, request.title());
     }
 
     @DeleteMapping("/conversations/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(@AuthenticationPrincipal Jwt jwt, @PathVariable Long id) {
-        assistantService.deleteConversation(CurrentUser.id(jwt), id);
+        conversationService.deleteConversation(CurrentUser.id(jwt), id);
     }
 
     // latitude/longitude = the user's current GPS position; conversationId = the chat to continue (null = new chat)

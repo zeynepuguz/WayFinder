@@ -2,6 +2,7 @@ package com.nomi.wayfinder.area;
 
 import com.nomi.wayfinder.dto.CityResponse;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.i18n.Texts;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,7 @@ public class CityService {
 
     // Default for requests that name no city (the app covered only Istanbul before)
     public static final String DEFAULT_CITY = "istanbul";
-    private static final Collator TURKISH = Collator.getInstance(Locale.forLanguageTag("tr-TR"));
+    private static final Collator TURKISH = Collator.getInstance(Texts.TURKISH);
     // A point just outside every polygon (a ferry, a pier, a coastline drawn a little inland): nearest city within ~5 km
     static final double NEAREST_CITY_DEGREES = 0.05;
 

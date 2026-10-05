@@ -7,6 +7,7 @@ import { Alert, BackButton, Spinner, useToast } from '../components/ui'
 import { BrandMark } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { tr, useT } from '../lib/i18n'
+import { safeNext } from '../lib/nav'
 
 const RESEND_SECONDS = 60
 
@@ -17,7 +18,7 @@ export function ForgotPasswordPage() {
   const toast = useToast()
   const t = useT()
   const [params] = useSearchParams()
-  const next = params.get('next') ?? '/'
+  const next = safeNext(params.get('next')) ?? '/'
 
   const [step, setStep] = useState<'email' | 'code'>('email')
   const [email, setEmail] = useState(params.get('email') ?? '')

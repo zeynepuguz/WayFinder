@@ -1,5 +1,6 @@
-package com.nomi.wayfinder.admin;
+package com.nomi.wayfinder.controller;
 
+import com.nomi.wayfinder.admin.PlaceReviewService;
 import com.nomi.wayfinder.admin.PlaceReviewService.Action;
 import com.nomi.wayfinder.admin.PlaceReviewService.Counts;
 import com.nomi.wayfinder.admin.PlaceReviewService.Feedback;

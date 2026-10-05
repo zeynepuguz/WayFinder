@@ -3,7 +3,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 // Turkish for locals, English for tourists ("For tourists"). Texts live next to their use:
 //   const t = useT();  t('Kaydedilenler', 'Saved')
 // so a screen can never show a string that exists in only one language.
-export type Lang = 'tr' | 'en'
+type Lang = 'tr' | 'en'
 
 const STORAGE_KEY = 'nomi.lang'
 
@@ -81,7 +81,10 @@ export function useLang(): LanguageState {
   return useContext(LanguageContext)
 }
 
-export function useT(): (turkish: string, english: string) => string {
+/** t('Kaydedilenler', 'Saved'): the text in the current language */
+export type Translate = (turkish: string, english: string) => string
+
+export function useT(): Translate {
   const { lang } = useLang()
   return useCallback((turkish: string, english: string) => (lang === 'en' ? english : turkish), [lang])
 }

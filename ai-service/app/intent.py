@@ -11,9 +11,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Protocol
 
-from openai import OpenAI
-
-from .config import Settings
+from .config import Settings, openai_client
 from .schemas import ALLOWED_INTERESTS, AssistantIntent, IntentRequest, IntentType, ReplanType
 
 log = logging.getLogger(__name__)
@@ -95,11 +93,7 @@ class IntentExtractor(Protocol):
 class OpenAIIntentExtractor:
     def __init__(self, settings: Settings):
         self._model = settings.openai_model
-        self._client = OpenAI(
-            api_key=settings.openai_api_key,
-            timeout=settings.openai_timeout_seconds,
-            max_retries=1,
-        )
+        self._client = openai_client(settings, settings.openai_timeout_seconds)
 
     def extract(self, request: IntentRequest) -> AssistantIntent:
         today = istanbul_today()
@@ -126,6 +120,11 @@ class OpenAIIntentExtractor:
         return sanitize(intent, request, today)
 
 
+# A budget the backend can hold (Java int) and a place name of reasonable length
+BUDGET_MAX = 10_000_000
+TARGET_TEXT_MAX_LENGTH = 100
+
+
 def sanitize(intent: AssistantIntent, request: IntentRequest, today: date | None = None) -> AssistantIntent:
     """Guardrails: the backend must only receive values it understands."""
     intent.date = clean_date(intent.date, today or istanbul_today())
@@ -137,7 +136,7 @@ def sanitize(intent: AssistantIntent, request: IntentRequest, today: date | None
         intent.plan.interests = [i for i in intent.plan.interests if i in ALLOWED_INTERESTS]
         if intent.plan.startTime and not TIME_PATTERN.match(intent.plan.startTime):
             intent.plan.startTime = None
-        if intent.plan.budget is not None and intent.plan.budget < 0:
+        if intent.plan.budget is not None and not 0 <= intent.plan.budget <= BUDGET_MAX:
             intent.plan.budget = None
         if intent.plan.partySize is not None and not 1 <= intent.plan.partySize <= 20:
             intent.plan.partySize = None
@@ -145,6 +144,8 @@ def sanitize(intent: AssistantIntent, request: IntentRequest, today: date | None
     # Drop edits that are missing what they need
     valid_edits = []
     for edit in intent.edits:
+        if edit.targetText is not None:
+            edit.targetText = edit.targetText.strip()[:TARGET_TEXT_MAX_LENGTH] or None
         if edit.type == ReplanType.ADD_INTEREST and edit.interest not in ALLOWED_INTERESTS:
             continue
         if edit.type == ReplanType.ADD_STOP and edit.stopType is None:

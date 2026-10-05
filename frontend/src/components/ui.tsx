@@ -145,6 +145,40 @@ export function Sheet({ open, onClose, children, label }: {
   )
 }
 
+interface ConfirmProps {
+  text: string
+  confirmLabel: string
+  onConfirm: () => void
+  busy?: boolean
+  error?: string | null
+}
+
+/** A delete confirmation's body: the consequence, the last failure, Vazgeç / <confirm>. */
+export function ConfirmPanel({ text, confirmLabel, onConfirm, onCancel, busy = false, error }: ConfirmProps & { onCancel: () => void }) {
+  const t = useT()
+  return (
+    <div className="stack">
+      <p className="ink-2">{text}</p>
+      {error && <Alert tone="danger"><span>{error}</span></Alert>}
+      <div className="row">
+        <button type="button" className="btn btn-secondary grow" disabled={busy} onClick={onCancel}>{t('Vazgeç', 'Cancel')}</button>
+        <button type="button" className="btn btn-danger grow" disabled={busy} onClick={onConfirm}>
+          {busy ? <Spinner /> : confirmLabel}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/** The same confirmation in its own sheet (delete a route, the account, a photo). */
+export function ConfirmSheet({ open, label, onClose, ...props }: ConfirmProps & { open: boolean; label: string; onClose: () => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} label={label}>
+      <ConfirmPanel {...props} onCancel={onClose} />
+    </Sheet>
+  )
+}
+
 // ---------- toasts ----------
 
 const ToastContext = createContext<(message: string) => void>(() => {})

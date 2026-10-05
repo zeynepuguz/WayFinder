@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.popularity;
 
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.popularity.WikiPopularityParser.ApiErrorException;
 import com.nomi.wayfinder.popularity.WikiPopularityParser.PageviewPage;
 import com.nomi.wayfinder.popularity.WikiPopularityParser.Sitelinks;
@@ -7,7 +8,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -46,11 +46,7 @@ public class WikiPopularityClient {
         this.properties = properties;
         this.jsonMapper = jsonMapper;
 
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(properties.connectTimeout());
-        requestFactory.setReadTimeout(properties.readTimeout());
-        this.restClient = RestClient.builder()
-                .requestFactory(requestFactory)
+        this.restClient = HttpClients.restClient(properties.connectTimeout(), properties.readTimeout())
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
     }

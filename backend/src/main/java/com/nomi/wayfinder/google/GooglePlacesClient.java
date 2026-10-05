@@ -1,7 +1,7 @@
 package com.nomi.wayfinder.google;
 
+import com.nomi.wayfinder.config.HttpClients;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -32,10 +32,7 @@ public class GooglePlacesClient {
     public GooglePlacesClient(GooglePlacesProperties properties) {
         this.properties = properties;
         Duration timeout = properties.timeout() == null ? Duration.ofSeconds(5) : properties.timeout();
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(timeout);
-        requestFactory.setReadTimeout(timeout);
-        this.restClient = RestClient.builder().requestFactory(requestFactory).build();
+        this.restClient = HttpClients.restClient(timeout, timeout).build();
     }
 
     public boolean enabled() {

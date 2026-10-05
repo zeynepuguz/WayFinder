@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.service;
 
 import com.nomi.wayfinder.billing.BillingService;
+import com.nomi.wayfinder.config.NomiProperties;
 import com.nomi.wayfinder.dto.AuthDtos.*;
 import com.nomi.wayfinder.entity.User;
 import com.nomi.wayfinder.entity.UserPreferences;
@@ -16,7 +17,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -28,7 +32,7 @@ public class UserService {
     private final BillingService billingService;
     private final PhotoService photoService;
     // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they register or sign in
-    private final java.util.Set<String> ownerEmails;
+    private final Set<String> ownerEmails;
 
     public UserService(
             UserRepository userRepository,
@@ -37,11 +41,12 @@ public class UserService {
             JwtService jwtService,
             BillingService billingService,
             PhotoService photoService,
-            @org.springframework.beans.factory.annotation.Value("${nomi.security.owner-emails:}") String ownerEmails
+            NomiProperties properties
     ) {
-        this.ownerEmails = java.util.Arrays.stream(ownerEmails.split(","))
+        List<String> owners = properties.security() == null ? null : properties.security().ownerEmails();
+        this.ownerEmails = (owners == null ? List.<String>of() : owners).stream()
                 .map(e -> e.trim().toLowerCase(Locale.ROOT)).filter(e -> !e.isEmpty())
-                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+                .collect(Collectors.toUnmodifiableSet());
         this.userRepository = userRepository;
         this.preferencesRepository = preferencesRepository;
         this.passwordEncoder = passwordEncoder;

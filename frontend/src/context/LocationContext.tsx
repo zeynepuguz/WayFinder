@@ -6,7 +6,7 @@ import { isInTurkey } from '../lib/geo'
 export const KADIKOY = { latitude: 40.991, longitude: 29.023 }
 
 // demo-denied: the user refused location; demo-unavailable: allowed but no fix (indoors, GPS off, timeout)
-export type LocationSource = 'gps' | 'demo-outside' | 'demo-denied' | 'demo-unavailable' | 'loading'
+type LocationSource = 'gps' | 'demo-outside' | 'demo-denied' | 'demo-unavailable' | 'loading'
 
 interface LocationState {
   latitude: number
@@ -77,9 +77,9 @@ export function locationLabel(source: LocationSource): string {
 
 // ---------- live tracking (map) ----------
 
-export type LiveStatus = 'off' | 'locating' | 'live' | 'denied' | 'unavailable'
+type LiveStatus = 'off' | 'locating' | 'live' | 'denied' | 'unavailable'
 
-export interface LiveLocation {
+interface LiveLocation {
   latitude: number | null
   longitude: number | null
   // metres (68% confidence radius from the browser)

@@ -1,9 +1,9 @@
 package com.nomi.wayfinder.planning;
 
 import com.nomi.wayfinder.entity.Place;
-import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 
 import java.time.LocalDate;
@@ -93,10 +93,6 @@ public final class PopularRouteBuilder {
      */
     public static double fallbackScore(boolean verified, Double rating, boolean hasImage) {
         return (verified ? 3 : 0) + (rating == null ? 0 : Math.max(0, Math.min(2, rating - 3))) + (hasImage ? 1 : 0);
-    }
-
-    public static boolean isSightCategory(PlaceCategory category) {
-        return StopType.SIGHTSEEING.getCategories().contains(category);
     }
 
     // ---------- 2. walkable groups ----------
@@ -372,7 +368,7 @@ public final class PopularRouteBuilder {
 
     private static boolean nearSomeSight(Area area, List<Sight> sights, double maxMeters) {
         return sights.stream().anyMatch(s ->
-                meters(s.latitude(), s.longitude(), area.latitude(), area.longitude()) <= maxMeters);
+                GeoMath.meters(s.latitude(), s.longitude(), area.latitude(), area.longitude()) <= maxMeters);
     }
 
     /**
@@ -448,8 +444,8 @@ public final class PopularRouteBuilder {
     private static Optional<Area> nearest(Sight sight, List<Area> areas, String kind, double maxMeters) {
         return areas.stream()
                 .filter(a -> kind == null || kind.equals(a.kind()))
-                .filter(a -> meters(sight.latitude(), sight.longitude(), a.latitude(), a.longitude()) <= maxMeters)
-                .min(Comparator.comparingDouble(a -> meters(sight.latitude(), sight.longitude(), a.latitude(), a.longitude())));
+                .filter(a -> GeoMath.meters(sight.latitude(), sight.longitude(), a.latitude(), a.longitude()) <= maxMeters)
+                .min(Comparator.comparingDouble(a -> GeoMath.meters(sight.latitude(), sight.longitude(), a.latitude(), a.longitude())));
     }
 
     // ---------- helpers ----------
@@ -473,15 +469,7 @@ public final class PopularRouteBuilder {
     }
 
     static double meters(Sight a, Sight b) {
-        return meters(a.latitude(), a.longitude(), b.latitude(), b.longitude());
-    }
-
-    public static double meters(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * 6_371_000 * Math.asin(Math.sqrt(a));
+        return GeoMath.meters(a.latitude(), a.longitude(), b.latitude(), b.longitude());
     }
 
     private static int minutes(LocalTime time) {

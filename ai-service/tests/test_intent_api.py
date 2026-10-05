@@ -191,3 +191,14 @@ def test_prompt_covers_turkey_and_city_areas():
     # A city alone, and a city with a neighbourhood inside it
     assert '"Ankara\'da" -> "Ankara"' in INSTRUCTIONS
     assert '"Ankara Kızılay"' in INSTRUCTIONS
+
+
+def test_sanitize_caps_budget_and_target_text():
+    intent = plan_intent(budget=5_000_000_000)
+    assert sanitize(intent, IntentRequest(message="x")).plan.budget is None
+
+    edit = RouteEdit(type=ReplanType.REMOVE_STOP, stopType=None, interest=None, targetText="x" * 500,
+                     targetStopType=None, targetIsCurrent=False)
+    intent = AssistantIntent(type=IntentType.REPLAN, plan=None, edits=[edit], recommendType=None, source=None)
+    result = sanitize(intent, IntentRequest(message="x", context=IntentContext(hasRoute=True)))
+    assert len(result.edits[0].targetText) == 100

@@ -1,9 +1,9 @@
 package com.nomi.wayfinder.weather;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -26,13 +26,8 @@ public class OpenMeteoClient {
         NomiProperties.Weather weather = properties.weather();
 
         // Timeouts: a slow weather API must not make route planning hang
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(weather.connectTimeout());
-        requestFactory.setReadTimeout(weather.readTimeout());
-
-        this.restClient = RestClient.builder()
+        this.restClient = HttpClients.restClient(weather.connectTimeout(), weather.readTimeout())
                 .baseUrl(weather.baseUrl())
-                .requestFactory(requestFactory)
                 .build();
         this.timezone = properties.timezone();
     }

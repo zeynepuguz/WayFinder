@@ -55,6 +55,9 @@ spring:
 server:
   error:
     include-message: never
+  # Behind Caddy: the client's address comes from X-Forwarded-For (Tomcat trusts only private proxy addresses),
+  # so rate limits count each guest, not the proxy
+  forward-headers-strategy: native
 
 logging:
   pattern:
@@ -113,6 +116,13 @@ nomi:
   rate-limit:
     # Requests per minute per user for expensive endpoints (route planning, assistant)
     requests-per-minute: 30
+  places:
+    # Realism cleanup of the places already in the database after every startup (osm/PlaceRealismCleanup); it has run
+    # once, now only on demand: POST /api/v1/admin/places/cleanup
+    cleanup-on-startup: false
+  routes:
+    # Unfinished routes of past days -> EXPIRED, at 00:05 (Istanbul time) and once after startup (RouteExpiryJob)
+    expire-cron: 0 5 0 * * *
   google-places:
     # Places API (New) key: the place page asks Google whether a place is still there (closed for good -> hidden).
     # Empty = no check: "Google Haritalar'da aç" searches the name around our pin

@@ -193,7 +193,7 @@ public class ResponseComposer {
         if (recommendations.isEmpty()) {
             sb.append(Texts.english()
                     ? "I could not find a suitable " + typeLabel.toLowerCase(Locale.ROOT) + " place open near you right now."
-                    : "Yakınında şu an açık ve uygun bir " + typeLabel.toLowerCase(Locale.forLanguageTag("tr-TR"))
+                    : "Yakınında şu an açık ve uygun bir " + typeLabel.toLowerCase(Texts.TURKISH)
                     + " mekanı bulamadım.");
         } else {
             sb.append(Texts.english()

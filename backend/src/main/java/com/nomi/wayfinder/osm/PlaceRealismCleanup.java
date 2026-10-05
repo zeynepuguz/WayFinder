@@ -33,14 +33,16 @@ public class PlaceRealismCleanup {
     static final int MAX_EXAMPLES = 20;
 
     private final JdbcTemplate jdbc;
+    private final PlaceRemoval removal;
     private final ApplicationEventPublisher events;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final boolean cleanupOnStartup;
 
-    public PlaceRealismCleanup(JdbcTemplate jdbc, ApplicationEventPublisher events,
+    public PlaceRealismCleanup(JdbcTemplate jdbc, PlaceRemoval removal, ApplicationEventPublisher events,
                                @Value("${nomi.places.cleanup-on-startup:false}") boolean cleanupOnStartup) {
         this.cleanupOnStartup = cleanupOnStartup;
         this.jdbc = jdbc;
+        this.removal = removal;
         this.events = events;
     }
 
@@ -93,7 +95,8 @@ public class PlaceRealismCleanup {
                             }
                         }
                     });
-            OsmPlaceImporter.RemovedRows rows = removeOrHide(flagged);
+            // Deleted when nothing references them, else hidden (a route stop, saved place or user photo uses them)
+            PlaceRemoval.RemovedRows rows = removal.removeOrHideByIds(flagged);
             CleanupResult result = new CleanupResult(checked[0], flagged.size(), rows.removed(), rows.hidden(), examples);
             log.info("Place cleanup: {}", result);
             if (!flagged.isEmpty()) {
@@ -103,31 +106,6 @@ public class PlaceRealismCleanup {
         } finally {
             running.set(false);
         }
-    }
-
-    // Deletes the rows nothing references and hides the others (a route stop, saved place or user photo uses them)
-    OsmPlaceImporter.RemovedRows removeOrHide(List<Long> ids) {
-        if (ids.isEmpty()) {
-            return new OsmPlaceImporter.RemovedRows(0, 0);
-        }
-        Long[] array = ids.toArray(Long[]::new);
-        int deleted = jdbc.update(con -> {
-            var ps = con.prepareStatement("""
-                    DELETE FROM places p
-                    WHERE p.id = ANY (?)
-                      AND NOT EXISTS (SELECT 1 FROM route_stops rs WHERE rs.place_id = p.id)
-                      AND NOT EXISTS (SELECT 1 FROM saved_places sp WHERE sp.place_id = p.id)
-                      AND NOT EXISTS (SELECT 1 FROM user_photos up WHERE up.place_id = p.id)
-                    """);
-            ps.setArray(1, con.createArrayOf("bigint", array));
-            return ps;
-        });
-        int hidden = jdbc.update(con -> {
-            var ps = con.prepareStatement("UPDATE places SET hidden = TRUE, updated_at = now() WHERE id = ANY (?) AND NOT hidden");
-            ps.setArray(1, con.createArrayOf("bigint", array));
-            return ps;
-        });
-        return new OsmPlaceImporter.RemovedRows(deleted, hidden);
     }
 
     /**

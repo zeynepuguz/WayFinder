@@ -20,10 +20,7 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     List<Route> findByUserIdAndSavedTrueOrderByCreatedAtDesc(Long userId);
 
-    // The route of one day the user is most likely busy with (home screen: today, tomorrow)
-    Optional<Route> findFirstByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
-            Long userId, LocalDate date, Collection<RouteStatus> statuses);
-
+    // The routes of one day, the one the user is most likely busy with first
     List<Route> findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
             Long userId, LocalDate date, Collection<RouteStatus> statuses);
 

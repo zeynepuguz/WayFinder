@@ -1,4 +1,4 @@
-import { BadgeCheck, Camera, Check, ExternalLink, Heart, MapPin } from 'lucide-react'
+import { BadgeCheck, Camera, ExternalLink, Heart, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import type { Place, PlaceImage, Recommendation } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
@@ -43,7 +43,7 @@ export function VerifiedBadge() {
 
 // Compact row for lists
 // showDistrict: city-wide lists add the district ("Kafe · Üsküdar") so same-named places can be told apart
-export function PlaceRow({ place, reasons, showDistrict }: { place: Place; reasons?: string[]; showDistrict?: boolean }) {
+export function PlaceRow({ place, showDistrict }: { place: Place; showDistrict?: boolean }) {
   const t = useT()
   return (
     <div className="card" style={{ padding: 0 }}>
@@ -64,11 +64,6 @@ export function PlaceRow({ place, reasons, showDistrict }: { place: Place; reaso
         </div>
         <SaveButton place={place} />
       </Link>
-      {reasons && reasons.length > 0 && (
-        <ul className="reasons" style={{ padding: '0 16px 14px' }}>
-          {reasons.map(r => <li key={r}><Check size={14} />{r}</li>)}
-        </ul>
-      )}
     </div>
   )
 }

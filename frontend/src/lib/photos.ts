@@ -2,7 +2,7 @@ import { ApiRequestError } from '../api/client'
 import type { DevicePosition } from '../api/types'
 import { tr } from './i18n'
 
-export const MAX_PHOTO_BYTES = 12 * 1024 * 1024
+const MAX_PHOTO_BYTES = 12 * 1024 * 1024
 export const PHOTO_ACCEPT = 'image/jpeg,image/png,image/webp'
 const ALLOWED_TYPES = PHOTO_ACCEPT.split(',')
 const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp)$/i

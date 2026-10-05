@@ -6,11 +6,10 @@ import type { AccessPlan, Plan } from '../api/types'
 import { Alert, Spinner, useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, purchase, PurchaseCancelled, restorePurchases, storePrices } from '../lib/billing'
-import { formatDateTime } from '../lib/format'
+import { errorMessage, formatDateTime } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
-import { locale, useLang, useT } from '../lib/i18n'
-
-type Translate = (turkish: string, english: string) => string
+import { locale, useLang, useT, type Translate } from '../lib/i18n'
+import { safeNext } from '../lib/nav'
 
 const perks = (t: Translate) => [
   { icon: Sparkles, text: t('Sınırsız AI asistan: “2 kişiyiz, 700 TL’miz var…” de, gerisini Nomi planlasın', 'Unlimited AI assistant: say “We’re 2 people with 700 TL…” and Nomi plans the rest') },
@@ -42,7 +41,7 @@ export function PremiumPage() {
   const t = useT()
   const { lang } = useLang()
   const [params] = useSearchParams()
-  const next = params.get('next')
+  const next = safeNext(params.get('next'))
 
   const { data, error, loading } = useAsync(() => api.plans(), [])
   const [selected, setSelected] = useState<AccessPlan>('WEEKLY')
@@ -79,7 +78,7 @@ export function PremiumPage() {
       navigate(next ?? '/', { replace: true })
     } catch (e) {
       if (!(e instanceof PurchaseCancelled)) {
-        setPurchaseError(e instanceof Error ? e.message : t('Satın alma tamamlanamadı', 'Purchase couldn’t be completed'))
+        setPurchaseError(errorMessage(e, t('Satın alma tamamlanamadı', 'Purchase couldn’t be completed')))
       }
     } finally {
       setBusy(false)
@@ -92,7 +91,7 @@ export function PremiumPage() {
       await restorePurchases()
       toast(t('Satın alımlar kontrol edildi', 'Purchases checked'))
     } catch (e) {
-      setPurchaseError(e instanceof Error ? e.message : t('Satın alımlar kontrol edilemedi', 'Couldn’t check purchases'))
+      setPurchaseError(errorMessage(e, t('Satın alımlar kontrol edilemedi', 'Couldn’t check purchases')))
     } finally {
       setBusy(false)
     }

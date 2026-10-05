@@ -4,6 +4,7 @@ import com.nomi.wayfinder.area.CityService;
 import com.nomi.wayfinder.area.DistrictService;
 import com.nomi.wayfinder.exception.PlaceNotFoundException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.photo.PhotoDtos.MyPhotoResponse;
 import com.nomi.wayfinder.photo.PhotoDtos.PhotoResponse;
@@ -73,7 +74,7 @@ public class PhotoService {
         ProcessedPhoto photo = images.process(file);
 
         Proof proof = PhotoLocationCheck.proof(photo.metadata(), latitude, longitude, accuracy);
-        Double distance = proof == null ? null : PhotoLocationCheck.distanceMeters(
+        Double distance = proof == null ? null : GeoMath.meters(
                 proof.latitude(), proof.longitude(), place.latitude(), place.longitude());
         RejectReason reason = proof == null ? RejectReason.NO_LOCATION
                 : !PhotoLocationCheck.nearPlace(proof, distance) ? RejectReason.NOT_NEAR

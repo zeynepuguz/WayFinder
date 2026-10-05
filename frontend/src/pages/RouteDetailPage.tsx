@@ -8,17 +8,17 @@ import { api } from '../api'
 import type { ReplanRequest, Route, RouteStop, StopStatus, StopType } from '../api/types'
 import { useGate } from '../components/gate'
 import { RouteMap } from '../components/RouteMap'
-import { Alert, BackButton, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
+import { Alert, BackButton, ConfirmSheet, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeCost, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
-import { locale, useT } from '../lib/i18n'
+import { errorMessage, formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeTotalCost, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
+import { locale, useT, type Translate } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
 type Change = Omit<ReplanRequest, 'latitude' | 'longitude'>
 
 // Ready answers for "Neye göre değiştirelim?" by stop type (the backend reads any text: planning/StopWish)
-function swapWishes(type: StopType, t: (tr: string, en: string) => string): string[] {
+function swapWishes(type: StopType, t: Translate): string[] {
   const common = [t('Daha ucuz', 'Cheaper'), t('Daha yakın', 'Closer'), t('Kapalı alan', 'Indoors')]
   if (type === 'LUNCH' || type === 'DINNER') return [...common, t('Kebap', 'Kebab'), t('Balık', 'Fish'), t('Ev yemekleri', 'Home cooking')]
   if (type === 'SIGHTSEEING') return [t('Daha yakın', 'Closer'), t('Müze', 'Museum'), t('Tarihi yer', 'Historic'), t('Manzaralı', 'With a view'), t('Kapalı alan', 'Indoors')]
@@ -43,6 +43,8 @@ export function RouteDetailPage() {
   const [actionError, setActionError] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [menuStop, setMenuStop] = useState<RouteStop | null>(null)
   // "Başka bir yerle değiştir": the stop being swapped and what the new place should be like
   const [swapStop, setSwapStop] = useState<RouteStop | null>(null)
@@ -62,7 +64,7 @@ export function RouteDetailPage() {
         setRoute(result)
       }
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : t('İşlem başarısız', 'Something went wrong'))
+      setActionError(errorMessage(e, t('İşlem başarısız', 'Something went wrong')))
     } finally {
       setBusy(false)
     }
@@ -73,9 +75,17 @@ export function RouteDetailPage() {
   const setStopStatus = (stop: RouteStop, status: StopStatus) => act(() => api.updateStop(routeId, stop.id, status))
 
   async function remove() {
-    await api.deleteRoute(routeId)
-    toast(t('Rota silindi', 'Route deleted'))
-    navigate('/routes', { replace: true })
+    setDeleting(true)
+    setDeleteError(null)
+    try {
+      await api.deleteRoute(routeId)
+      toast(t('Rota silindi', 'Route deleted'))
+      navigate('/routes', { replace: true })
+    } catch (e) {
+      setDeleteError(errorMessage(e, t('Rota silinemedi', 'Couldn’t delete the route')))
+    } finally {
+      setDeleting(false)
+    }
   }
 
   if (loading) {
@@ -135,7 +145,7 @@ export function RouteDetailPage() {
         </div>
 
         <div className="stats">
-          <div className="stat"><Wallet size={16} className="muted" /><strong>{routeCost(route.totalEstimatedCost, route.stops.some(s => s.place.estimatedCost != null))}</strong>
+          <div className="stat"><Wallet size={16} className="muted" /><strong>{routeTotalCost(route)}</strong>
             <span>{route.budget != null ? t(`bütçe ₺${route.budget.toLocaleString(locale())}`, `budget ₺${route.budget.toLocaleString(locale())}`) : t('tahmini', 'estimated')}</span></div>
           <div className="stat"><Footprints size={16} className="muted" /><strong>~{route.totalWalkingMinutes} {t('dk', 'min')}</strong><span>{t('yürüme', 'walking')}</span></div>
           <div className="stat"><Clock size={16} className="muted" /><strong>{route.stops.length}</strong><span>{t('durak', route.stops.length === 1 ? 'stop' : 'stops')}</span></div>
@@ -197,7 +207,7 @@ export function RouteDetailPage() {
           </ol>
         </section>
 
-        <button className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} onClick={() => setDeleteOpen(true)}>
+        <button className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} onClick={() => { setDeleteError(null); setDeleteOpen(true) }}>
           <Trash2 size={18} /> {t('Rotayı sil', 'Delete route')}
         </button>
       </div>
@@ -245,15 +255,9 @@ export function RouteDetailPage() {
         )}
       </Sheet>
 
-      <Sheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label={t('Rota silinsin mi?', 'Delete this route?')}>
-        <div className="stack">
-          <p className="ink-2">{t('Bu rota ve durakları kalıcı olarak silinir.', 'This route and its stops will be permanently deleted.')}</p>
-          <div className="row">
-            <button className="btn btn-secondary grow" onClick={() => setDeleteOpen(false)}>{t('Vazgeç', 'Cancel')}</button>
-            <button className="btn btn-danger grow" onClick={() => void remove()}>{t('Sil', 'Delete')}</button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label={t('Rota silinsin mi?', 'Delete this route?')}
+                    text={t('Bu rota ve durakları kalıcı olarak silinir.', 'This route and its stops will be permanently deleted.')}
+                    confirmLabel={t('Sil', 'Delete')} busy={deleting} error={deleteError} onConfirm={() => void remove()} />
     </main>
   )
 }

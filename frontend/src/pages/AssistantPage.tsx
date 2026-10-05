@@ -1,18 +1,19 @@
-import { ArrowUp, Check, ChevronRight, Crown, MessagesSquare, Pencil, Sparkles, SquarePen, Trash2, X } from 'lucide-react'
+import { ArrowUp, ChevronRight, Crown, MessagesSquare, Sparkles, SquarePen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
 import { ApiRequestError } from '../api/client'
 import type { ConversationSummary, Recommendation, Route } from '../api/types'
+import { ConversationList } from '../components/assistant/ConversationList'
+import { RoutePreview } from '../components/assistant/RoutePreview'
 import { Locked } from '../components/gate'
 import { HScroll } from '../components/HScroll'
 import { FartherPlaceRow, PlaceRow } from '../components/PlaceViews'
 import { Alert, Sheet } from '../components/ui'
-import { STOP_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
-import { formatCost, formatTime, routeCost } from '../lib/format'
-import { locale, tr, useT } from '../lib/i18n'
+import { errorMessage } from '../lib/format'
+import { tr, useT } from '../lib/i18n'
 
 interface Message {
   key: string
@@ -111,7 +112,7 @@ function Chat({ canSend }: { canSend: boolean }) {
         if (!cancelled) setMessages(history.map(m => ({ key: `h${m.id}`, role: m.role, content: m.content, routeId: m.routeId })))
       })
       .catch(e => {
-        if (!cancelled) setError(e instanceof Error ? e.message : t('Sohbet yüklenemedi', 'Could not load the chat'))
+        if (!cancelled) setError(errorMessage(e, t('Sohbet yüklenemedi', 'Could not load the chat')))
       })
       .finally(() => {
         if (!cancelled) setLoadingChat(false)
@@ -157,7 +158,7 @@ function Chat({ canSend }: { canSend: boolean }) {
       loadConversations()
     } catch (e) {
       if (!(e instanceof ApiRequestError && e.status === 402)) {
-        setError(e instanceof Error ? e.message : t('Mesaj gönderilemedi', 'Message could not be sent'))
+        setError(errorMessage(e, t('Mesaj gönderilemedi', 'Message could not be sent')))
       }
     } finally {
       setSending(false)
@@ -291,154 +292,6 @@ function Chat({ canSend }: { canSend: boolean }) {
         />
       </Sheet>
     </main>
-  )
-}
-
-function ConversationList({ conversations, currentId, canEdit, onOpen, onChanged, onDeleted }: {
-  conversations: ConversationSummary[]
-  currentId: number | null
-  canEdit: boolean
-  onOpen: (id: number | null) => void
-  onChanged: (conversation: ConversationSummary) => void
-  onDeleted: (id: number) => void
-}) {
-  const t = useT()
-  const [editing, setEditing] = useState<number | null>(null)
-  const [title, setTitle] = useState('')
-  const [confirming, setConfirming] = useState<ConversationSummary | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function run(action: () => Promise<void>) {
-    setBusy(true)
-    setError(null)
-    try {
-      await action()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('İşlem başarısız', 'Something went wrong'))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const rename = (event: FormEvent, id: number) => {
-    event.preventDefault()
-    if (!title.trim()) return
-    void run(async () => {
-      onChanged(await api.renameConversation(id, title.trim()))
-      setEditing(null)
-    })
-  }
-
-  if (confirming) {
-    return (
-      <div className="stack">
-        <p className="ink-2">
-          {t(`“${confirming.title ?? 'Yeni sohbet'}” sohbeti ve mesajları kalıcı olarak silinsin mi? Oluşturduğu rota Rotalarım’da kalır.`,
-            `Permanently delete the chat “${confirming.title ?? 'New chat'}” and its messages? Its route stays in My routes.`)}
-        </p>
-        {error && <Alert tone="danger"><span>{error}</span></Alert>}
-        <div className="row">
-          <button className="btn btn-secondary grow" onClick={() => setConfirming(null)} disabled={busy}>{t('Vazgeç', 'Cancel')}</button>
-          <button className="btn btn-danger grow" disabled={busy} onClick={() => void run(async () => {
-            await api.deleteConversation(confirming.id)
-            onDeleted(confirming.id)
-            setConfirming(null)
-          })}>{t('Sil', 'Delete')}</button>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="stack">
-      <button className="btn btn-primary btn-block" onClick={() => onOpen(null)}>
-        <SquarePen size={18} /> {t('Yeni sohbet', 'New chat')}
-      </button>
-      {error && <Alert tone="danger"><span>{error}</span></Alert>}
-      {conversations.length === 0 ? (
-        <p className="t-caption" style={{ textAlign: 'center' }}>{t('Henüz bir sohbetin yok.', 'You have no chats yet.')}</p>
-      ) : (
-        <div className="list-group">
-          {conversations.map(c => editing === c.id ? (
-            <form key={c.id} className="list-item" onSubmit={e => rename(e, c.id)}>
-              <span className="input grow" style={{ minHeight: 44 }}>
-                <input value={title} onChange={e => setTitle(e.target.value)} maxLength={120} autoFocus
-                       aria-label={t('Sohbet adı', 'Chat name')} />
-              </span>
-              <button type="submit" className="icon-btn icon-btn-plain" disabled={busy || !title.trim()} aria-label={t('Kaydet', 'Save')}><Check size={18} /></button>
-              <button type="button" className="icon-btn icon-btn-plain" onClick={() => setEditing(null)} aria-label={t('Vazgeç', 'Cancel')}><X size={18} /></button>
-            </form>
-          ) : (
-            <div key={c.id} className="list-item" style={c.id === currentId ? { background: 'var(--brand-50)' } : undefined}>
-              <button className="grow" style={{ minWidth: 0, background: 'none', border: 'none', padding: 0, textAlign: 'left', color: 'inherit' }}
-                      onClick={() => onOpen(c.id)} aria-current={c.id === currentId ? 'page' : undefined}>
-                <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.title ?? t('Yeni sohbet', 'New chat')}
-                </strong>
-                <span className="t-caption" style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {c.routeTitle ? `${c.routeTitle} · ` : ''}{c.preview ?? ''}
-                </span>
-                <span className="t-caption muted">{formatWhen(c.lastMessageAt)}</span>
-              </button>
-              {canEdit && (
-                <>
-                  <button className="icon-btn icon-btn-plain" aria-label={t(`“${c.title ?? 'Yeni sohbet'}” adını değiştir`, `Rename “${c.title ?? 'New chat'}”`)}
-                          onClick={() => { setEditing(c.id); setTitle(c.title ?? '') }}>
-                    <Pencil size={17} />
-                  </button>
-                  <button className="icon-btn icon-btn-plain" style={{ color: 'var(--danger)' }}
-                          aria-label={t(`“${c.title ?? 'Yeni sohbet'}” sohbetini sil`, `Delete “${c.title ?? 'New chat'}”`)}
-                          onClick={() => setConfirming(c)}>
-                    <Trash2 size={17} />
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// "Bugün 14:05" / "27 Eyl 18:30"
-function formatWhen(iso: string): string {
-  const date = new Date(iso)
-  if (Number.isNaN(date.getTime())) return ''
-  const time = date.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
-  return date.toDateString() === new Date().toDateString()
-    ? `${tr('Bugün', 'Today')} ${time}`
-    : `${date.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })} ${time}`
-}
-
-function RoutePreview({ route }: { route: Route }) {
-  const t = useT()
-  const upcoming = route.stops.filter(s => s.status === 'PLANNED')
-  return (
-    <Link to={`/routes/${route.id}`} className="card route-mini card-press">
-      <div className="row-between">
-        <span className="t-headline" style={{ fontSize: 15 }}>{route.title}</span>
-        <span className="badge badge-brand">
-          {routeCost(route.totalEstimatedCost, route.stops.some(s => s.place.estimatedCost != null))}
-        </span>
-      </div>
-      <ol>
-        {upcoming.slice(0, 7).map(stop => {
-          const Icon = STOP_ICON[stop.type]
-          return (
-            <li key={stop.id}>
-              <span className="time">{formatTime(stop.plannedStart)}</span>
-              <span className="stop-icon"><Icon size={15} /></span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {stop.place.name} <span className="muted" style={{ fontWeight: 500 }}>· {formatCost(stop.place.estimatedCost)}</span>
-              </span>
-            </li>
-          )
-        })}
-      </ol>
-      <span className="section-link">{t('Haritada gör', 'View on map')} <ChevronRight size={16} /></span>
-    </Link>
   )
 }
 

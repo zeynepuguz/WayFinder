@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.osm;
 
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.i18n.TurkishFold;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -263,7 +264,7 @@ public final class PlaceTags {
     }
 
     private static String lowerTr(String name) {
-        return name == null ? "" : name.replace('İ', 'i').replace('I', 'ı').toLowerCase(Locale.ROOT);
+        return name == null ? "" : TurkishFold.lower(name);
     }
 
     /**

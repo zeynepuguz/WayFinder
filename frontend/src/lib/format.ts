@@ -118,6 +118,11 @@ export function routeCost(total: number, known: boolean | undefined): string {
   return known === false ? tr('Fiyat bilgisi yok', 'No price info') : `~${total.toLocaleString(locale())} TL`
 }
 
+// A full route (detail page, assistant preview): its price is known when any stop has one
+export function routeTotalCost(route: { totalEstimatedCost: number; stops: { place: { estimatedCost: number | null } }[] }): string {
+  return routeCost(route.totalEstimatedCost, route.stops.some(s => s.place.estimatedCost != null))
+}
+
 // Price filter: a place with an unknown price never counts as "within budget"
 export function withinBudget(cost: number | null | undefined, max: number): boolean {
   return cost != null && cost <= max
@@ -129,6 +134,16 @@ export function formatDate(date: string): string {
 
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString(locale(), { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+}
+
+// "Bugün 14:05" / "27 Eyl 18:30"
+export function formatWhen(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+  const time = date.toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' })
+  return date.toDateString() === new Date().toDateString()
+    ? `${tr('Bugün', 'Today')} ${time}`
+    : `${date.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })} ${time}`
 }
 
 export function todayIso(): string {
@@ -158,7 +173,7 @@ export function haversineMeters(lat1: number, lon1: number, lat2: number, lon2: 
 }
 
 // URL slugs of the crawlable category pages (/kadikoy/kafe); keep in sync with scripts/prerender.mjs
-export const CATEGORY_SLUGS: Record<PlaceCategory, string> = {
+const CATEGORY_SLUGS: Record<PlaceCategory, string> = {
   BREAKFAST: 'kahvalti',
   RESTAURANT: 'restoran',
   CAFE: 'kafe',
@@ -178,6 +193,11 @@ export const CATEGORY_BY_SLUG: Record<string, PlaceCategory> = Object.fromEntrie
 // Only http(s) links from the API are rendered as links or images
 export function httpUrl(url: string | null | undefined): string | null {
   return url && /^https?:\/\//i.test(url) ? url : null
+}
+
+// Text for a failed request: the API's own message when there is one, otherwise the screen's fallback
+export function errorMessage(e: unknown, fallback: string): string {
+  return e instanceof Error && e.message ? e.message : fallback
 }
 
 // "kadikoy" matches "Kadıköy": case- and diacritic-insensitive, so English keyboards work too
@@ -233,6 +253,17 @@ export function googleMapsSearchUrl(name: string, ...area: (string | null | unde
   const where = area.map(part => part?.trim()).filter(Boolean).join(' ')
   const query = [name.trim(), where].filter(Boolean).join(', ')
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+}
+
+/**
+ * Google Maps search "<city> <place name>" centred on our pin: Google opens its own listing of the place, which says
+ * when it is "Kalıcı olarak kapalı" (a pin from OSM / Overture can be wrong: "Akdağ Çayevi" sat in Suluova, the real
+ * one closed in Amasya Merkez), and a namesake elsewhere in the city does not come first. Without a city, the name only.
+ */
+export function googleMapsPinUrl(place: { name: string; city?: string | null; latitude: number; longitude: number }): string {
+  const query = place.city && !place.name.toLocaleLowerCase('tr').includes(place.city.toLocaleLowerCase('tr'))
+    ? `${place.city} ${place.name}` : place.name
+  return `https://www.google.com/maps/search/${encodeURIComponent(query)}/@${place.latitude},${place.longitude},17z`
 }
 
 /**

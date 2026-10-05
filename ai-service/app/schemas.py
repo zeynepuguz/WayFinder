@@ -55,12 +55,12 @@ ALLOWED_INTERESTS = {
 class StopRef(BaseModel):
     stopId: int | None = None
     type: StopType | None = None
-    placeName: str | None = None
+    placeName: str | None = Field(default=None, max_length=200)
 
 
 class IntentContext(BaseModel):
     hasRoute: bool = False
-    remainingStops: list[StopRef] = Field(default_factory=list)
+    remainingStops: list[StopRef] = Field(default_factory=list, max_length=30)
 
 
 class IntentRequest(BaseModel):

@@ -5,6 +5,7 @@ import com.nomi.wayfinder.assistant.AssistantIntent.PlanParams;
 import com.nomi.wayfinder.assistant.AssistantIntent.RouteEdit;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.planning.ReplanType;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -28,7 +29,6 @@ import java.util.regex.Pattern;
 @Component
 public class RuleBasedIntentParser implements IntentParser {
 
-    private static final Locale TR = Locale.forLanguageTag("tr-TR");
 
     // "4 kişi", "4 arkadaş", "4 kişilik"
     private static final Pattern PARTY_DIGITS = Pattern.compile("(\\d{1,2})\\s*(?:kişi|arkadaş)");
@@ -166,7 +166,7 @@ public class RuleBasedIntentParser implements IntentParser {
     }
 
     private AssistantIntent parseWithoutDate(String message, IntentContext context) {
-        String text = message.toLowerCase(TR).replace('’', '\'').trim();
+        String text = message.toLowerCase(Texts.TURKISH).replace('’', '\'').trim();
 
         // ---- 1) Changes to the current route ----
         if (context.hasRoute()) {

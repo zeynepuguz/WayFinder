@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { BrandMark } from '../components/visuals'
 import { LanguageSwitch } from '../components/LanguageSwitch'
-import { useT } from '../lib/i18n'
+import { useT, type Translate } from '../lib/i18n'
 
 const ONBOARDED_KEY = 'nomi.onboarded'
 
@@ -23,7 +23,7 @@ function markOnboarded() {
   }
 }
 
-const slides = (t: (turkish: string, english: string) => string): {
+const slides = (t: Translate): {
   title: string
   text: string
   icon: LucideIcon

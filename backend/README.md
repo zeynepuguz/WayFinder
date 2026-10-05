@@ -15,8 +15,8 @@ docker compose up -d
 ./mvnw spring-boot:run
 ```
 
-- Şema ve Kadıköy seed verisi Flyway ile otomatik kurulur (`src/main/resources/db/migration`).
-- Seed mekanlarının koordinat/fiyat/saatleri **yaklaşıktır** (`source = SEED_UNVERIFIED`); production öncesi doğrulanmalı.
+- Şema Flyway ile otomatik kurulur (`src/main/resources/db/migration`). Mekanlar OpenStreetMap ve Overture'dan
+  il il aktarılır (bkz. kök README "Mekan verisi"); geliştirmede `OSM_IMPORT_ON_STARTUP=false` ile başlatmak hızlıdır.
 - Testler: `./mvnw test` (`WayfinderApplicationTests` çalışan Postgres + Redis ister).
 
 ## Mimari
@@ -53,6 +53,11 @@ Planı **LLM değil deterministik planlayıcı** üretir. Mekan, fiyat, mesafe, 
 | GET / PUT / DELETE | `/saved/places`, `/saved/places/{placeId}` | ✔ | Kaydedilen mekanlar |
 | POST | `/assistant/messages` | ✔ | `{message, latitude, longitude, routeId?}` |
 | GET | `/assistant/messages?limit=` | ✔ | Sohbet geçmişi |
+| GET | `/places/{id}/availability` | – | Google Places'a göre hâlâ açık mı (anahtar varsa) |
+| POST | `/places/{id}/reports`, `/feedback` | ✔ | "Kapanmış" bildirimi, uygulama önerisi |
+| GET / POST | `/admin/review/**` | ADMIN | Kaldır / şüpheli, silinen mekanlar, bildirimler, öneriler |
+| GET | `/routes/popular?city=&district=&date=` | – | Popüler rotalar |
+| GET | `/cities`, `/districts?city=` | – | 81 il ve ilçeleri |
 
 Örnek rota isteği:
 

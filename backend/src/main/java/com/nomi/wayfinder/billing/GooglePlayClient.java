@@ -1,10 +1,10 @@
 package com.nomi.wayfinder.billing;
 
 import com.google.auth.oauth2.GoogleCredentials;
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -36,12 +36,8 @@ public class GooglePlayClient {
         this.packageName = billing.googlePlayPackageName();
         this.credentials = loadCredentials(billing.googlePlayServiceAccountFile());
 
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(5));
-        requestFactory.setReadTimeout(Duration.ofSeconds(10));
-        this.restClient = RestClient.builder()
+        this.restClient = HttpClients.restClient(Duration.ofSeconds(5), Duration.ofSeconds(10))
                 .baseUrl("https://androidpublisher.googleapis.com/androidpublisher/v3")
-                .requestFactory(requestFactory)
                 .build();
     }
 

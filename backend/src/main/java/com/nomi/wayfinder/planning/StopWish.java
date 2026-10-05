@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.planning;
 
 import com.nomi.wayfinder.entity.Place;
+import com.nomi.wayfinder.i18n.TurkishFold;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 
 import java.util.*;
@@ -85,7 +86,7 @@ public record StopWish(String text, List<String> words, Set<String> tags, boolea
         if (text == null || text.isBlank()) {
             return null;
         }
-        String lower = text.replace('İ', 'i').replace('I', 'ı').toLowerCase(Locale.ROOT);
+        String lower = TurkishFold.lower(text);
         List<String> folded = Arrays.stream(lower.split("[^\\p{L}\\p{N}]+"))
                 .map(OsmPlaceMapper::fold)
                 .filter(w -> !w.isEmpty())

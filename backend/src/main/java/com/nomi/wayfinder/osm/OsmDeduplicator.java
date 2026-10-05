@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.osm;
 
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.geo.GeoMath;
 
 import java.util.*;
 
@@ -20,7 +21,6 @@ public final class OsmDeduplicator {
     static final double MAX_DISTANCE_METERS = 80;
     static final double SAME_NAME_METERS = 150;
     static final double SAME_NAME_LARGE_METERS = 600;
-    private static final double EARTH_RADIUS_METERS = 6_371_000;
 
     private final List<ExistingPlace> existing;
 
@@ -43,7 +43,7 @@ public final class OsmDeduplicator {
             return Optional.empty();
         }
         for (ExistingPlace other : existing) {
-            if (distanceMeters(place.latitude(), place.longitude(), other.latitude(), other.longitude())
+            if (GeoMath.meters(place.latitude(), place.longitude(), other.latitude(), other.longitude())
                     <= MAX_DISTANCE_METERS
                     && (name.contains(other.name()) || other.name().contains(name))) {
                 return Optional.of(other);
@@ -75,7 +75,7 @@ public final class OsmDeduplicator {
             List<OsmPlaceMapper.OsmPlace> kept = keptByKey.computeIfAbsent(place.category() + "|" + name,
                     k -> new ArrayList<>());
             double limit = sameNameMeters(place.category());
-            boolean duplicate = kept.stream().anyMatch(k -> distanceMeters(place.latitude(), place.longitude(),
+            boolean duplicate = kept.stream().anyMatch(k -> GeoMath.meters(place.latitude(), place.longitude(),
                     k.latitude(), k.longitude()) <= limit);
             if (duplicate) {
                 dropped.add(place.osmId());
@@ -108,16 +108,6 @@ public final class OsmDeduplicator {
      *                      nothing references them
      */
     public record Deduped(List<OsmPlaceMapper.OsmPlace> kept, List<String> droppedOsmIds) {
-    }
-
-    // Haversine; plenty accurate for 80 m
-    static double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(a));
     }
 
     /**

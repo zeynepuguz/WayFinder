@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.photo;
 
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.photo.PhotoImageProcessor.PhotoMetadata;
 import com.nomi.wayfinder.photo.PhotoLocationCheck.Proof;
 import org.junit.jupiter.api.Test;
@@ -74,11 +75,11 @@ class PhotoLocationCheckTest {
     @Test
     void haversineDistance() {
         // Galata Tower -> Hagia Sophia is about 2 km as the crow flies
-        double meters = PhotoLocationCheck.distanceMeters(41.0256, 28.9742, 41.0086, 28.9802);
+        double meters = GeoMath.meters(41.0256, 28.9742, 41.0086, 28.9802);
 
         assertThat(meters).isCloseTo(1_960, within(80.0));
-        assertThat(PhotoLocationCheck.distanceMeters(41.0, 29.0, 41.0, 29.0)).isZero();
+        assertThat(GeoMath.meters(41.0, 29.0, 41.0, 29.0)).isZero();
         // 0.001 degrees of latitude ~ 111 m
-        assertThat(PhotoLocationCheck.distanceMeters(41.0, 29.0, 41.001, 29.0)).isCloseTo(111.2, within(0.5));
+        assertThat(GeoMath.meters(41.0, 29.0, 41.001, 29.0)).isCloseTo(111.2, within(0.5));
     }
 }

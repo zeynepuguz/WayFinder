@@ -211,11 +211,6 @@ export interface Recommendation {
   whyBetter: string | null
 }
 
-export interface TieredRecommendations {
-  nearby: Recommendation[]
-  farther: Recommendation[]
-}
-
 // ---------- weather / home ----------
 
 export interface WeatherNow {

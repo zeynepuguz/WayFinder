@@ -1,5 +1,7 @@
 package com.nomi.wayfinder.osm;
 
+import com.nomi.wayfinder.i18n.Texts;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -22,7 +24,6 @@ import java.util.regex.Pattern;
  */
 public final class PlaceNames {
 
-    static final Locale TR = Locale.forLanguageTag("tr");
     static final int MAX_NAME_LENGTH = 60;
 
     // Stay lowercase inside a title-cased name (Turkish and English particles)
@@ -144,7 +145,7 @@ public final class PlaceNames {
             if (w > 0) {
                 result.append(' ');
             }
-            String lower = word.toLowerCase(TR);
+            String lower = word.toLowerCase(Texts.TURKISH);
             int letters = (int) word.chars().filter(Character::isLetter).count();
             if (fromCaps && letters > 0 && letters <= 3 && !SHORT_WORDS.contains(lower) && !PARTICLES.contains(lower)) {
                 // An acronym: "KFC", "İBB", "AVM"
@@ -165,7 +166,7 @@ public final class PlaceNames {
         for (int i = 0; i < lower.length(); i++) {
             char c = lower.charAt(i);
             if (start && Character.isLetter(c)) {
-                out.append(String.valueOf(c).toUpperCase(TR));
+                out.append(String.valueOf(c).toUpperCase(Texts.TURKISH));
                 start = false;
             } else {
                 out.append(c);
@@ -194,7 +195,7 @@ public final class PlaceNames {
             return true;
         }
         // "... olaylarının yeri"
-        if (EVENT_WORDS.matcher(trimmed).find() && trimmed.toLowerCase(TR).matches("(?s).*\\s(yer|yeri|nokta|noktası)$")) {
+        if (EVENT_WORDS.matcher(trimmed).find() && trimmed.toLowerCase(Texts.TURKISH).matches("(?s).*\\s(yer|yeri|nokta|noktası)$")) {
             return true;
         }
         // A long description or sentence: a verb, or a list of things ("... vardır", "kamp, kahvaltı, çay, duş")

@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.overture;
 
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.i18n.Texts;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 import com.nomi.wayfinder.osm.PlaceNames;
 import com.nomi.wayfinder.osm.PlaceRealismFilter;
@@ -41,7 +42,6 @@ public final class OvertureMapper {
     private static final List<String> PASTRY_WORDS = List.of("pastane", "pastahane", "patisserie", "patiseri",
             "pasta", "tatli", "baklava", "kunefe", "muhallebi", "cikolata", "chocolate", "cake", "dessert");
     private static final Pattern STUCK_SHIFT = Pattern.compile("\\p{Lu}{2,}\\p{Ll}{2,}");
-    private static final Locale TURKISH = Locale.forLanguageTag("tr");
     // A meal in the name (folded prefixes): "döner", "kebap", "köfteci", "pide", "lahmacun", "iskender", "mantı"
     private static final List<String> MEAL_WORDS = List.of("doner", "kebap", "kebab", "kofte", "pide", "lahmacun",
             "iskender", "manti", "lokanta", "tantuni", "kokorec", "durum", "cagkebap");
@@ -323,8 +323,8 @@ public final class OvertureMapper {
         StringBuilder fixed = new StringBuilder();
         for (String part : name.split("(?<= )|(?= )")) {
             if (STUCK_SHIFT.matcher(part).find()) {
-                String lower = part.toLowerCase(TURKISH);
-                fixed.append(lower.substring(0, 1).toUpperCase(TURKISH)).append(lower.substring(1));
+                String lower = part.toLowerCase(Texts.TURKISH);
+                fixed.append(lower.substring(0, 1).toUpperCase(Texts.TURKISH)).append(lower.substring(1));
             } else {
                 fixed.append(part);
             }

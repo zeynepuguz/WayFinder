@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { api } from '../api'
 import type { Place, ReportReason, ReviewAction } from '../api/types'
 import { useAuth } from '../context/AuthContext'
+import { errorMessage } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { Sheet, useToast } from './ui'
 
@@ -33,7 +34,7 @@ export function PlaceReportAndReview({ place, onChanged }: { place: Place; onCha
       await api.reportPlace(place.id, reason)
       toast(t('Bildirimin için teşekkürler, kontrol edeceğiz.', 'Thanks for letting us know, we will check it.'))
     } catch (e) {
-      toast(e instanceof Error ? e.message : t('Bildirim gönderilemedi', 'Could not send the report'))
+      toast(errorMessage(e, t('Bildirim gönderilemedi', 'Could not send the report')))
     }
   }
 
@@ -50,7 +51,7 @@ export function PlaceReportAndReview({ place, onChanged }: { place: Place; onCha
       toast(action === 'SUSPECT' ? t('Şüpheli olarak işaretlendi', 'Marked as suspect') : t('İşaret kaldırıldı', 'Mark removed'))
       onChanged()
     } catch (e) {
-      toast(e instanceof Error ? e.message : t('İşlem yapılamadı', 'Could not do that'))
+      toast(errorMessage(e, t('İşlem yapılamadı', 'Could not do that')))
     } finally {
       setBusy(false)
     }

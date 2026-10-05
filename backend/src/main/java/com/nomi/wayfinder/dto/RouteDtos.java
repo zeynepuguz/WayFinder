@@ -34,7 +34,7 @@ public final class RouteDtos {
             @PositiveOrZero Integer budget,
             WalkingTolerance walkingTolerance,
             @Size(max = 10) List<StopType> stops,
-            @Size(max = 20) List<@NotBlank String> interests,
+            @Size(max = 20) List<@NotBlank @Size(max = 40) String> interests,
             @Size(max = 255) String title,
             // City slug ("istanbul"); with district: a district slug of that city ("kadikoy")
             @Size(max = 100) String city,
@@ -50,14 +50,6 @@ public final class RouteDtos {
                                 String title, String city, String district, StartMode startMode) {
             this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
                     title, city, district, startMode, null);
-        }
-
-        public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
-                                LocalTime endTime, Integer partySize, Integer budget,
-                                WalkingTolerance walkingTolerance, List<StopType> stops, List<String> interests,
-                                String title) {
-            this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
-                    title, null, null, null);
         }
     }
 
@@ -77,7 +69,7 @@ public final class RouteDtos {
             // ADD_STOP
             StopType stopType,
             // ADD_INTEREST
-            String interest,
+            @Size(max = 40) String interest,
             // REPLACE_STOP (optional): what the new place should be like, in the user's words ("kebap", "daha ucuz")
             @Size(max = 200) String wish
     ) {

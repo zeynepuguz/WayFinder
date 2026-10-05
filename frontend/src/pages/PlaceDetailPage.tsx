@@ -9,7 +9,7 @@ import { Alert, BackButton, ErrorState, Skeleton } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsSearchUrl, httpUrl, TAG_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
 
@@ -40,14 +40,8 @@ export function PlaceDetailPage() {
   const isSaved = saved.isSaved(place.id)
   const today = (new Date().getDay() + 6) % 7 + 1
   const todayHours = place.openingHours.filter(h => h.dayOfWeek === today)
-  // Google Maps searches "<city> <place name>": Google opens its own listing of the place, which says when it is
-  // "Kalıcı olarak kapalı" (a pin from OSM / Overture can be wrong: "Akdağ Çayevi" sat in Suluova, the real one
-  // closed in Amasya Merkez). Without a city, the point we show
-  const searchQuery = place.city && !place.name.toLocaleLowerCase('tr').includes(place.city.toLocaleLowerCase('tr'))
-    ? `${place.city} ${place.name}` : place.name
-  // Around our pin, so a namesake elsewhere in the city does not come first; the backend may know the exact place
-  const mapsUrl = availability?.mapsUrl
-    ?? `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}/@${place.latitude},${place.longitude},17z`
+  // The backend may know the exact place; otherwise a search around our pin. Only http(s) links are followed
+  const mapsUrl = httpUrl(availability?.mapsUrl) ?? googleMapsPinUrl(place)
   const closed = availability?.status === 'CLOSED_PERMANENTLY'
   // No match on Google, or the owner marked it "may have closed"
   const notFound = availability?.status === 'NOT_FOUND' || Boolean(place.suspect)
@@ -146,10 +140,10 @@ export function PlaceDetailPage() {
           ) : !place.verified ? (
             <span>
               {t('Bu mekanın bilgileri OpenStreetMap katkıcılarından geliyor ve güncel olmayabilir.', 'This place’s details come from OpenStreetMap contributors and may be out of date.')}
-              {place.sourceUrl && /^https?:\/\//.test(place.sourceUrl) && (
+              {httpUrl(place.sourceUrl) && (
                 <>
                   {' '}
-                  <a href={place.sourceUrl} target="_blank" rel="noopener noreferrer" className="section-link" style={{ fontSize: 13 }}>
+                  <a href={httpUrl(place.sourceUrl)!} target="_blank" rel="noopener noreferrer" className="section-link" style={{ fontSize: 13 }}>
                     {t('OpenStreetMap’te gör', 'View on OpenStreetMap')} <ExternalLink size={12} />
                   </a>
                 </>

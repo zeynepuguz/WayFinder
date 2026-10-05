@@ -1,10 +1,10 @@
 package com.nomi.wayfinder.overture;
 
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.overture.OvertureMapper.OvertureRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import tools.jackson.databind.JsonNode;
@@ -56,11 +56,7 @@ public class OvertureClient {
     public OvertureClient(OvertureProperties properties, JsonMapper jsonMapper) {
         this.properties = properties;
         this.jsonMapper = jsonMapper;
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(15));
-        requestFactory.setReadTimeout(Duration.ofSeconds(30));
-        this.restClient = RestClient.builder()
-                .requestFactory(requestFactory)
+        this.restClient = HttpClients.restClient(Duration.ofSeconds(15), Duration.ofSeconds(30))
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
     }

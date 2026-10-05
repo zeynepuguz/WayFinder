@@ -23,7 +23,7 @@ public final class AuthDtos {
 
     public record LoginRequest(
             @NotBlank @Email String email,
-            @NotBlank String password
+            @NotBlank @Size(max = 100) String password
     ) {
     }
 
@@ -62,7 +62,7 @@ public final class AuthDtos {
             @NotNull WalkingTolerance walkingTolerance,
             @Min(1) @Max(20) int defaultPartySize,
             @PositiveOrZero Integer defaultBudget,
-            @Size(max = 20) List<@NotBlank String> interests
+            @Size(max = 20) List<@NotBlank @Size(max = 40) String> interests
     ) {
     }
 }

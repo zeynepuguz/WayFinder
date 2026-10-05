@@ -36,15 +36,15 @@ public class PlaceController {
     @GetMapping
     public PageResponse<PlaceResponse> searchPlaces(
             @RequestParam(required = false) PlaceCategory category,
-            @RequestParam(required = false) String neighborhood,
+            @RequestParam(required = false) @Size(max = 100) String neighborhood,
             @RequestParam(required = false) @PositiveOrZero Integer maxCost,
             @RequestParam(required = false) Boolean indoor,
-            @RequestParam(required = false) String q,
+            @RequestParam(required = false) @Size(max = 100) String q,
             @RequestParam(required = false) Boolean verified,
             // City slug from GET /api/v1/cities; the list is then verified first, then with a photo, then by name
-            @RequestParam(required = false) String city,
+            @RequestParam(required = false) @Size(max = 100) String city,
             // District slug from GET /api/v1/districts?city=, looked up in the city (istanbul when no city is given)
-            @RequestParam(required = false) String district,
+            @RequestParam(required = false) @Size(max = 100) String district,
             // A sub-kind: İbadet > mosque / church / synagogue / cemevi
             @RequestParam(required = false) @Size(max = 30) String tag,
             @RequestParam(defaultValue = "0") @Min(0) int page,

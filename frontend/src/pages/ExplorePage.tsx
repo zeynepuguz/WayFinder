@@ -14,12 +14,12 @@ import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { useDistricts } from '../lib/districts'
-import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, fold, googleMapsSearchUrl, MARKET_KINDS, withinBudget, WORSHIP_KINDS } from '../lib/format'
-import { useT } from '../lib/i18n'
+import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, errorMessage, fold, googleMapsSearchUrl, MARKET_KINDS, withinBudget, WORSHIP_KINDS } from '../lib/format'
+import { useT, type Translate } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
 type View = 'list' | 'map'
-const priceOptions = (t: (turkish: string, english: string) => string) => [
+const priceOptions = (t: Translate) => [
   { value: '', label: t('Hepsi', 'All') },
   { value: '0', label: t('Ücretsiz', 'Free') },
   { value: '200', label: '≤ 200 TL' },
@@ -86,6 +86,7 @@ export function ExplorePage() {
   const cacheKey = routerLocation.pathname + routerLocation.search
   const [restored] = useState(() => listCache.get(cacheKey) ?? null)
   const skipLoad = useRef(restored !== null)
+  const latestLoad = useRef(0)
 
   const [mode, setMode] = useState<Mode>(restored?.mode
     ?? (slugCategory || districtParam || params.get('sehir') ? 'all' : 'nearby'))
@@ -174,6 +175,9 @@ export function ExplorePage() {
   }, [view, popular, mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
 
   async function load(nextPage: number) {
+    // Only the newest request may change the list: a slow answer for old filters must not overwrite it
+    const call = ++latestLoad.current
+    const current = () => call === latestLoad.current
     setLoading(true)
     setError(null)
     try {
@@ -181,6 +185,7 @@ export function ExplorePage() {
         // Nearby list is sorted by PostGIS distance; filters are applied on that small result
         const nearby = await api.nearbyPlaces(location.latitude, location.longitude, 2500, 50, category || undefined,
           worshipKind ?? undefined)
+        if (!current()) return
         const q = fold(query)
         setPlaces(nearby.filter(p =>
           // İbadet also lists the famous mosques / churches that are sights
@@ -202,15 +207,16 @@ export function ExplorePage() {
           page: nextPage,
           size: 20,
         })
+        if (!current()) return
         // A place can shift between pages while data changes: never list it twice
         setPlaces(current => (nextPage === 0 ? result.content : appendUnique(current, result.content)))
         setHasMore(result.page + 1 < result.totalPages)
       }
       setPage(nextPage)
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('Mekanlar yüklenemedi', 'Couldn’t load places'))
+      if (current()) setError(errorMessage(e, t('Mekanlar yüklenemedi', 'Couldn’t load places')))
     } finally {
-      setLoading(false)
+      if (current()) setLoading(false)
     }
   }
 

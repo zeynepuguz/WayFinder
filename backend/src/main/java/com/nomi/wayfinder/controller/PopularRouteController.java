@@ -6,6 +6,7 @@ import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.security.CurrentUser;
 import com.nomi.wayfinder.service.PopularRouteService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -31,8 +32,8 @@ public class PopularRouteController {
      */
     @GetMapping
     public List<PopularRouteResponse> popularRoutes(
-            @RequestParam String city,
-            @RequestParam(required = false) String district,
+            @RequestParam @Size(max = 100) String city,
+            @RequestParam(required = false) @Size(max = 100) String district,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date
     ) {
         return popularRouteService.popularRoutes(city, district, popularRouteService.dayOrToday(date));

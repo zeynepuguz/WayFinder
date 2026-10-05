@@ -1,17 +1,17 @@
 # Nomi — AI City Companion
 
 Bulunduğun yerde, hava durumuna, bütçene ve tercihlerine göre günlük rota planlayan; gezi sırasında
-"çok yorulduk", "yağmur başladı" dediğinde rotayı yeniden düzenleyen şehir asistanı. MVP: Kadıköy.
+"çok yorulduk", "yağmur başladı" dediğinde rotayı yeniden düzenleyen şehir asistanı. Türkiye'nin 81 ilinde çalışır.
 
 ```
 React (frontend/)  ──/api──►  Spring Boot (backend/)  ──►  PostgreSQL + PostGIS, Redis
                                      │
-                                     └──POST /v1/intent──►  FastAPI (ai-service/)  ──►  OpenAI
+                                     └──POST /v1/intent, /v1/photos/verify──►  FastAPI (ai-service/)  ──►  OpenAI
 ```
 
 - **backend/**: kullanıcılar, mekanlar, PostGIS aramaları, hava durumu, rota planlayıcı, replan, asistan. Ayrıntılar: [backend/README.md](backend/README.md)
-- **ai-service/**: kullanıcının mesajını yapılandırılmış bir niyete (intent) çevirir. Mekan, fiyat, mesafe seçmez; onlar backend'de gerçek veriden gelir.
-- **frontend/**: mobil öncelikli React + TypeScript arayüzü (Ana Sayfa, Asistan, Rotalarım, Keşfet, Kaydedilenler).
+- **ai-service/**: kullanıcının mesajını yapılandırılmış bir niyete (intent) çevirir ve kullanıcı fotoğraflarını denetler. Mekan, fiyat, mesafe seçmez; onlar backend'de gerçek veriden gelir.
+- **frontend/**: mobil öncelikli React + TypeScript arayüzü (Ana Sayfa, Keşfet, Asistan, Rotalarım, Kaydedilenler, Profil, sahibine özel Yönetim).
 
 ## Çalıştırma
 
@@ -22,7 +22,7 @@ docker compose up -d              # PostgreSQL + PostGIS (5433), Redis (6379)
 cd backend && ./mvnw spring-boot:run                            # http://localhost:8080
 
 cd ai-service                                                   # opsiyonel
-py -3.12 -m venv .venv && .venv/Scripts/pip install -r requirements.txt
+py -3.12 -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # testler dahil
 .venv/Scripts/uvicorn app.main:app --port 8000                  # http://localhost:8000/health
 
 cd frontend && npm install && npm run dev                       # http://localhost:5173
@@ -94,9 +94,20 @@ backend loguna yazılır.
 
 ## Mekan verisi
 
-Kadıköy mekanları `V2` ile eklendi, `V6` ile 27.09.2026'da web üzerinden kontrol edildi: koordinatlar
-OpenStreetMap'ten, çalışma saatleri yalnızca kaynağı olanlar için (kaynaklar çelişiyorsa hepsinin açık olduğu aralık).
-Saati bilinmeyen mekanların satırı yoktur (planlayıcı "bilinmiyor" sayar). Fiyatlar tahminidir.
+- **OpenStreetMap:** 81 il, ilçeler ve mahalleler. Canlı Overpass API'den ilçe ilçe (`backend/.../osm`); Overpass
+  çalışmıyorsa Geofabrik'in günlük Türkiye dosyası okunabilir (`OSM_PBF_ENABLED`, `OSM_PBF_PATH`). Her ay yenilenir.
+- **Overture Maps:** OSM'de olmayan mekanlar ve zincir market şubeleri (güven ≥ 0,7). OSM ile eşleşen yerler tek kayıt
+  olur; yıllardır düzenlenmemiş ve Overture'ın da tanımadığı OSM yerleri "muhtemelen kapanmış" diye gizlenir.
+- **Popülerlik:** Wikipedia/Wikidata verisiyle; popüler rotalar buna göre seçilir. Fotoğraflar Wikimedia Commons'tan.
+- **Google Places (opsiyonel, `GOOGLE_PLACES_API_KEY`):** mekan sayfası açılınca yerin hâlâ orada olup olmadığı sorulur;
+  kalıcı kapalıysa gizlenir. Google Cloud'da günlük kota koy; backend de günde 140 / ayda 4.500 istekle sınırlar.
+- Fiyatlar tahminidir; bilinmeyen fiyat "Fiyat bilgisi yok" olarak gösterilir, toplamlara eklenmez.
+
+## Yönetim (sadece uygulama sahibi)
+
+`OWNER_EMAILS` (`.env`) içindeki hesaplar giriş yapınca yönetici olur. Mekan sayfasında "Mekanı kaldır" (kullanıcılardan
+anında kalkar) ve "Şüpheli" (uyarıyla görünür, hiçbir öneride kullanılmaz) seçenekleri; Profil → Yönetim'de kullanıcı
+bildirimleri, şüpheli ve silinen mekanlar (şehre göre) ve kullanıcı önerileri (küfür içerenler reddedilir) bulunur.
 
 ## Sunucuya kurulum (production)
 

@@ -28,7 +28,7 @@ public class RouteExpiryJob {
         run();
     }
 
-    @Scheduled(cron = "${nomi.routes.expire-cron:0 5 0 * * *}", zone = "${nomi.timezone}")
+    @Scheduled(cron = "${nomi.routes.expire-cron:0 5 0 * * *}", zone = "${nomi.timezone:Europe/Istanbul}")
     public void run() {
         try {
             int expired = routeService.expirePastRoutes();

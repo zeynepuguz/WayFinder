@@ -4,6 +4,7 @@ import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.repository.PlaceDistance;
 import com.nomi.wayfinder.repository.PlaceRepository;
 import com.nomi.wayfinder.weather.WeatherService;
@@ -263,7 +264,7 @@ class RouteShapeTest {
                 : Set.of(interestTags.split(","));
         List<PlaceDistance> result = new ArrayList<>();
         for (Place place : places.values()) {
-            double distance = PopularRouteBuilder.meters(lat, lon, place.getLatitude(), place.getLongitude());
+            double distance = GeoMath.meters(lat, lon, place.getLatitude(), place.getLongitude());
             boolean kind = categories.contains(place.getCategory().name()) || (tag != null && place.hasTag(tag));
             boolean interest = interestTags == null
                     || place.getTags().stream().anyMatch(wanted::contains) || (nearSea && place.isNearSea());

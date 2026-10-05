@@ -6,6 +6,7 @@ import { Alert, BackButton, Segmented, Spinner } from '../components/ui'
 import { BrandMark } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { LEGAL_LINKS } from '../lib/legal'
+import { safeNext } from '../lib/nav'
 import { tr, useT } from '../lib/i18n'
 
 export function AuthPage() {
@@ -13,7 +14,7 @@ export function AuthPage() {
   const navigate = useNavigate()
   const t = useT()
   const [params] = useSearchParams()
-  const next = params.get('next') ?? '/'
+  const next = safeNext(params.get('next')) ?? '/'
 
   const [mode, setMode] = useState<'login' | 'register'>(params.get('mode') === 'register' ? 'register' : 'login')
   const [email, setEmail] = useState('')

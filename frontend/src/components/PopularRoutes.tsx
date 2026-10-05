@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router'
 import { api } from '../api'
 import type { PlaceCategory, PopularRoute, PopularRouteStop, StopType } from '../api/types'
 import { useAuth } from '../context/AuthContext'
-import { popularRouteCost } from '../lib/format'
+import { errorMessage, popularRouteCost } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 import { useGate } from './gate'
@@ -75,7 +75,7 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
       const created = await api.startPopularRoute({ city, district: district ?? undefined, key: route.key, date: route.date })
       navigate(`/routes/${created.id}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('Rota oluşturulamadı', 'Could not create the route'))
+      setError(errorMessage(e, t('Rota oluşturulamadı', 'Could not create the route')))
       setBusy(false)
     }
   }

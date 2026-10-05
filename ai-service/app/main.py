@@ -40,14 +40,22 @@ def require_api_key(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
 
+if not get_settings().ai_service_api_key:
+    log.warning("AI_SERVICE_API_KEY is empty: requests are not checked (local development only)")
+
+
+def require_openai_key(settings: Settings) -> None:
+    # The backend treats this like any error: rule-based parser for intents, photo stays PENDING and is retried
+    if not settings.openai_api_key:
+        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+
+
 _extractor: IntentExtractor | None = None
 
 
 def get_extractor(settings: Settings = Depends(get_settings)) -> IntentExtractor:
     global _extractor
-    if not settings.openai_api_key:
-        # The backend treats any error as "use the rule-based parser"
-        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+    require_openai_key(settings)
     if _extractor is None:
         _extractor = OpenAIIntentExtractor(settings)
     return _extractor
@@ -74,9 +82,7 @@ _photo_verifier: PhotoVerifier | None = None
 
 def get_photo_verifier(settings: Settings = Depends(get_settings)) -> PhotoVerifier:
     global _photo_verifier
-    if not settings.openai_api_key:
-        # The backend keeps the photo PENDING and retries later
-        raise HTTPException(status_code=503, detail="OPENAI_API_KEY is not configured")
+    require_openai_key(settings)
     if _photo_verifier is None:
         _photo_verifier = OpenAIPhotoVerifier(settings)
     return _photo_verifier

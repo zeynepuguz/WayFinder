@@ -297,8 +297,6 @@ svg { flex-shrink: 0; }
 .list-item-danger { color: var(--danger); }
 .list-item-danger .list-item-icon { background: var(--danger-50); color: var(--danger); }
 
-.divider { height: 1px; background: var(--line); }
-
 /* =========================================================
    Chips, badges, segmented, inputs
    ========================================================= */

@@ -1,10 +1,9 @@
 package com.nomi.wayfinder.photo;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
-import org.slf4j.MDC;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -21,27 +20,8 @@ public class PhotoAiClient {
 
     public PhotoAiClient(NomiProperties nomiProperties, PhotoProperties photoProperties) {
         this.properties = nomiProperties.ai();
-
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(properties.connectTimeout());
-        requestFactory.setReadTimeout(photoProperties.aiReadTimeout());
-
-        RestClient.Builder builder = RestClient.builder()
-                .requestFactory(requestFactory)
-                .requestInterceptor((request, body, execution) -> {
-                    String requestId = MDC.get("requestId");
-                    if (requestId != null) {
-                        request.getHeaders().add("X-Request-Id", requestId);
-                    }
-                    return execution.execute(request, body);
-                });
-        if (properties.enabled()) {
-            builder.baseUrl(properties.baseUrl());
-        }
-        if (properties.apiKey() != null && !properties.apiKey().isBlank()) {
-            builder.defaultHeader("X-API-Key", properties.apiKey());
-        }
-        this.restClient = builder.build();
+        // Vision checks take longer than intent parsing: the photo read timeout
+        this.restClient = HttpClients.aiService(properties, photoProperties.aiReadTimeout()).build();
     }
 
     public boolean isEnabled() {

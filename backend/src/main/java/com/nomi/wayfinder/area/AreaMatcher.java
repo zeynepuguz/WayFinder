@@ -1,5 +1,6 @@
 package com.nomi.wayfinder.area;
 
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.i18n.TurkishFold;
 
 import java.util.*;
@@ -286,7 +287,7 @@ public final class AreaMatcher {
             return false;
         }
         NamedArea first = sameName.getFirst();
-        return sameName.stream().anyMatch(a -> distanceMeters(first.latitude(), first.longitude(),
+        return sameName.stream().anyMatch(a -> GeoMath.meters(first.latitude(), first.longitude(),
                 a.latitude(), a.longitude()) > AMBIGUOUS_METERS);
     }
 
@@ -299,15 +300,6 @@ public final class AreaMatcher {
     // Cities are compared folded ("İzmir" = "izmir"); "" = unknown city
     private static String cityKey(String city) {
         return city == null ? "" : key(city);
-    }
-
-    static double distanceMeters(double lat1, double lon1, double lat2, double lon2) {
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
-                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * 6_371_000 * Math.asin(Math.sqrt(a));
     }
 
     private record Entry(NamedArea area, String[] tokens, int letters, String key) {

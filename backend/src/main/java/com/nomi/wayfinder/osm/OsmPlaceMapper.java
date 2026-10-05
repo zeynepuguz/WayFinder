@@ -2,10 +2,10 @@ package com.nomi.wayfinder.osm;
 
 import com.nomi.wayfinder.dto.OpeningHoursDto;
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.i18n.TurkishFold;
 
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -410,22 +410,11 @@ public final class OsmPlaceMapper {
 
     /**
      * Case and diacritic insensitive form for comparing names: "Çiya Sofrası" -> "ciyasofrasi".
-     * Turkish letters are mapped by hand first, so the JVM's Turkish locale cannot turn "I" into "ı".
+     * Built on TurkishFold.ascii, so the JVM's Turkish locale cannot turn "I" into "ı".
      * Spaces and punctuation are dropped, so "Moda Çay Bahçesi" matches "Moda Çay-Bahçesi".
      */
     public static String fold(String text) {
-        if (text == null) {
-            return "";
-        }
-        String mapped = text
-                .replace('İ', 'i').replace('I', 'i').replace('ı', 'i')
-                .replace('Ş', 's').replace('ş', 's')
-                .replace('Ğ', 'g').replace('ğ', 'g')
-                .replace('Ü', 'u').replace('ü', 'u')
-                .replace('Ö', 'o').replace('ö', 'o')
-                .replace('Ç', 'c').replace('ç', 'c');
-        String withoutMarks = Normalizer.normalize(mapped, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
-        return withoutMarks.toLowerCase(Locale.ROOT).replaceAll("[^\\p{L}\\p{N}]+", "");
+        return TurkishFold.ascii(text).replaceAll("[^\\p{L}\\p{N}]+", "");
     }
 
     private static String trimToNull(String value) {

@@ -16,10 +16,8 @@ import { locationLabel, useUserLocation } from '../context/LocationContext'
 import { CATEGORY_LABELS, isOpenRoute, locativeTr, STOP_TYPE_LABELS, todayIso } from '../lib/format'
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
-import { locale, useT } from '../lib/i18n'
+import { locale, useT, type Translate } from '../lib/i18n'
 import { LanguageSwitch } from '../components/LanguageSwitch'
-
-type Translate = (turkish: string, english: string) => string
 
 // Ready-made ideas: tapping one asks the assistant (paid) with this prompt
 const ideas = (t: Translate): { title: string; text: string; prompt: string; icon: LucideIcon; gradient: string }[] => [

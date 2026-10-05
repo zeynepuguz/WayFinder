@@ -32,15 +32,15 @@ public class PlaceDataNormalizer {
     static final int MAX_EXAMPLES = 40;
 
     private final JdbcTemplate jdbc;
-    private final OsmPlaceImporter importer;
+    private final PlaceRemoval removal;
     private final TransactionTemplate transactions;
     private final ApplicationEventPublisher events;
     private final AtomicBoolean running = new AtomicBoolean(false);
 
-    public PlaceDataNormalizer(JdbcTemplate jdbc, OsmPlaceImporter importer, TransactionTemplate transactions,
+    public PlaceDataNormalizer(JdbcTemplate jdbc, PlaceRemoval removal, TransactionTemplate transactions,
                                ApplicationEventPublisher events) {
         this.jdbc = jdbc;
-        this.importer = importer;
+        this.removal = removal;
         this.transactions = transactions;
         this.events = events;
     }
@@ -79,7 +79,7 @@ public class PlaceDataNormalizer {
                                     ps.setArray(2, ps.getConnection().createArrayOf("text", u.tags().toArray()));
                                     ps.setLong(3, u.id());
                                 }));
-                OsmPlaceImporter.RemovedRows gone = importer.removeOrHide(plan.notPlaces());
+                PlaceRemoval.RemovedRows gone = removal.removeOrHideOsm(plan.notPlaces());
                 removed = gone.removed();
                 hidden = gone.hidden();
                 if (!plan.updates().isEmpty() || !plan.notPlaces().isEmpty()) {

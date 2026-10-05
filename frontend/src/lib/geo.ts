@@ -1,7 +1,7 @@
 import type { MapBox, PlaceCategory } from '../api/types'
 
 // Türkiye, roughly (Edirne/Gökçeada in the west to Iğdır in the east): Nomi's service area
-export const TURKEY_BOUNDS: MapBox = { south: 35.8, west: 25.6, north: 42.2, east: 44.9 }
+const TURKEY_BOUNDS: MapBox = { south: 35.8, west: 25.6, north: 42.2, east: 44.9 }
 
 export function inBox(box: MapBox, latitude: number, longitude: number): boolean {
   return latitude >= box.south && latitude <= box.north && longitude >= box.west && longitude <= box.east

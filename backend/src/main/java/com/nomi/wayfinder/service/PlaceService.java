@@ -97,8 +97,11 @@ public class PlaceService {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("indoor"), filter.indoor()));
         }
         if (filter.query() != null && !filter.query().isBlank()) {
-            String pattern = "%" + filter.query().toLowerCase(Locale.ROOT) + "%";
-            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("name")), pattern));
+            // The text is searched as typed: % and _ are not wildcards
+            String typed = filter.query().toLowerCase(Locale.ROOT)
+                    .replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+            String pattern = "%" + typed + "%";
+            spec = spec.and((root, query, cb) -> cb.like(cb.lower(root.get("name")), pattern, '\\'));
         }
         boolean byDistrict = filter.district() != null && !filter.district().isBlank();
         boolean byCity = filter.city() != null && !filter.city().isBlank();
@@ -247,20 +250,5 @@ public class PlaceService {
             // a sub-kind tag (İbadet > "mosque", "church", ...); null = any
             String tag
     ) {
-
-        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
-                                 String query, Boolean verified, String district, String city) {
-            this(category, neighborhood, maxCost, indoor, query, verified, district, city, null);
-        }
-
-        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
-                                 String query, Boolean verified) {
-            this(category, neighborhood, maxCost, indoor, query, verified, null, null);
-        }
-
-        public PlaceSearchFilter(PlaceCategory category, String neighborhood, Integer maxCost, Boolean indoor,
-                                 String query, Boolean verified, String district) {
-            this(category, neighborhood, maxCost, indoor, query, verified, district, null);
-        }
     }
 }

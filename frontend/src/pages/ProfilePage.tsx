@@ -2,16 +2,15 @@ import {
   ChevronRight, CircleHelp, Crown, FileText, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
   SlidersHorizontal, Trash2,
 } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { api } from '../api'
-import type { WalkingTolerance } from '../api/types'
 import { LanguageSwitch } from '../components/LanguageSwitch'
-import { Alert, BackButton, Segmented, Sheet, Spinner, Stepper, useToast } from '../components/ui'
+import { FeedbackForm, PreferencesForm } from '../components/ProfileForms'
+import { BackButton, ConfirmSheet, Sheet, useToast } from '../components/ui'
 import { MyPhotos } from '../components/UserPhotos'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
-import { formatDateTime, INTEREST_LABELS, WALKING_LABELS } from '../lib/format'
+import { errorMessage, formatDateTime } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { LEGAL_LINKS } from '../lib/legal'
 
@@ -23,6 +22,7 @@ export function ProfilePage() {
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   if (!user) {
@@ -38,11 +38,6 @@ export function ProfilePage() {
         </div>
         <div className="list-group">
           <LanguageRow />
-        <button className="list-item" onClick={() => setFeedbackOpen(true)}>
-          <span className="list-item-icon"><MessageSquare size={18} /></span>
-          <span className="grow">{t('Uygulama için önerin var mı?', 'Any suggestions for the app?')}</span>
-          <ChevronRight size={18} className="muted" />
-        </button>
         </div>
         <LegalLinks />
       </main>
@@ -53,10 +48,13 @@ export function ProfilePage() {
 
   async function confirmDelete() {
     setDeleting(true)
+    setDeleteError(null)
     try {
       await deleteAccount()
       toast(t('Hesabın silindi', 'Your account has been deleted'))
       navigate('/', { replace: true })
+    } catch (e) {
+      setDeleteError(errorMessage(e, t('Hesap silinemedi', 'Couldn’t delete the account')))
     } finally {
       setDeleting(false)
     }
@@ -114,8 +112,14 @@ export function ProfilePage() {
           <ChevronRight size={18} className="muted" />
         </button>
         <LanguageRow />
+        {/* Suggestions are stored with the sender, so only signed-in users see this row */}
+        <button className="list-item" onClick={() => setFeedbackOpen(true)}>
+          <span className="list-item-icon"><MessageSquare size={18} /></span>
+          <span className="grow">{t('Uygulama için önerin var mı?', 'Any suggestions for the app?')}</span>
+          <ChevronRight size={18} className="muted" />
+        </button>
         {isNativeApp() && (
-          <button className="list-item" onClick={() => void restorePurchases().then(() => toast(t('Satın alımlar kontrol edildi', 'Purchases checked')), (e: unknown) => toast(e instanceof Error ? e.message : t('Satın alımlar kontrol edilemedi', 'Could not check purchases')))}>
+          <button className="list-item" onClick={() => void restorePurchases().then(() => toast(t('Satın alımlar kontrol edildi', 'Purchases checked')), (e: unknown) => toast(errorMessage(e, t('Satın alımlar kontrol edilemedi', 'Could not check purchases'))))}>
             <span className="list-item-icon"><RotateCcw size={18} /></span>
             <span className="grow">{t('Satın alımları geri yükle', 'Restore purchases')}</span>
           </button>
@@ -138,7 +142,7 @@ export function ProfilePage() {
           <span className="list-item-icon"><LogOut size={18} /></span>
           <span className="grow">{t('Çıkış yap', 'Sign out')}</span>
         </button>
-        <button className="list-item list-item-danger" onClick={() => setDeleteOpen(true)}>
+        <button className="list-item list-item-danger" onClick={() => { setDeleteError(null); setDeleteOpen(true) }}>
           <span className="list-item-icon"><Trash2 size={18} /></span>
           <span className="grow">{t('Hesabımı sil', 'Delete my account')}</span>
         </button>
@@ -152,20 +156,10 @@ export function ProfilePage() {
         <PreferencesForm onSaved={() => { setPrefsOpen(false); toast(t('Tercihlerin kaydedildi', 'Preferences saved')) }} />
       </Sheet>
 
-      <Sheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label={t('Hesabın silinsin mi?', 'Delete your account?')}>
-        <div className="stack">
-          <p className="ink-2">
-            {t('Hesabın, rotaların, kayıtların ve sohbet geçmişin kalıcı olarak silinir. Kalan Premium süren iade edilmez ve geri getirilemez.',
-               'Your account, routes, saved items and chat history will be permanently deleted. Any remaining Premium time is not refunded and cannot be restored.')}
-          </p>
-          <div className="row">
-            <button className="btn btn-secondary grow" onClick={() => setDeleteOpen(false)}>{t('Vazgeç', 'Cancel')}</button>
-            <button className="btn btn-danger grow" disabled={deleting} onClick={() => void confirmDelete()}>
-              {deleting ? <Spinner /> : t('Hesabı sil', 'Delete account')}
-            </button>
-          </div>
-        </div>
-      </Sheet>
+      <ConfirmSheet open={deleteOpen} onClose={() => setDeleteOpen(false)} label={t('Hesabın silinsin mi?', 'Delete your account?')}
+                    text={t('Hesabın, rotaların, kayıtların ve sohbet geçmişin kalıcı olarak silinir. Kalan Premium süren iade edilmez ve geri getirilemez.',
+                            'Your account, routes, saved items and chat history will be permanently deleted. Any remaining Premium time is not refunded and cannot be restored.')}
+                    confirmLabel={t('Hesabı sil', 'Delete account')} busy={deleting} error={deleteError} onConfirm={() => void confirmDelete()} />
     </main>
   )
 }
@@ -199,103 +193,5 @@ function LegalLinks() {
         </a>
       )}
     </div>
-  )
-}
-
-function PreferencesForm({ onSaved }: { onSaved: () => void }) {
-  const { user, refreshUser } = useAuth()
-  const t = useT()
-  const prefs = user!.preferences
-  const [walking, setWalking] = useState<WalkingTolerance>(prefs.walkingTolerance)
-  const [partySize, setPartySize] = useState(prefs.defaultPartySize)
-  const [budget, setBudget] = useState(prefs.defaultBudget?.toString() ?? '')
-  const [interests, setInterests] = useState<string[]>(prefs.interests)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit(event: FormEvent) {
-    event.preventDefault()
-    setSaving(true)
-    setError(null)
-    try {
-      await api.updatePreferences({ walkingTolerance: walking, defaultPartySize: partySize, defaultBudget: budget ? Number(budget) : null, interests })
-      await refreshUser()
-      onSaved()
-    } catch (e) {
-      setError(e instanceof Error ? e.message : t('Kaydedilemedi', 'Could not save'))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const toggle = (key: string) => setInterests(c => (c.includes(key) ? c.filter(i => i !== key) : [...c, key]))
-
-  return (
-    <form className="stack" style={{ gap: 20 }} onSubmit={submit}>
-      <p className="t-caption">{t('Başka bir şey söylemediğinde Nomi rotalarını bunlara göre planlar.', 'Unless you say otherwise, Nomi plans your routes with these.')}</p>
-      <div className="field">
-        <span className="field-label">{t('Yürüme', 'Walking')}</span>
-        <Segmented value={walking} onChange={setWalking}
-                   options={(Object.keys(WALKING_LABELS) as WalkingTolerance[]).map(w => ({ value: w, label: WALKING_LABELS[w] }))} />
-      </div>
-      <div className="field-row">
-        <div className="field">
-          <span className="field-label">{t('Genelde kaç kişi?', 'Usually how many people?')}</span>
-          <Stepper value={partySize} min={1} max={20} onChange={setPartySize} label={t('Kişi sayısı', 'Number of people')} />
-        </div>
-        <label className="field">
-          <span className="field-label">{t('Varsayılan bütçe', 'Default budget')}</span>
-          <span className="input">
-            <input type="number" inputMode="numeric" min={0} step={50} value={budget} placeholder={t('Yok', 'None')} onChange={e => setBudget(e.target.value)} />TL
-          </span>
-        </label>
-      </div>
-      <div className="field">
-        <span className="field-label">{t('İlgi alanları', 'Interests')}</span>
-        <div className="chips">
-          {Object.entries(INTEREST_LABELS).map(([key, label]) => (
-            <button type="button" key={key} className={`chip ${interests.includes(key) ? 'active' : ''}`}
-                    aria-pressed={interests.includes(key)} onClick={() => toggle(key)}>{label}</button>
-          ))}
-        </div>
-      </div>
-      {error && <Alert tone="danger"><span>{error}</span></Alert>}
-      <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={saving}>{saving ? <Spinner /> : t('Kaydet', 'Save')}</button>
-    </form>
-  )
-}
-
-// Suggestions for the app: reach the owner's admin area; the backend refuses messages with swear words
-function FeedbackForm({ onSent }: { onSent: () => void }) {
-  const t = useT()
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  async function submit(e: FormEvent) {
-    e.preventDefault()
-    setSending(true)
-    setError(null)
-    try {
-      await api.sendFeedback(message.trim())
-      setMessage('')
-      onSent()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('Gönderilemedi', 'Could not send'))
-    } finally {
-      setSending(false)
-    }
-  }
-
-  return (
-    <form className="stack" onSubmit={submit}>
-      <p className="t-caption">{t('Nomi’yi nasıl daha iyi yapabiliriz? Eksik bir mekan, bir hata ya da bir fikir yazabilirsin.', 'How can we make Nomi better? Tell us about a missing place, a bug or an idea.')}</p>
-      <textarea className="input" rows={5} maxLength={1000} value={message} onChange={e => setMessage(e.target.value)}
-                aria-label={t('Önerin', 'Your suggestion')} style={{ resize: 'vertical', padding: 12 }} />
-      {error && <Alert tone="danger">{error}</Alert>}
-      <button type="submit" className="btn btn-primary btn-block" disabled={sending || message.trim().length < 3}>
-        {sending ? <Spinner /> : t('Gönder', 'Send')}
-      </button>
-    </form>
   )
 }

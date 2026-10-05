@@ -13,19 +13,8 @@ import java.util.Optional;
 
 public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecificationExecutor<Place> {
 
-    // Loads places together with their opening hours in one query (avoids N+1)
-    @EntityGraph(attributePaths = "openingHours")
-    List<Place> findByIdIn(Collection<Long> ids);
-
-    @EntityGraph(attributePaths = "openingHours")
-    Optional<Place> findWithOpeningHoursById(Long id);
-
-    // ST_MakePoint takes (longitude, latitude). ST_DWithin uses the GiST index.
-    @Query(value = """
-            SELECT p.id AS id,
-                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
-            FROM places p
-            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+    // Places shown in the lists and on the map (findNearby, findInArea), by the category / tag the user picked
+    String LISTED = """
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
@@ -39,6 +28,39 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    OR CAST(:category AS text) = 'CAFE' AND 'cafe' = ANY (p.tags))
               -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
               AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
+            """;
+
+    // Places a route may suggest
+    String PLANNABLE = """
+              AND NOT p.hidden
+              -- Likely closed: no current Overture source knows this OSM food place
+              AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
+              -- Cafés on a campus, in a hospital or a factory site are not planned (osm/OsmContextImporter)
+              AND NOT p.inside_institution
+            """;
+
+    // Plannable places that can fill a stop: one of the categories, or tagged with the stop's matching tag
+    String FILLS_STOP = PLANNABLE + """
+              AND (p.category IN (:categories)
+                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            """;
+
+    // Loads places together with their opening hours in one query (avoids N+1)
+    @EntityGraph(attributePaths = "openingHours")
+    List<Place> findByIdIn(Collection<Long> ids);
+
+    @EntityGraph(attributePaths = "openingHours")
+    Optional<Place> findWithOpeningHoursById(Long id);
+
+    // ST_MakePoint takes (longitude, latitude). ST_DWithin uses the GiST index.
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+            """ + LISTED + """
             ORDER BY "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -57,15 +79,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
-              AND NOT p.hidden
-              -- Likely closed: no current Overture source knows this OSM food place
-              AND NOT p.unconfirmed
-              -- The owner marked it "may have closed": listed with a warning, never suggested
-              AND p.review IS NULL
-              -- Cafés on a campus, in a hospital or a factory site are not planned (osm/OsmContextImporter)
-              AND NOT p.inside_institution
-              AND (p.category IN (:categories)
-                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            """ + FILLS_STOP + """
             ORDER BY "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)
@@ -88,14 +102,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
-              AND NOT p.hidden
-              -- Likely closed: no current Overture source knows this OSM food place
-              AND NOT p.unconfirmed
-              -- The owner marked it "may have closed": listed with a warning, never suggested
-              AND p.review IS NULL
-              AND NOT p.inside_institution
-              AND (p.category IN (:categories)
-                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            """ + FILLS_STOP + """
               AND (p.tags && string_to_array(CAST(:interestTags AS text), ',') OR (:nearSea AND p.near_sea))
             ORDER BY "distanceMeters"
             LIMIT :limit
@@ -120,13 +127,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
-              AND NOT p.hidden
-              AND NOT p.unconfirmed
-              -- The owner marked it "may have closed": listed with a warning, never suggested
-              AND p.review IS NULL
-              AND NOT p.inside_institution
-              AND (p.category IN (:categories)
-                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            """ + FILLS_STOP + """
               AND lower(translate(p.name || ' ' || coalesce(p.cuisine, '') || ' ' || array_to_string(p.tags, ' '),
                                   'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc'))
                   LIKE ANY (string_to_array(CAST(:patterns AS text), ','))
@@ -147,12 +148,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
     @Query(value = """
             SELECT count(*) FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
-              AND NOT p.hidden
-              -- Likely closed: no current Overture source knows this OSM food place
-              AND NOT p.unconfirmed
-              -- The owner marked it "may have closed": listed with a warning, never suggested
-              AND p.review IS NULL
-              AND NOT p.inside_institution
+            """ + PLANNABLE + """
               AND p.category IN (:categories)
             """, nativeQuery = true)
     long countPlannable(
@@ -172,15 +168,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :maxRadius)
-              AND NOT p.hidden
-              -- Likely closed: no current Overture source knows this OSM food place
-              AND NOT p.unconfirmed
-              -- The owner marked it "may have closed": listed with a warning, never suggested
-              AND p.review IS NULL
               AND NOT ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :minRadius)
-              AND NOT p.inside_institution
-              AND (p.category IN (:categories)
-                   OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
+            """ + FILLS_STOP + """
             ORDER BY p.rating DESC NULLS LAST,
                      (p.tags && string_to_array(CAST(:interests AS text), ',')) DESC,
                      "distanceMeters"
@@ -206,19 +195,7 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
                    ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
             FROM places p
             WHERE p.location && CAST(ST_MakeEnvelope(:west, :south, :east, :north, 4326) AS geography)
-              AND NOT p.hidden
-              -- Likely closed: no current Overture source knows this OSM food place
-              AND NOT p.unconfirmed
-              -- "Tümü" leaves out markets and places of worship (they have their own filter); "İbadet" also lists
-              -- the famous mosques / churches that are sights (ATTRACTION tagged religious)
-              AND (CAST(:category AS text) IS NULL AND p.category NOT IN ('MARKET', 'WORSHIP')
-                   OR p.category = CAST(:category AS text)
-                   OR CAST(:category AS text) = 'WORSHIP' AND 'religious' = ANY (p.tags)
-                   -- A café serving breakfast is in both lists (osm/PlaceTags.breakfastAware)
-                   OR CAST(:category AS text) = 'BREAKFAST' AND 'breakfast' = ANY (p.tags)
-                   OR CAST(:category AS text) = 'CAFE' AND 'cafe' = ANY (p.tags))
-              -- A sub-kind by tag: İbadet > Cami ve mescit (mosque), Kilise (church), ...
-              AND (CAST(:tag AS text) IS NULL OR CAST(:tag AS text) = ANY (p.tags))
+            """ + LISTED + """
             ORDER BY CASE WHEN p.source IN ('OSM', 'OVERTURE') THEN 1 ELSE 0 END, "distanceMeters"
             LIMIT :limit
             """, nativeQuery = true)

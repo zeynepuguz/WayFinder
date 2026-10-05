@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.area;
 
 import com.nomi.wayfinder.dto.DistrictResponse;
+import com.nomi.wayfinder.i18n.Texts;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,7 +16,7 @@ import java.util.Optional;
 @Service
 public class DistrictService {
 
-    private static final Collator TURKISH = Collator.getInstance(Locale.forLanguageTag("tr-TR"));
+    private static final Collator TURKISH = Collator.getInstance(Texts.TURKISH);
 
     private final JdbcTemplate jdbc;
     private final CityService cityService;

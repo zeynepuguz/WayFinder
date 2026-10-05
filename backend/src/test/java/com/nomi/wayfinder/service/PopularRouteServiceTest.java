@@ -9,6 +9,7 @@ import com.nomi.wayfinder.dto.RouteDtos.RouteResponse;
 import com.nomi.wayfinder.entity.*;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.geo.GeoMath;
 import com.nomi.wayfinder.planning.PlaceScorer;
 import com.nomi.wayfinder.planning.PopularRouteBuilder;
 import com.nomi.wayfinder.planning.PopularRouteBuilder.Area;
@@ -91,7 +92,7 @@ class PopularRouteServiceTest {
                     String tag = inv.getArgument(4);
                     List<PlaceDistance> result = new ArrayList<>();
                     for (Place p : places.values()) {
-                        double d = PopularRouteBuilder.meters(lat, lon, p.getLatitude(), p.getLongitude());
+                        double d = GeoMath.meters(lat, lon, p.getLatitude(), p.getLongitude());
                         if (d <= radius && (categories.contains(p.getCategory().name()) || p.hasTag(tag))) {
                             result.add(distance(p.getId(), d));
                         }
@@ -107,7 +108,7 @@ class PopularRouteServiceTest {
                 .thenAnswer(inv -> Optional.ofNullable(places.get(inv.<Long>getArgument(0))));
         when(repository.distanceTo(anyLong(), anyDouble(), anyDouble())).thenAnswer(inv -> {
             Place p = places.get(inv.<Long>getArgument(0));
-            return PopularRouteBuilder.meters(inv.getArgument(1), inv.getArgument(2), p.getLatitude(), p.getLongitude());
+            return GeoMath.meters(inv.getArgument(1), inv.getArgument(2), p.getLatitude(), p.getLongitude());
         });
         WeatherService weather = mock(WeatherService.class);
         when(weather.getForecast(anyDouble(), anyDouble(), any())).thenReturn(Optional.empty());

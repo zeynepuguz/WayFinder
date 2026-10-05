@@ -3,11 +3,11 @@ import type {
   AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
   AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
-  Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
+  Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
 
 // Multipart body of a photo upload: the original file (EXIF intact) plus the device position when known
-export function photoForm(file: File, position?: DevicePosition | null): FormData {
+function photoForm(file: File, position?: DevicePosition | null): FormData {
   const form = new FormData()
   form.append('file', file)
   if (position) {
@@ -34,7 +34,6 @@ export const api = {
   deleteAccount: () => http.delete<void>('/users/me'),
 
   plans: () => http.get<PlansResponse>('/billing/plans'),
-  accessStatus: () => http.get<AccessStatus>('/billing/me'),
   verifyGooglePlay: (productId: string, purchaseToken: string) =>
     http.post<AccessStatus>('/billing/google-play/verify', { productId, purchaseToken }),
   devPurchase: (plan: AccessPlan) => http.post<AccessStatus>('/billing/dev/purchase', { plan }),
@@ -74,9 +73,6 @@ export const api = {
   markFeedbackRead: (id: number) => http.post<void>(`/admin/review/feedback/${id}/read`),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
-  // Close-by picks plus better fits that are farther away
-  tieredRecommendations: (lat: number, lon: number, type?: StopType) =>
-    http.get<TieredRecommendations>('/recommendations/tiered', { lat, lon, type }),
 
   routes: (saved = false) => http.get<RouteSummary[]>('/routes', { saved }),
   route: (id: number) => http.get<Route>(`/routes/${id}`),
@@ -107,10 +103,7 @@ export const api = {
   // Without conversationId the backend starts a new chat; the reply carries its id
   sendMessage: (message: string, latitude: number, longitude: number, conversationId?: number | null) =>
     http.post<AssistantReply>('/assistant/messages', { message, latitude, longitude, conversationId: conversationId ?? undefined }),
-  // Latest messages across all chats (older app versions)
-  messages: () => http.get<ChatMessage[]>('/assistant/messages', { limit: 50 }),
   conversations: () => http.get<ConversationSummary[]>('/assistant/conversations'),
-  createConversation: () => http.post<ConversationSummary>('/assistant/conversations'),
   conversationMessages: (id: number) => http.get<ChatMessage[]>(`/assistant/conversations/${id}/messages`),
   renameConversation: (id: number, title: string) => http.patch<ConversationSummary>(`/assistant/conversations/${id}`, { title }),
   deleteConversation: (id: number) => http.delete<void>(`/assistant/conversations/${id}`),

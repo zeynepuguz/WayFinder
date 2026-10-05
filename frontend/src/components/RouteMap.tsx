@@ -5,7 +5,7 @@ import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-
 import { useT } from '../lib/i18n'
 import { TILE_ATTRIBUTION, TILE_URL } from './mapTiles'
 
-export interface MapPoint {
+interface MapPoint {
   latitude: number
   longitude: number
   label: string
@@ -20,15 +20,23 @@ interface Props {
   hero?: boolean
 }
 
-// Pins are drawn with CSS, so no marker image files need to be bundled
-function pinIcon(label: string, muted?: boolean) {
-  return L.divIcon({
-    className: '',
-    html: `<div class="map-pin ${muted ? 'map-pin-muted' : ''}"><span>${label}</span></div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 30],
-    popupAnchor: [0, -28],
-  })
+// Pins are drawn with CSS, so no marker image files need to be bundled. Cached: a new icon object on every
+// render would make Leaflet replace each marker's element (labels are stop numbers, so the cache stays small)
+const iconCache = new Map<string, L.DivIcon>()
+function pinIcon(label: string, muted = false): L.DivIcon {
+  const key = `${label}-${muted}`
+  let icon = iconCache.get(key)
+  if (!icon) {
+    icon = L.divIcon({
+      className: '',
+      html: `<div class="map-pin ${muted ? 'map-pin-muted' : ''}"><span>${label}</span></div>`,
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+      popupAnchor: [0, -28],
+    })
+    iconCache.set(key, icon)
+  }
+  return icon
 }
 
 const startIcon = L.divIcon({ className: '', html: '<div class="map-start"></div>', iconSize: [18, 18], iconAnchor: [9, 9] })

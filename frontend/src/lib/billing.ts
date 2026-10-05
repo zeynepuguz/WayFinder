@@ -10,6 +10,7 @@
 import { Capacitor } from '@capacitor/core'
 import { api } from '../api'
 import type { AccessStatus, Plan } from '../api/types'
+import { errorMessage } from './format'
 import { tr } from './i18n'
 
 export function isNativeApp(): boolean {
@@ -170,11 +171,15 @@ export async function purchase(plan: Plan, userId: number, devMode: boolean): Pr
 
   return new Promise<AccessStatus>((resolve, reject) => {
     waiting.set(plan.productId, { resolve, reject })
+    const fail = (e: Error) => {
+      waiting.delete(plan.productId)
+      reject(e)
+    }
     offer.order({ applicationUsername: String(userId) }).then(error => {
-      if (error) {
-        waiting.delete(plan.productId)
-        reject(error.code === cdv.ErrorCode.PAYMENT_CANCELLED ? new PurchaseCancelled() : new Error(error.message))
-      }
+      if (error) fail(error.code === cdv.ErrorCode.PAYMENT_CANCELLED ? new PurchaseCancelled() : new Error(error.message))
+    }, (e: unknown) => {
+      // The plugin itself threw: settle here, or the purchase button would spin forever
+      fail(new Error(errorMessage(e, tr('Satın alma başlatılamadı', 'Couldn’t start the purchase'))))
     })
   })
 }
