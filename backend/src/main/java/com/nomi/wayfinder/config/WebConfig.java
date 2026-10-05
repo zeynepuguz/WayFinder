@@ -51,7 +51,9 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/v1/routes", "/api/v1/routes/*/replan", "/api/v1/routes/popular/start",
                         "/api/v1/assistant/**", "/api/v1/auth/**",
                         // Each call is a paid Google Places request
-                        "/api/v1/places/*/availability");
+                        "/api/v1/places/*/availability",
+                        // Users write these
+                        "/api/v1/places/*/reports", "/api/v1/feedback");
 
         // Paid features
         registry.addInterceptor(accessInterceptor)

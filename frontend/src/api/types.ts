@@ -76,6 +76,39 @@ export interface OpeningHours {
   closesAt: string
 }
 
+// The owner's admin area (/admin/review/**)
+export type ReviewAction = 'REMOVE' | 'SUSPECT' | 'CLEAR'
+export type ReportReason = 'CLOSED' | 'WRONG_LOCATION'
+
+export interface ReviewedPlace {
+  id: number
+  name: string
+  category: PlaceCategory
+  district: string | null
+  city: string | null
+  review: 'REMOVED' | 'SUSPECT' | null
+  reviewedAt: string | null
+  // Open reports (the reports list); 0 elsewhere
+  reports: number
+  lastReason: ReportReason | null
+  lastReportAt: string | null
+}
+
+export interface AppFeedback {
+  id: number
+  message: string
+  userEmail: string | null
+  createdAt: string
+  read: boolean
+}
+
+export interface ReviewCounts {
+  openReports: number
+  suspects: number
+  removed: number
+  unreadFeedback: number
+}
+
 // GET /places/{id}/availability: Google Places says whether the place is still there (when the backend has a key)
 export interface PlaceAvailability {
   status: 'OPEN' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'NOT_FOUND' | 'UNCHECKED'
@@ -117,6 +150,8 @@ export interface Place {
   // one free-licensed photo when available (most cafes and restaurants have none)
   image: PlaceImage | null
   distanceMeters?: number
+  // The owner marked it "may have closed": shown with a warning, never suggested
+  suspect?: boolean
 }
 
 // Wikimedia Commons photo; url is an 800px thumbnail hot-linked from upload.wikimedia.org

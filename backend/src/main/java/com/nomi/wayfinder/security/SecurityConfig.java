@@ -60,6 +60,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/media/photos/**").permitAll()
                         // Any logged-in user may add photos of a place (checked before they are published)
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/*/photos").authenticated()
+                        // ... and report a place they think has closed (admin/PlaceReviewService)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/places/*/reports").authenticated()
                         // Place data comes from admins / data pipeline, not from users
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/places/**").hasRole("ADMIN")

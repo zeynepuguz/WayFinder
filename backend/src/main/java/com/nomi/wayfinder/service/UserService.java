@@ -27,6 +27,8 @@ public class UserService {
     private final JwtService jwtService;
     private final BillingService billingService;
     private final PhotoService photoService;
+    // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they register or sign in
+    private final java.util.Set<String> ownerEmails;
 
     public UserService(
             UserRepository userRepository,
@@ -34,8 +36,12 @@ public class UserService {
             PasswordEncoder passwordEncoder,
             JwtService jwtService,
             BillingService billingService,
-            PhotoService photoService
+            PhotoService photoService,
+            @org.springframework.beans.factory.annotation.Value("${nomi.security.owner-emails:}") String ownerEmails
     ) {
+        this.ownerEmails = java.util.Arrays.stream(ownerEmails.split(","))
+                .map(e -> e.trim().toLowerCase(Locale.ROOT)).filter(e -> !e.isEmpty())
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
         this.userRepository = userRepository;
         this.preferencesRepository = preferencesRepository;
         this.passwordEncoder = passwordEncoder;
@@ -47,7 +53,7 @@ public class UserService {
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         User user = createUser(request.email(), request.password(), request.displayName(), UserRole.USER);
-        return toAuthResponse(user);
+        return toAuthResponse(promoteOwner(user));
     }
 
     @Transactional
@@ -69,14 +75,23 @@ public class UserService {
         return saved;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         // Same message for unknown email and wrong password, so emails cannot be probed
         User user = userRepository.findByEmailIgnoreCase(request.email().trim())
                 .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
                 .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
-        return toAuthResponse(user);
+        return toAuthResponse(promoteOwner(user));
+    }
+
+    // An owner account becomes ADMIN (admin area, place reviews); the role is in the token from this sign-in on
+    User promoteOwner(User user) {
+        if (user.getRole() != UserRole.ADMIN && ownerEmails.contains(user.getEmail().toLowerCase(Locale.ROOT))) {
+            user.setRole(UserRole.ADMIN);
+            return userRepository.save(user);
+        }
+        return user;
     }
 
     @Transactional(readOnly = true)

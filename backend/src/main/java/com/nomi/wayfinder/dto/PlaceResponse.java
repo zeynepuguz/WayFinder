@@ -229,4 +229,15 @@ public class PlaceResponse {
     public void setImage(PlaceImage image) {
         this.image = image;
     }
+
+    // The owner marked it "may have closed": shown with a warning, never suggested
+    private boolean suspect;
+
+    public boolean isSuspect() {
+        return suspect;
+    }
+
+    public void setSuspect(boolean suspect) {
+        this.suspect = suspect;
+    }
 }

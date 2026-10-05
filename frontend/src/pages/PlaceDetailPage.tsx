@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
 import { OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
+import { PlaceReportAndReview } from '../components/PlaceReview'
 import { RouteMap } from '../components/RouteMap'
 import { Alert, BackButton, ErrorState, Skeleton } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
@@ -48,7 +49,8 @@ export function PlaceDetailPage() {
   const mapsUrl = availability?.mapsUrl
     ?? `https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}/@${place.latitude},${place.longitude},17z`
   const closed = availability?.status === 'CLOSED_PERMANENTLY'
-  const notFound = availability?.status === 'NOT_FOUND'
+  // No match on Google, or the owner marked it "may have closed"
+  const notFound = availability?.status === 'NOT_FOUND' || Boolean(place.suspect)
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
@@ -160,11 +162,15 @@ export function PlaceDetailPage() {
             )
             : t('Fiyat ve saat bilgileri henüz doğrulanmadı; gitmeden önce kontrol etmeni öneririz.', 'Prices and hours are not verified yet; we suggest checking before you go.')}
         </p>
+
+        <PlaceReportAndReview place={place} onChanged={reload} />
       </div>
 
       <div className="sticky-cta" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
         {closed && <Alert tone="danger">{t('Google Haritalar’a göre bu yer kalıcı olarak kapanmış. Artık Nomi’de önerilmeyecek.', 'According to Google Maps this place has closed for good. Nomi will not suggest it any more.')}</Alert>}
-        {notFound && <Alert tone="warning">{t('Bu yer ile eşleşen bir konum bulunamadı. Kapanmış olabilir.', 'No matching place was found here. It may have closed.')}</Alert>}
+        {notFound && <Alert tone="warning">{place.suspect
+          ? t('Bu yer kapanmış olabilir.', 'This place may have closed.')
+          : t('Bu yer ile eşleşen bir konum bulunamadı. Kapanmış olabilir.', 'No matching place was found here. It may have closed.')}</Alert>}
         {availability?.status === 'CLOSED_TEMPORARILY' && <Alert tone="warning">{t('Google Haritalar’a göre bu yer geçici olarak kapalı.', 'According to Google Maps this place is temporarily closed.')}</Alert>}
         {!closed && (
           <a className={`btn ${notFound ? 'btn-secondary' : 'btn-primary'} btn-lg grow`} href={mapsUrl} target="_blank" rel="noreferrer">

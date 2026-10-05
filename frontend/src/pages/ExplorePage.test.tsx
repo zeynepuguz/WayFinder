@@ -1,10 +1,10 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import type { City, District, Page, Place, PopularRoute } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { place } from '../test/fixtures'
-import { ExplorePage } from './ExplorePage'
+import { ExplorePage, resetExploreListCache } from './ExplorePage'
 
 const district = (slug: string, name: string, placeCount: number): District => ({
   slug, name, placeCount, latitude: 41, longitude: 29, south: 40.9, west: 28.9, north: 41.1, east: 29.1,
@@ -68,6 +68,7 @@ function renderPage(url = '/explore') {
 }
 
 beforeEach(() => {
+  resetExploreListCache()
   resetDistrictCache()
   districts.mockReset().mockImplementation((slug: string) => Promise.resolve(slug === 'ankara' ? ANKARA_DISTRICTS : DISTRICTS))
   popularRoutes.mockReset().mockResolvedValue([])
@@ -291,5 +292,26 @@ describe('ExplorePage market kinds', () => {
     await waitFor(() => expect(searchPlaces).toHaveBeenLastCalledWith(
       expect.objectContaining({ category: 'MARKET', tag: 'bim', district: 'uskudar' })))
     expect(search).toContain('tur=bim')
+  })
+})
+
+describe('ExplorePage back navigation', () => {
+  it('keeps the loaded list and the scroll position after opening a place', async () => {
+    renderPage('/explore?category=CAFE&sehir=istanbul&ilce=kadikoy')
+    expect(await screen.findByText('Moda Kahve')).toBeInTheDocument()
+    const calls = searchPlaces.mock.calls.length
+    window.scrollY = 1200
+    const scrollTo = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+
+    // Leave for a place and come back to the same list
+    cleanup()
+    renderPage('/explore?category=CAFE&sehir=istanbul&ilce=kadikoy')
+
+    expect(screen.getByText('Moda Kahve')).toBeInTheDocument()
+    expect(scrollTo).toHaveBeenCalledWith(0, 1200)
+    // Nothing is loaded again from the first page
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(searchPlaces.mock.calls.length).toBe(calls)
+    scrollTo.mockRestore()
   })
 })

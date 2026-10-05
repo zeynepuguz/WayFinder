@@ -19,6 +19,7 @@ import { hasOnboarded, OnboardingPage } from './pages/OnboardingPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { PremiumPage } from './pages/PremiumPage'
 import { ProfilePage } from './pages/ProfilePage'
+import { AdminPage } from './pages/AdminPage'
 import { RouteDetailPage } from './pages/RouteDetailPage'
 import { RoutesPage } from './pages/RoutesPage'
 import { SavedPage } from './pages/SavedPage'
@@ -78,6 +79,7 @@ function AppRoutes() {
           <Route path="premium" element={<PremiumPage />} />
           <Route path="places/:id" element={<PlaceDetailPage />} />
           <Route path="profile" element={<ProfilePage />} />
+          <Route path="admin" element={<AdminPage />} />
         </Route>
         <Route element={<AppLayout />}>
           <Route index element={<HomeEntry />} />

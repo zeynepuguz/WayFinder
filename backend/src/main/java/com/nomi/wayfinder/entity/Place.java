@@ -129,6 +129,10 @@ public class Place {
     @Column(insertable = false, updatable = false)
     private boolean unconfirmed;
 
+    // The owner's review (admin/PlaceReviewService): REMOVED (also hidden) or SUSPECT (may have closed); null = none
+    @Column(insertable = false, updatable = false)
+    private String review;
+
     // Real-world interest from Wikipedia (popularity/PlacePopularityService); null = unknown
     @Column(insertable = false, updatable = false)
     private Double popularity;
@@ -256,6 +260,14 @@ public class Place {
 
     public boolean isUnconfirmed() {
         return unconfirmed;
+    }
+
+    public String getReview() {
+        return review;
+    }
+
+    public boolean isSuspect() {
+        return "SUSPECT".equals(review);
     }
 
     // The name in the request's language: OSM name:en for English requests when there is one

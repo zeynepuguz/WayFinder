@@ -89,7 +89,7 @@ public class OverturePlaceImporter {
             ON CONFLICT (overture_id) DO UPDATE SET
                 name = EXCLUDED.name, location = EXCLUDED.location, category = EXCLUDED.category,
                 indoor = EXCLUDED.indoor, tags = EXCLUDED.tags, overture_confidence = EXCLUDED.overture_confidence,
-                phone = EXCLUDED.phone, website = EXCLUDED.website, hidden = FALSE, unconfirmed = FALSE,
+                phone = EXCLUDED.phone, website = EXCLUDED.website, hidden = (places.review IS NOT DISTINCT FROM 'REMOVED'), unconfirmed = FALSE,
                 updated_at = now()
             WHERE places.source = 'OVERTURE'
             """;

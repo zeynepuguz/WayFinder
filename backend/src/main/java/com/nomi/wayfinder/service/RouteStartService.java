@@ -34,7 +34,7 @@ public class RouteStartService {
     private static final String BEST_SIGHT = """
             SELECT p.name, ST_Y(p.location::geometry) AS lat, ST_X(p.location::geometry) AS lon
             FROM places p
-            WHERE %s = ? AND NOT p.hidden AND NOT p.inside_institution AND NOT p.unconfirmed
+            WHERE %s = ? AND NOT p.hidden AND NOT p.inside_institution AND NOT p.unconfirmed AND p.review IS NULL
               AND p.category IN ('ATTRACTION', 'MUSEUM', 'PARK', 'CULTURE')
               AND p.popularity > 0
               AND (SELECT count(*) FROM places q

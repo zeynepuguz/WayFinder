@@ -94,3 +94,16 @@ describe('PlaceDetailPage Overture place', () => {
     expect(screen.queryByRole('link', { name: /Web sitesi/ })).not.toBeInTheDocument()
   })
 })
+
+describe('PlaceDetailPage owner review', () => {
+  it('warns about a place the owner marked as suspect and offers a search anyway', async () => {
+    availability = null
+    current = place(11, 'Seyir Cafe', { city: 'Amasya', latitude: 40.647, longitude: 35.82, suspect: true })
+    renderPage()
+    expect(await screen.findByText('Bu yer kapanmış olabilir.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Haritada yine de ara/ })).toBeInTheDocument()
+    // Every user can report it; the owner's controls are not shown to others
+    expect(screen.getByRole('button', { name: /Bu mekanı bildir/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mekanı kaldır/ })).not.toBeInTheDocument()
+  })
+})

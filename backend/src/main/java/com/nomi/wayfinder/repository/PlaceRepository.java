@@ -60,6 +60,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
               -- Cafés on a campus, in a hospital or a factory site are not planned (osm/OsmContextImporter)
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
@@ -89,6 +91,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
                    OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
@@ -118,6 +122,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
               AND NOT p.hidden
               AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
               AND NOT p.inside_institution
               AND (p.category IN (:categories)
                    OR (CAST(:tag AS text) IS NOT NULL AND CAST(:tag AS text) = ANY (p.tags)))
@@ -144,6 +150,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
               AND NOT p.inside_institution
               AND p.category IN (:categories)
             """, nativeQuery = true)
@@ -167,6 +175,8 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
               AND NOT p.hidden
               -- Likely closed: no current Overture source knows this OSM food place
               AND NOT p.unconfirmed
+              -- The owner marked it "may have closed": listed with a warning, never suggested
+              AND p.review IS NULL
               AND NOT ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :minRadius)
               AND NOT p.inside_institution
               AND (p.category IN (:categories)

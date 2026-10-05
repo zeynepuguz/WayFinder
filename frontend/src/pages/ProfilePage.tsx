@@ -1,5 +1,6 @@
 import {
-  ChevronRight, CircleHelp, Crown, FileText, Languages, LogIn, LogOut, RotateCcw, ShieldCheck, SlidersHorizontal, Trash2,
+  ChevronRight, CircleHelp, Crown, FileText, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
+  SlidersHorizontal, Trash2,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -22,6 +23,7 @@ export function ProfilePage() {
   const [prefsOpen, setPrefsOpen] = useState(false)
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   if (!user) {
     return (
@@ -36,6 +38,11 @@ export function ProfilePage() {
         </div>
         <div className="list-group">
           <LanguageRow />
+        <button className="list-item" onClick={() => setFeedbackOpen(true)}>
+          <span className="list-item-icon"><MessageSquare size={18} /></span>
+          <span className="grow">{t('Uygulama için önerin var mı?', 'Any suggestions for the app?')}</span>
+          <ChevronRight size={18} className="muted" />
+        </button>
         </div>
         <LegalLinks />
       </main>
@@ -94,6 +101,13 @@ export function ProfilePage() {
       )}
 
       <div className="list-group">
+        {user.role === 'ADMIN' && (
+          <Link className="list-item" to="/admin">
+            <span className="list-item-icon"><ShieldCheck size={18} /></span>
+            <span className="grow">{t('Yönetim', 'Admin')}</span>
+            <ChevronRight size={18} className="muted" />
+          </Link>
+        )}
         <button className="list-item" onClick={() => setPrefsOpen(true)}>
           <span className="list-item-icon"><SlidersHorizontal size={18} /></span>
           <span className="grow">{t('Tercihlerim', 'My preferences')}</span>
@@ -129,6 +143,10 @@ export function ProfilePage() {
           <span className="grow">{t('Hesabımı sil', 'Delete my account')}</span>
         </button>
       </div>
+
+      <Sheet open={feedbackOpen} onClose={() => setFeedbackOpen(false)} label={t('Uygulama için önerin var mı?', 'Any suggestions for the app?')}>
+        <FeedbackForm onSent={() => { setFeedbackOpen(false); toast(t('Önerin için teşekkürler!', 'Thanks for your suggestion!')) }} />
+      </Sheet>
 
       <Sheet open={prefsOpen} onClose={() => setPrefsOpen(false)} label={t('Tercihlerim', 'My preferences')}>
         <PreferencesForm onSaved={() => { setPrefsOpen(false); toast(t('Tercihlerin kaydedildi', 'Preferences saved')) }} />
@@ -243,6 +261,41 @@ function PreferencesForm({ onSaved }: { onSaved: () => void }) {
       </div>
       {error && <Alert tone="danger"><span>{error}</span></Alert>}
       <button type="submit" className="btn btn-primary btn-lg btn-block" disabled={saving}>{saving ? <Spinner /> : t('Kaydet', 'Save')}</button>
+    </form>
+  )
+}
+
+// Suggestions for the app: reach the owner's admin area; the backend refuses messages with swear words
+function FeedbackForm({ onSent }: { onSent: () => void }) {
+  const t = useT()
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setSending(true)
+    setError(null)
+    try {
+      await api.sendFeedback(message.trim())
+      setMessage('')
+      onSent()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('Gönderilemedi', 'Could not send'))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <form className="stack" onSubmit={submit}>
+      <p className="t-caption">{t('Nomi’yi nasıl daha iyi yapabiliriz? Eksik bir mekan, bir hata ya da bir fikir yazabilirsin.', 'How can we make Nomi better? Tell us about a missing place, a bug or an idea.')}</p>
+      <textarea className="input" rows={5} maxLength={1000} value={message} onChange={e => setMessage(e.target.value)}
+                aria-label={t('Önerin', 'Your suggestion')} style={{ resize: 'vertical', padding: 12 }} />
+      {error && <Alert tone="danger">{error}</Alert>}
+      <button type="submit" className="btn btn-primary btn-block" disabled={sending || message.trim().length < 3}>
+        {sending ? <Spinner /> : t('Gönder', 'Send')}
+      </button>
     </form>
   )
 }

@@ -1,6 +1,6 @@
 import { ChevronDown, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Square, SquareCheck, Umbrella } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import type { City, District, Place, PlaceCategory } from '../api/types'
 import { HScroll } from '../components/HScroll'
@@ -26,6 +26,24 @@ const priceOptions = (t: (turkish: string, english: string) => string) => [
   { value: '400', label: '≤ 400 TL' },
   { value: '700', label: '≤ 700 TL' },
 ]
+
+// The lists the user left, by URL (kept for this browser session only)
+interface ListSnapshot {
+  mode: Mode
+  query: string
+  indoorOnly: boolean
+  maxCost: string
+  places: Place[]
+  page: number
+  hasMore: boolean
+  scrollY: number
+}
+const listCache = new Map<string, ListSnapshot>()
+
+// Tests start without remembered lists
+export function resetExploreListCache() {
+  listCache.clear()
+}
 
 export function ExplorePage() {
   const location = useUserLocation()
@@ -63,16 +81,36 @@ export function ExplorePage() {
   const districtSlug = districtParam && (!districts.data || district) ? districtParam : null
   const [districtOpen, setDistrictOpen] = useState(false)
 
-  const [mode, setMode] = useState<Mode>(slugCategory || districtParam || params.get('sehir') ? 'all' : 'nearby')
-  const [query, setQuery] = useState('')
-  const [indoorOnly, setIndoorOnly] = useState(false)
-  const [maxCost, setMaxCost] = useState('')
+  // Back from a place: the list as it was (loaded pages, tab, filters) and the same scroll position
+  const routerLocation = useLocation()
+  const cacheKey = routerLocation.pathname + routerLocation.search
+  const [restored] = useState(() => listCache.get(cacheKey) ?? null)
+  const skipLoad = useRef(restored !== null)
+
+  const [mode, setMode] = useState<Mode>(restored?.mode
+    ?? (slugCategory || districtParam || params.get('sehir') ? 'all' : 'nearby'))
+  const [query, setQuery] = useState(restored?.query ?? '')
+  const [indoorOnly, setIndoorOnly] = useState(restored?.indoorOnly ?? false)
+  const [maxCost, setMaxCost] = useState(restored?.maxCost ?? '')
   const [filtersOpen, setFiltersOpen] = useState(false)
 
-  const [places, setPlaces] = useState<Place[]>([])
-  const [page, setPage] = useState(0)
-  const [hasMore, setHasMore] = useState(false)
-  const [loading, setLoading] = useState(true)
+  const [places, setPlaces] = useState<Place[]>(restored?.places ?? [])
+  const [page, setPage] = useState(restored?.page ?? 0)
+  const [hasMore, setHasMore] = useState(restored?.hasMore ?? false)
+  const [loading, setLoading] = useState(restored === null)
+
+  // Remember the list when leaving (to a place, another tab); restore the scroll position once on return
+  const snapshot = useRef<ListSnapshot | null>(null)
+  snapshot.current = { mode, query, indoorOnly, maxCost, places, page, hasMore, scrollY: 0 }
+  const keyRef = useRef(cacheKey)
+  keyRef.current = cacheKey
+  useLayoutEffect(() => {
+    if (restored) window.scrollTo(0, restored.scrollY)
+    return () => {
+      if (snapshot.current) listCache.set(keyRef.current, { ...snapshot.current, scrollY: window.scrollY })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [error, setError] = useState<string | null>(null)
 
   // A district chosen (or restored from the URL) shows that district's list
@@ -125,6 +163,11 @@ export function ExplorePage() {
     if (view === 'map' || popular) return
     // The city list waits until the city is known (saved choice or detection)
     if (mode === 'all' && !citySlug) return
+    // Restored from the cache: the first run keeps it
+    if (skipLoad.current) {
+      skipLoad.current = false
+      return
+    }
     const timer = setTimeout(() => void load(0), query ? 300 : 0)
     return () => clearTimeout(timer)
     // Reload from the first page whenever a filter changes (search is debounced)

@@ -92,6 +92,7 @@ public class PlaceMapper {
         response.setWebsite(place.getWebsite());
         response.setLastVerifiedAt(place.getLastVerifiedAt());
         response.setImage(PlaceImage.of(place));
+        response.setSuspect(place.isSuspect());
 
         return response;
     }

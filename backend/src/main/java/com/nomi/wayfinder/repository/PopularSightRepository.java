@@ -17,7 +17,7 @@ public class PopularSightRepository {
     private static final String SEEDS = """
             SELECT p.id, p.popularity, p.source NOT IN ('OSM', 'OVERTURE') AS verified, p.rating, p.image_url IS NOT NULL AS has_image
             FROM places p
-            WHERE NOT p.hidden AND NOT p.inside_institution AND p.city_id = ?
+            WHERE NOT p.hidden AND NOT p.inside_institution AND p.review IS NULL AND p.city_id = ?
               AND (CAST(? AS bigint) IS NULL OR p.district_id = ?)
               AND p.category IN ('ATTRACTION', 'MUSEUM', 'PARK', 'CULTURE')
               AND (p.popularity > 0 OR p.source NOT IN ('OSM', 'OVERTURE') OR p.rating IS NOT NULL OR p.image_url IS NOT NULL)

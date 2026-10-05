@@ -1,7 +1,7 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, PlaceCategory,
+  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, TieredRecommendations, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
@@ -61,6 +61,17 @@ export const api = {
   districts: (city: string) => http.get<District[]>('/districts', { city }),
   place: (id: number) => http.get<Place>(`/places/${id}`),
   placeAvailability: (id: number) => http.get<PlaceAvailability>(`/places/${id}/availability`),
+  reportPlace: (id: number, reason: ReportReason) => http.post<void>(`/places/${id}/reports`, { reason }),
+  sendFeedback: (message: string) => http.post<void>('/feedback', { message }),
+  // The owner's admin area
+  reviewCounts: () => http.get<ReviewCounts>('/admin/review/counts'),
+  reviewPlace: (id: number, action: ReviewAction) => http.post<void>(`/admin/review/places/${id}`, { action }),
+  removedPlaces: (city?: string) => http.get<ReviewedPlace[]>(`/admin/review/removed${city ? `?city=${encodeURIComponent(city)}` : ''}`),
+  suspectPlaces: (city?: string) => http.get<ReviewedPlace[]>(`/admin/review/suspects${city ? `?city=${encodeURIComponent(city)}` : ''}`),
+  placeReports: () => http.get<ReviewedPlace[]>('/admin/review/reports'),
+  dismissReports: (placeId: number) => http.post<void>(`/admin/review/reports/${placeId}/dismiss`),
+  feedbackList: () => http.get<AppFeedback[]>('/admin/review/feedback'),
+  markFeedbackRead: (id: number) => http.post<void>(`/admin/review/feedback/${id}/read`),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
   // Close-by picks plus better fits that are farther away
