@@ -16,6 +16,8 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     Optional<Route> findByIdAndUserId(Long id, Long userId);
 
+    Optional<Route> findByShareToken(String shareToken);
+
     List<Route> findByUserIdOrderByCreatedAtDesc(Long userId);
 
     List<Route> findByUserIdAndSavedTrueOrderByCreatedAtDesc(Long userId);

@@ -45,17 +45,21 @@ Planı **LLM değil deterministik planlayıcı** üretir. Mekan, fiyat, mesafe, 
 | GET | `/weather?lat=&lon=&date=` | – | Saatlik tahmin + plan tavsiyesi |
 | GET | `/recommendations?lat=&lon=&type=&limit=` | opsiyonel | Şu an için öneri |
 | GET | `/home?lat=&lon=` | opsiyonel | Ana sayfa: hava, öneriler, aktif rota |
-| POST | `/routes` | ✔ | Günlük rota oluştur |
+| POST | `/routes` | ✔ | Günlük rota oluştur (`theme`: `RAINY`, `LOW_BUDGET`, `FAMILY` isteğe bağlı) |
 | GET | `/routes?saved=` | ✔ | Gezi Rotalarım / Kaydedilenler |
-| GET / PATCH / DELETE | `/routes/{id}` | ✔ | Detay, kaydet, durum, başlık |
+| GET / PATCH / DELETE | `/routes/{id}` | ✔ | Detay (grup üyeleri de görür); kaydet, durum, başlık, silme sadece sahibi |
 | PATCH | `/routes/{id}/stops/{stopId}` | ✔ | Durak: `VISITED` / `SKIPPED` |
-| POST | `/routes/{id}/replan` | ✔ | `TIRED`, `WEATHER_CHANGED`, `REMOVE_STOP`, `REPLACE_STOP`, `ADD_STOP`, `ADD_INTEREST`, `LESS_WALKING` |
+| POST | `/routes/{id}/replan` | ✔ | `TIRED`, `WEATHER_CHANGED`, `REMOVE_STOP`, `REPLACE_STOP`, `ADD_STOP`, `ADD_INTEREST`, `LESS_WALKING`, `RUNNING_LATE` (bugünün rotası: aynı mekanlar şimdiden itibaren) |
 | GET / PUT / DELETE | `/saved/places`, `/saved/places/{placeId}` | ✔ | Kaydedilen mekanlar |
 | POST | `/assistant/messages` | ✔ | `{message, latitude, longitude, routeId?}` |
 | GET | `/assistant/messages?limit=` | ✔ | Sohbet geçmişi |
 | GET | `/places/{id}/availability` | – | Google Places'a göre hâlâ açık mı (anahtar varsa) |
 | POST | `/places/{id}/reports`, `/feedback` | ✔ | "Kapanmış" bildirimi, uygulama önerisi |
 | GET / POST | `/admin/review/**` | ADMIN | Kaldır / şüpheli, silinen mekanlar, bildirimler, öneriler |
+| POST / DELETE | `/routes/{id}/share` | ✔ | Grup planı: davet kodu oluştur / kapat (sahibi) |
+| POST | `/shared-routes/{code}/join` | giriş | Davet koduyla gruba katıl (Premium gerekmez) |
+| POST | `/shared-routes/{id}/votes` | giriş | `{placeId, vote: 1 | -1 | 0}` durak oyu (Premium gerekmez) |
+| DELETE | `/shared-routes/{id}/membership` | giriş | Gruptan ayrıl |
 | GET | `/routes/popular?city=&district=&date=` | – | Popüler rotalar |
 | GET | `/cities`, `/districts?city=` | – | 81 il ve ilçeleri |
 

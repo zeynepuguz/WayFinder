@@ -8,11 +8,21 @@ import com.nomi.wayfinder.entity.RouteStop;
 import com.nomi.wayfinder.entity.StopStatus;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Component
 public class RouteMapper {
 
     public RouteResponse toResponse(Route route) {
-        var stops = route.getStops().stream().map(this::toStopResponse).toList();
+        return toResponse(route, null, Map.of());
+    }
+
+    // A group plan: votes by place id (places nobody voted on are missing)
+    public RouteResponse toResponse(Route route, GroupInfo group, Map<Long, StopVotes> votes) {
+        StopVotes none = group == null ? null : new StopVotes(0, 0, 0);
+        var stops = route.getStops().stream()
+                .map(s -> toStopResponse(s, votes.getOrDefault(s.getPlace().getId(), none)))
+                .toList();
 
         return new RouteResponse(
                 route.getId(),
@@ -36,11 +46,16 @@ public class RouteMapper {
                 route.getNotes(),
                 stops,
                 route.getCreatedAt(),
-                route.getUpdatedAt()
+                route.getUpdatedAt(),
+                group
         );
     }
 
     public RouteSummary toSummary(Route route) {
+        return toSummary(route, false);
+    }
+
+    public RouteSummary toSummary(Route route, boolean sharedWithMe) {
         return new RouteSummary(
                 route.getId(),
                 route.getTitle(),
@@ -50,7 +65,8 @@ public class RouteMapper {
                 route.getStops().size(),
                 totalCost(route),
                 route.getCreatedAt(),
-                costKnown(route)
+                costKnown(route),
+                sharedWithMe
         );
     }
 
@@ -69,7 +85,7 @@ public class RouteMapper {
                 .sum();
     }
 
-    private StopResponse toStopResponse(RouteStop stop) {
+    private StopResponse toStopResponse(RouteStop stop, StopVotes votes) {
         Place place = stop.getPlace();
 
         return new StopResponse(
@@ -95,7 +111,8 @@ public class RouteMapper {
                         place.getRating(),
                         place.isIndoor(),
                         PlaceImage.of(place)
-                )
+                ),
+                votes
         );
     }
 }

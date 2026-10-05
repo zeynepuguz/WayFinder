@@ -1,17 +1,21 @@
 import {
   BatteryLow, Check, MapPin, Sparkles, ChevronDown, CloudRain, Footprints, Heart, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
-  Clock, Ellipsis, History, SkipForward, X,
+  Clock, Ellipsis, History, SkipForward, ThumbsDown, ThumbsUp, X,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import type { ReplanRequest, Route, RouteStop, StopStatus, StopType } from '../api/types'
 import { useGate } from '../components/gate'
+import { RouteGroup } from '../components/RouteGroup'
 import { RouteMap } from '../components/RouteMap'
+import { TripBar } from '../components/TripBar'
 import { Alert, BackButton, ConfirmSheet, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { errorMessage, formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeTotalCost, STOP_TYPE_LABELS, TAG_LABELS } from '../lib/format'
+import { errorMessage, formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeTotalCost, STOP_TYPE_LABELS, TAG_LABELS, todayIso } from '../lib/format'
+import { isGroupRoute } from '../lib/group'
+import { cancelReminders } from '../lib/trip'
 import { locale, useT, type Translate } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -50,6 +54,16 @@ export function RouteDetailPage() {
   const [swapStop, setSwapStop] = useState<RouteStop | null>(null)
   const [wish, setWish] = useState('')
 
+  // A group plan changes while friends vote or edit it: fetch it again every half minute
+  const shared = route ? isGroupRoute(route) : false
+  useEffect(() => {
+    if (!shared || busy) return
+    const timer = window.setInterval(() => {
+      api.route(routeId).then(setRoute).catch(() => undefined)
+    }, 30_000)
+    return () => window.clearInterval(timer)
+  }, [shared, busy, routeId, setRoute])
+
   async function act(action: () => Promise<Route | { route: Route; changes: string[] }>, gated = true) {
     if (gated && !gate()) return
     setBusy(true)
@@ -73,12 +87,16 @@ export function RouteDetailPage() {
   const replan = (change: Change) =>
     act(() => api.replan(routeId, { ...change, latitude: location.latitude, longitude: location.longitude }))
   const setStopStatus = (stop: RouteStop, status: StopStatus) => act(() => api.updateStop(routeId, stop.id, status))
+  // Voting needs no pass: a friend without Premium still has a say
+  const vote = (stop: RouteStop, value: -1 | 1) =>
+    act(() => api.voteStop(routeId, stop.place.id, stop.votes?.mine === value ? 0 : value), false)
 
   async function remove() {
     setDeleting(true)
     setDeleteError(null)
     try {
       await api.deleteRoute(routeId)
+      void cancelReminders(routeId).catch(() => undefined)
       toast(t('Rota silindi', 'Route deleted'))
       navigate('/routes', { replace: true })
     } catch (e) {
@@ -106,6 +124,8 @@ export function RouteDetailPage() {
   const WeatherIcon = WEATHER_ICON[route.weather.condition ?? ''] ?? CloudRain
   const nextStop = route.stops.find(s => s.status === 'PLANNED')
   const interests = route.interests?.length ? route.interests : requested ?? []
+  // Only the owner saves, renames or deletes; group members see and change the plan
+  const owner = route.group?.owner ?? true
 
   return (
     <main className="screen screen-flush" style={{ paddingTop: 0 }}>
@@ -121,11 +141,11 @@ export function RouteDetailPage() {
         />
         <div className="place-hero-bar" style={{ top: 'calc(var(--safe-top) + 12px)', zIndex: 500 }}>
           <BackButton to="/routes" glass />
-          <button className="icon-btn icon-btn-glass" disabled={busy} aria-pressed={route.saved}
+          {owner && <button className="icon-btn icon-btn-glass" disabled={busy} aria-pressed={route.saved}
                   aria-label={route.saved ? t('Kaydedilenlerden çıkar', 'Remove from saved') : t('Rotayı kaydet', 'Save route')}
                   onClick={() => act(() => api.updateRoute(routeId, { saved: !route.saved }))}>
             <Heart size={20} fill={route.saved ? '#ff5a36' : 'none'} color={route.saved ? '#ff5a36' : 'currentColor'} />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -172,6 +192,11 @@ export function RouteDetailPage() {
         )}
         {route.notes.map(note => <Alert key={note} tone="warning" icon={TriangleAlert}><span>{note}</span></Alert>)}
 
+        {/* Also when just completed: its reminders are cancelled */}
+        {!past && route.date === todayIso() && (
+          <TripBar route={route} busy={busy} onShift={() => void replan({ type: 'RUNNING_LATE' })} />
+        )}
+
         {!finished && (
           <section className="section">
             <div className="row-between">
@@ -201,15 +226,20 @@ export function RouteDetailPage() {
             {route.stops.map((stop, index) => (
               <StopItem key={stop.id} stop={stop} index={index} isNext={stop.id === nextStop?.id}
                         editable={!finished && stop.status === 'PLANNED'} busy={busy}
+                        votes={shared && !past ? stop.votes : null} onVote={value => void vote(stop, value)}
                         onVisited={() => setStopStatus(stop, 'VISITED')}
                         onMore={() => setMenuStop(stop)} />
             ))}
           </ol>
         </section>
 
-        <button className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} onClick={() => { setDeleteError(null); setDeleteOpen(true) }}>
-          <Trash2 size={18} /> {t('Rotayı sil', 'Delete route')}
-        </button>
+        <RouteGroup route={route} onChange={setRoute} />
+
+        {owner && (
+          <button className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} onClick={() => { setDeleteError(null); setDeleteOpen(true) }}>
+            <Trash2 size={18} /> {t('Rotayı sil', 'Delete route')}
+          </button>
+        )}
       </div>
 
       <Sheet open={addOpen} onClose={() => setAddOpen(false)} label={t('Rotaya ekle', 'Add to route')}>
@@ -262,12 +292,15 @@ export function RouteDetailPage() {
   )
 }
 
-function StopItem({ stop, index, isNext, editable, busy, onVisited, onMore }: {
+function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisited, onMore }: {
   stop: RouteStop
   index: number
   isNext: boolean
   editable: boolean
   busy: boolean
+  // The group's votes; null = not a group plan
+  votes?: RouteStop['votes']
+  onVote: (value: -1 | 1) => void
   onVisited: () => void
   onMore: () => void
 }) {
@@ -302,6 +335,17 @@ function StopItem({ stop, index, isNext, editable, busy, onVisited, onMore }: {
             <summary>{t('Neden burası?', 'Why here?')} <ChevronDown size={14} /></summary>
             <ul className="reasons">{stop.reasons.map(r => <li key={r}><Check size={14} />{r}</li>)}</ul>
           </details>
+          {votes && (
+            <div className="row" style={{ gap: 8 }}>
+              <button className={`chip ${votes.mine === 1 ? 'active' : ''}`} disabled={busy} aria-pressed={votes.mine === 1}
+                      aria-label={t('Beğendim', 'I like it')} onClick={() => onVote(1)}><ThumbsUp size={14} /> {votes.likes}</button>
+              <button className={`chip ${votes.mine === -1 ? 'active' : ''}`} disabled={busy} aria-pressed={votes.mine === -1}
+                      aria-label={t('İstemiyorum', 'Not for me')} onClick={() => onVote(-1)}><ThumbsDown size={14} /> {votes.dislikes}</button>
+              {votes.dislikes >= 2 && votes.dislikes > votes.likes && (
+                <span className="t-caption">{t('Grubun çoğu burayı istemiyor', 'Most of the group would skip this')}</span>
+              )}
+            </div>
+          )}
           {editable && (
             <div className="stop-actions">
               <button className="btn btn-sm btn-tonal grow" disabled={busy} onClick={onVisited}><Check size={16} /> {t('Gittim', 'Been there')}</button>

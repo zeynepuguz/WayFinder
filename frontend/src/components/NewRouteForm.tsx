@@ -1,20 +1,34 @@
-import { Check, ChevronDown, LocateFixed, Map as MapIcon, MapPin } from 'lucide-react'
+import { Check, ChevronDown, CloudRain, LocateFixed, Map as MapIcon, MapPin, Users, Wallet, type LucideIcon } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router'
 import { api } from '../api'
-import type { City, District, RoutePlanRequest, RouteStartMode, StopType, WalkingTolerance } from '../api/types'
+import type { City, DayTheme, District, RoutePlanRequest, RouteStartMode, StopType, WalkingTolerance } from '../api/types'
 import { useAuth } from '../context/AuthContext'
 import { useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { useDistricts } from '../lib/districts'
 import { errorMessage, INTEREST_LABELS, STOP_TYPE_LABELS, todayIso, WALKING_LABELS } from '../lib/format'
-import { useT } from '../lib/i18n'
+import { useT, type Translate } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 import { CitySheet, DistrictSheet } from './AreaSheets'
 import { Alert, Segmented, Spinner, Stepper } from './ui'
 import { STOP_ICON } from './visuals'
 
 const STOP_ORDER: StopType[] = ['BREAKFAST', 'SIGHTSEEING', 'LUNCH', 'COFFEE', 'DESSERT', 'DINNER']
+
+// What each theme does, said plainly (the server adds the same caveats to the route: planning/DayTheme)
+function themes(t: Translate): { value: DayTheme; icon: LucideIcon; label: string; hint: string }[] {
+  return [
+    { value: 'RAINY', icon: CloudRain, label: t('Yağmurlu gün', 'Rainy day'),
+      hint: t('Müze, kafe gibi kapalı mekanlar seçilir.', 'Indoor places such as museums and cafés.') },
+    { value: 'LOW_BUDGET', icon: Wallet, label: t('Düşük bütçe', 'Low budget'),
+      hint: t('Ücretsiz yerler ve uygun fiyatlı mekanlar öne alınır. Fiyat her mekan için bilinmediğinden tutarlar yaklaşıktır.',
+        'Free sights and inexpensive places first. Prices are not known for every place, so amounts are rough.') },
+    { value: 'FAMILY', icon: Users, label: t('Aile günü', 'Family day'),
+      hint: t('Az yürüyüş, parklar ve tatlı molası. Çocuklara uygunluk her mekanda bilinmiyor.',
+        'Less walking, parks and a dessert break. Child-friendliness is not known for every place.') },
+  ]
+}
 
 // "Yeni rota": where to start, when, who, budget, walking, stops and interests -> a planned route
 export function NewRouteForm() {
@@ -32,6 +46,7 @@ export function NewRouteForm() {
   const [walking, setWalking] = useState<WalkingTolerance>(prefs?.walkingTolerance ?? 'MEDIUM')
   const [stops, setStops] = useState<StopType[]>([])
   const [interests, setInterests] = useState<string[]>(prefs?.interests ?? [])
+  const [theme, setTheme] = useState<DayTheme | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -104,6 +119,7 @@ export function NewRouteForm() {
         walkingTolerance: walking,
         stops: stops.length ? STOP_ORDER.filter(s => stops.includes(s)) : undefined,
         interests,
+        theme: theme ?? undefined,
       })
       // The chosen interests travel along in case the server's route does not list them
       navigate(`/routes/${route.id}`, { state: { interests } })
@@ -154,6 +170,24 @@ export function NewRouteForm() {
                   ? t(`Rota ${cityName} merkezinden başlar; istersen bir ilçe seç.`, `The route starts in central ${cityName}; pick a district if you like.`)
                   : t('Bir şehir seç; istersen bir ilçe de seçebilirsin.', 'Choose a city, and a district if you like.')}
           </span>
+        </div>
+
+        <div className="field">
+          <span className="field-label">{t('Günün teması', 'Theme of the day')} <span className="muted">· {t('isteğe bağlı', 'optional')}</span></span>
+          <div className="option-grid">
+            {themes(t).map(({ value, icon: Icon, label }) => (
+              <button type="button" key={value} className={`option ${theme === value ? 'active' : ''}`} aria-pressed={theme === value}
+                      onClick={() => {
+                        const next = theme === value ? null : value
+                        setTheme(next)
+                        // Shown in the walking choice below, so the user sees it and can change it
+                        if (next === 'FAMILY') setWalking('LOW')
+                      }}>
+                <Icon size={20} /> {label}
+              </button>
+            ))}
+          </div>
+          {theme && <span className="t-caption">{themes(t).find(x => x.value === theme)?.hint}</span>}
         </div>
 
         <div className="stack-sm">

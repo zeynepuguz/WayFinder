@@ -11,6 +11,8 @@ export type RouteStatus = 'DRAFT' | 'ACTIVE' | 'COMPLETED' | 'EXPIRED'
 export type StopStatus = 'PLANNED' | 'VISITED' | 'SKIPPED'
 export type ReplanType =
   | 'TIRED' | 'WEATHER_CHANGED' | 'REMOVE_STOP' | 'REPLACE_STOP' | 'ADD_STOP' | 'ADD_INTEREST' | 'LESS_WALKING'
+  // Today's route: the same places at later times from now
+  | 'RUNNING_LATE'
 
 export interface ApiError {
   status: number
@@ -234,6 +236,8 @@ export interface RouteSummary {
   costKnown?: boolean
   // where the route starts ("Kadıköy merkezi"); null/absent for older routes
   startLabel?: string | null
+  // someone else's route the user joined with an invite code
+  sharedWithMe?: boolean
 }
 
 export interface HomeResponse {
@@ -276,6 +280,25 @@ export interface RouteStop {
   reasons: string[]
   status: StopStatus
   place: StopPlace
+  // The group's votes on this stop's place; null/absent = the route is not shared
+  votes?: StopVotes | null
+}
+
+// mine: the user's own vote (1 like, -1 dislike, 0 none)
+export interface StopVotes {
+  likes: number
+  dislikes: number
+  mine: -1 | 0 | 1
+}
+
+// A group plan: the owner shares an invite code, members see, vote on and (with a pass) change the route
+export interface GroupInfo {
+  // the user made the route: only the owner shares, renames, saves or deletes it
+  owner: boolean
+  // owner only; null = not shared
+  shareToken: string | null
+  // display names, the owner first
+  members: string[]
 }
 
 export interface Route {
@@ -302,7 +325,12 @@ export interface Route {
   stops: RouteStop[]
   createdAt: string
   updatedAt: string
+  // null/absent right after planning (the route screen loads it)
+  group?: GroupInfo | null
 }
+
+// Ready-made kinds of day: defaults for what the user did not choose, with an honest note on the route
+export type DayTheme = 'RAINY' | 'LOW_BUDGET' | 'FAMILY'
 
 // LOCATION: start at latitude/longitude (the device); AREA: start in the chosen city / district (lat/lon not sent)
 export type RouteStartMode = 'LOCATION' | 'AREA'
@@ -323,6 +351,7 @@ export interface RoutePlanRequest {
   stops?: StopType[]
   interests?: string[]
   title?: string
+  theme?: DayTheme
 }
 
 // Ready-made route of a city or district (GET /routes/popular): the area's most popular sights that lie

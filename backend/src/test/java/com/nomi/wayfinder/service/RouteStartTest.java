@@ -72,7 +72,8 @@ class RouteStartTest {
         when(routes.save(any(Route.class))).thenAnswer(inv -> inv.getArgument(0));
         UserService users = mock(UserService.class);
         when(users.getPreferences(anyLong())).thenReturn(new UserPreferences(1L));
-        routeService = new RouteService(routes, planner, users, new RouteMapper(), CLOCK, startService, placeRepository);
+        routeService = new RouteService(routes, planner, users, new RouteMapper(), CLOCK, startService, placeRepository,
+                null);
     }
 
     @AfterEach

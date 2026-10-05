@@ -5,6 +5,7 @@ import com.nomi.wayfinder.entity.RouteStatus;
 import com.nomi.wayfinder.entity.StopStatus;
 import com.nomi.wayfinder.entity.StopType;
 import com.nomi.wayfinder.entity.WalkingTolerance;
+import com.nomi.wayfinder.planning.DayTheme;
 import com.nomi.wayfinder.planning.ReplanType;
 import jakarta.validation.constraints.*;
 
@@ -41,15 +42,25 @@ public final class RouteDtos {
             @Size(max = 100) String district,
             StartMode startMode,
             // A named place the route starts at ("Anıtkabir"): latitude / longitude are that place, shown by this name
-            @Size(max = 200) String startLabel
+            @Size(max = 200) String startLabel,
+            // A ready-made kind of day (rainy, low budget, family): defaults for what the user did not choose
+            DayTheme theme
     ) {
+
+        public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
+                                LocalTime endTime, Integer partySize, Integer budget,
+                                WalkingTolerance walkingTolerance, List<StopType> stops, List<String> interests,
+                                String title, String city, String district, StartMode startMode, String startLabel) {
+            this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
+                    title, city, district, startMode, startLabel, null);
+        }
 
         public RoutePlanRequest(Double latitude, Double longitude, LocalDate date, LocalTime startTime,
                                 LocalTime endTime, Integer partySize, Integer budget,
                                 WalkingTolerance walkingTolerance, List<StopType> stops, List<String> interests,
                                 String title, String city, String district, StartMode startMode) {
             this(latitude, longitude, date, startTime, endTime, partySize, budget, walkingTolerance, stops, interests,
-                    title, city, district, startMode, null);
+                    title, city, district, startMode, null, null);
         }
     }
 
@@ -113,8 +124,32 @@ public final class RouteDtos {
             List<String> notes,
             List<StopResponse> stops,
             Instant createdAt,
-            Instant updatedAt
+            Instant updatedAt,
+            // Who plans this route together; null where the caller is not known (the assistant's route preview)
+            GroupInfo group
     ) {
+    }
+
+    /**
+     * @param owner      the caller made the route (only the owner shares, renames, saves or deletes it)
+     * @param shareToken the invite code, shown to the owner only; null = not shared
+     * @param members    display names of the others in the group, the owner first
+     */
+    public record GroupInfo(boolean owner, String shareToken, List<String> members) {
+    }
+
+    // The group's thumbs up / down for a stop's place; mine: the caller's own vote (1, -1, 0 = none)
+    public record StopVotes(int likes, int dislikes, int mine) {
+    }
+
+    public record JoinResponse(Long routeId) {
+    }
+
+    public record ShareResponse(String token) {
+    }
+
+    // vote: 1 = like, -1 = dislike, 0 = take my vote back
+    public record VoteRequest(@NotNull Long placeId, @NotNull @Min(-1) @Max(1) Integer vote) {
     }
 
     public record WeatherSnapshot(String condition, Double temperature, String advice) {
@@ -131,7 +166,9 @@ public final class RouteDtos {
             int walkingMinutes,
             List<String> reasons,
             StopStatus status,
-            StopPlace place
+            StopPlace place,
+            // null = the route is not shared
+            StopVotes votes
     ) {
     }
 
@@ -162,7 +199,9 @@ public final class RouteDtos {
             int totalEstimatedCost,
             Instant createdAt,
             // false = no stop has a known price: show "no price info", not "~0 TL"
-            boolean costKnown
+            boolean costKnown,
+            // Someone else's route the user joined as a group member
+            boolean sharedWithMe
     ) {
     }
 

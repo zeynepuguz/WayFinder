@@ -41,6 +41,7 @@ class ReplanType(StrEnum):
     ADD_STOP = "ADD_STOP"
     ADD_INTEREST = "ADD_INTEREST"
     LESS_WALKING = "LESS_WALKING"
+    RUNNING_LATE = "RUNNING_LATE"
 
 
 # Place tags in the backend database. The LLM may only use these as interests.

@@ -103,6 +103,16 @@ backend loguna yazılır.
   kalıcı kapalıysa gizlenir. Google Cloud'da günlük kota koy; backend de günde 140 / ayda 4.500 istekle sınırlar.
 - Fiyatlar tahminidir; bilinmeyen fiyat "Fiyat bilgisi yok" olarak gösterilir, toplamlara eklenmez.
 
+## Gezi sırasında, grup planı, temalı günler
+
+- **Gezi sırasında:** bugünün rotasında sıradaki durağın saati 15 dk'dan fazla geçtiyse "Saatleri kaydır" önerilir (aynı
+  mekanlar şimdiden itibaren; yeni saatte kapalı olan değiştirilir). Android uygulamasında "Durak hatırlatıcıları" her
+  duraktan önce yola çıkma vaktinde yerel bildirim gönderir (`@capacitor/local-notifications`).
+- **Grup planı:** rota sahibi davet bağlantısı (`/join/<kod>`) paylaşır. Katılanlar rotayı görür ve durakları oylar
+  (Premium gerekmez); Premium'u olan üyeler rotayı birlikte değiştirebilir. Silme, kaydetme, yeniden adlandırma sahibindir.
+- **Temalı günler:** Yağmurlu gün, Düşük bütçe, Aile günü. Sadece kullanıcının seçmediği ayarları doldurur ve rotaya
+  neyin bilinmediğini (fiyat, çocuklara uygunluk) yazan bir not ekler; fiyat tahmin edilmez.
+
 ## Yönetim (sadece uygulama sahibi)
 
 `OWNER_EMAILS` (`.env`) içindeki hesaplar giriş yapınca yönetici olur. Mekan sayfasında "Mekanı kaldır" (kullanıcılardan

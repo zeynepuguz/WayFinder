@@ -28,7 +28,10 @@ export function RouteCard({ route }: { route: RouteSummary }) {
           <span>{routeCost(route.totalEstimatedCost, route.costKnown)}</span>
         </div>
         {route.startLabel && <span className="t-caption">{t('Başlangıç', 'Start')}: {route.startLabel}</span>}
-        <div><span className={`badge ${status.tone}`}>{t(status.label[0], status.label[1])}</span></div>
+        <div className="row" style={{ gap: 6 }}>
+          <span className={`badge ${status.tone}`}>{t(status.label[0], status.label[1])}</span>
+          {route.sharedWithMe && <span className="badge badge-brand">{t('Grup', 'Group')}</span>}
+        </div>
       </div>
       <ChevronRight size={20} className="muted" />
     </Link>

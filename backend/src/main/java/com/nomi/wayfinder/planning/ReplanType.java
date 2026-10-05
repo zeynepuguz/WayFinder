@@ -15,5 +15,7 @@ public enum ReplanType {
     // "Biraz daha tarihi yerler ekle"
     ADD_INTEREST,
     // "Çok yürümek istemiyoruz"
-    LESS_WALKING
+    LESS_WALKING,
+    // "Geciktik" -> the same places at later times from now (a place closed at its new time is swapped)
+    RUNNING_LATE
 }

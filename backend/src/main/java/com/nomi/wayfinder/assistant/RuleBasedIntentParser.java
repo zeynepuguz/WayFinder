@@ -175,7 +175,8 @@ public class RuleBasedIntentParser implements IntentParser {
             boolean newPlan = mentionsNewPlan(text) || budget(text) != null || partySize(text) != null;
             // "Çok yürümek istemiyoruz, kahvaltı ve kahve istiyoruz" is a plan request, not a replan
             boolean onlySituational = edits.stream().allMatch(e -> e.type() == ReplanType.TIRED
-                    || e.type() == ReplanType.WEATHER_CHANGED || e.type() == ReplanType.LESS_WALKING);
+                    || e.type() == ReplanType.WEATHER_CHANGED || e.type() == ReplanType.LESS_WALKING
+                    || e.type() == ReplanType.RUNNING_LATE);
             if (onlySituational && stopTypes(text).size() >= 2) {
                 newPlan = true;
             }
@@ -259,6 +260,11 @@ public class RuleBasedIntentParser implements IntentParser {
         if (containsAny(text, "çok yürümek istemiyor", "daha az yürü", "az yürü", "yürümek istemiyor")
                 || lessWalkingEnglish(text)) {
             edits.add(RouteEdit.of(ReplanType.LESS_WALKING));
+        }
+
+        if (containsAny(text, "geciktik", "geç kaldık", "programın gerisinde", "saatleri kaydır")
+                || hasWord(text, "running late", "we're late", "we are late", "behind schedule")) {
+            edits.add(RouteEdit.of(ReplanType.RUNNING_LATE));
         }
 
         for (String clause : CLAUSE_SPLIT.split(text)) {

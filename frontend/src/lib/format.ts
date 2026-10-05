@@ -146,8 +146,7 @@ export function formatWhen(iso: string): string {
     : `${date.toLocaleDateString(locale(), { day: 'numeric', month: 'short' })} ${time}`
 }
 
-export function todayIso(): string {
-  const now = new Date()
+export function todayIso(now = new Date()): string {
   const offset = now.getTimezoneOffset() * 60000
   return new Date(now.getTime() - offset).toISOString().slice(0, 10)
 }

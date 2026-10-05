@@ -152,6 +152,10 @@ class RuleBasedIntentParserTest {
                 .extracting(AssistantIntent.RouteEdit::type).containsExactly(ReplanType.WEATHER_CHANGED);
         assertThat(parser.parse("Less walking please", WITH_ROUTE).edits())
                 .extracting(AssistantIntent.RouteEdit::type).containsExactly(ReplanType.LESS_WALKING);
+        assertThat(parser.parse("We're running late", WITH_ROUTE).edits())
+                .extracting(AssistantIntent.RouteEdit::type).containsExactly(ReplanType.RUNNING_LATE);
+        assertThat(parser.parse("Biraz geciktik", WITH_ROUTE).edits())
+                .extracting(AssistantIntent.RouteEdit::type).containsExactly(ReplanType.RUNNING_LATE);
     }
 
     @Test

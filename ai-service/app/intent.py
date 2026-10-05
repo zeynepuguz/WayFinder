@@ -41,7 +41,8 @@ Intent types:
   TIRED ("yorulduk" / "we're tired"), WEATHER_CHANGED ("yağmur başladı" / "it started raining"),
   LESS_WALKING ("daha az yürüyelim" / "less walking"), REMOVE_STOP ("burayı çıkar" / "remove this"),
   REPLACE_STOP ("başka bir yer olsun" / "somewhere else"), ADD_STOP ("tatlı da ekle" / "add a coffee stop"),
-  ADD_INTEREST ("biraz daha tarihi yer ekle" / "add more historical places"). One message may contain several edits, in order.
+  ADD_INTEREST ("biraz daha tarihi yer ekle" / "add more historical places"),
+  RUNNING_LATE ("geciktik, saatleri kaydır" / "we're running late"). One message may contain several edits, in order.
 - RECOMMEND: asks for a suggestion of one kind of place nearby ("yakında kahve öner" / "recommend a café nearby"). Set recommendType.
 - WEATHER: asks about the weather.
 - SHOW_ROUTE: asks to see the current route / next stop.

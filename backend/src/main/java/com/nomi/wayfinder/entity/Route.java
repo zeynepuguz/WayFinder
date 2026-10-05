@@ -89,6 +89,10 @@ public class Route {
     @Column(columnDefinition = "text[]", nullable = false)
     private List<String> notes = new ArrayList<>();
 
+    // Invite code of a group plan (service/RouteGroupService); null = not shared
+    @Column(length = 32, unique = true)
+    private String shareToken;
+
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position")
     private List<RouteStop> stops = new ArrayList<>();
@@ -288,6 +292,14 @@ public class Route {
 
     public void setNotes(List<String> notes) {
         this.notes = notes == null ? new ArrayList<>() : new ArrayList<>(notes);
+    }
+
+    public String getShareToken() {
+        return shareToken;
+    }
+
+    public void setShareToken(String shareToken) {
+        this.shareToken = shareToken;
     }
 
     public List<RouteStop> getStops() {

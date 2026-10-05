@@ -53,7 +53,9 @@ public class WebConfig implements WebMvcConfigurer {
                         // Each call is a paid Google Places request
                         "/api/v1/places/*/availability",
                         // Users write these
-                        "/api/v1/places/*/reports", "/api/v1/feedback");
+                        "/api/v1/places/*/reports", "/api/v1/feedback",
+                        // Group plans: joining (invite codes) and votes
+                        "/api/v1/shared-routes/**");
 
         // Paid features
         registry.addInterceptor(accessInterceptor)

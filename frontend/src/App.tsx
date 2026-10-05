@@ -15,6 +15,7 @@ import { AuthPage } from './pages/AuthPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ExplorePage } from './pages/ExplorePage'
 import { HomePage } from './pages/HomePage'
+import { JoinPage } from './pages/JoinPage'
 import { hasOnboarded, OnboardingPage } from './pages/OnboardingPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { PremiumPage } from './pages/PremiumPage'
@@ -80,6 +81,7 @@ function AppRoutes() {
           <Route path="places/:id" element={<PlaceDetailPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="admin" element={<AdminPage />} />
+          <Route path="join/:token" element={<JoinPage />} />
         </Route>
         <Route element={<AppLayout />}>
           <Route index element={<HomeEntry />} />

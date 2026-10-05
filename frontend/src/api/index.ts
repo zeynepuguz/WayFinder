@@ -88,6 +88,12 @@ export const api = {
   startPopularRoute: (request: { city: string; district?: string; key: string; date?: string }) =>
     http.post<Route>('/routes/popular/start', request),
   replan: (routeId: number, request: ReplanRequest) => http.post<ReplanResponse>(`/routes/${routeId}/replan`, request),
+  // Group plans: sharing is the owner's; joining, voting and leaving need no pass
+  shareRoute: (routeId: number) => http.post<{ token: string }>(`/routes/${routeId}/share`),
+  unshareRoute: (routeId: number) => http.delete<void>(`/routes/${routeId}/share`),
+  joinRoute: (code: string) => http.post<{ routeId: number }>(`/shared-routes/${encodeURIComponent(code)}/join`),
+  leaveRoute: (routeId: number) => http.delete<void>(`/shared-routes/${routeId}/membership`),
+  voteStop: (routeId: number, placeId: number, vote: -1 | 0 | 1) => http.post<Route>(`/shared-routes/${routeId}/votes`, { placeId, vote }),
 
   savedPlaces: () => http.get<Place[]>('/saved/places'),
   savePlace: (id: number) => http.put<void>(`/saved/places/${id}`),

@@ -37,6 +37,8 @@ public class RouteService {
     // null in unit tests that only plan at a position
     private final RouteStartService startService;
     private final PlaceRepository placeRepository;
+    // null in unit tests: then only the owner sees a route
+    private final RouteGroupService groups;
 
     @Autowired
     public RouteService(
@@ -46,7 +48,8 @@ public class RouteService {
             RouteMapper routeMapper,
             Clock clock,
             RouteStartService startService,
-            PlaceRepository placeRepository
+            PlaceRepository placeRepository,
+            RouteGroupService groups
     ) {
         this.routeRepository = routeRepository;
         this.planner = planner;
@@ -55,6 +58,7 @@ public class RouteService {
         this.clock = clock;
         this.startService = startService;
         this.placeRepository = placeRepository;
+        this.groups = groups;
     }
 
     public RouteService(
@@ -64,7 +68,7 @@ public class RouteService {
             RouteMapper routeMapper,
             Clock clock
     ) {
-        this(routeRepository, planner, userService, routeMapper, clock, null, null);
+        this(routeRepository, planner, userService, routeMapper, clock, null, null, null);
     }
 
     // ================= PLAN =================
@@ -92,12 +96,20 @@ public class RouteService {
 
         int partySize = request.partySize() != null ? request.partySize() : preferences.getDefaultPartySize();
         Integer budget = request.budget() != null ? request.budget() : preferences.getDefaultBudget();
-        WalkingTolerance tolerance = request.walkingTolerance() != null
-                ? request.walkingTolerance() : preferences.getWalkingTolerance();
+        DayTheme theme = request.theme();
+        WalkingTolerance tolerance = theme != null ? theme.walking(request.walkingTolerance()) : request.walkingTolerance();
+        if (tolerance == null) {
+            tolerance = preferences.getWalkingTolerance();
+        }
         List<String> interests = request.interests() != null && !request.interests().isEmpty()
                 ? Interests.normalize(request.interests()) : preferences.getInterests();
-
-        List<PlanningSlot> slots = DayTemplate.slotsFor(request.stops(), start, end, interests);
+        boolean ownStops = request.stops() != null && !request.stops().isEmpty();
+        List<String> themed = theme != null ? theme.interests(interests) : interests;
+        // The stops the user listed are sized by their own interests, never grown by the theme's
+        List<PlanningSlot> slots = DayTemplate.slotsFor(theme != null ? theme.stops(request.stops()) : request.stops(),
+                start, end, ownStops ? interests : themed);
+        interests = themed;
+        boolean assumeWet = theme != null && theme.assumeWet();
         if (slots.isEmpty()) {
             throw new BusinessException(HttpStatus.BAD_REQUEST, "No stops fit into the requested time window");
         }
@@ -107,9 +119,14 @@ public class RouteService {
 
         PlanResult result = planner.plan(new PlanningRequest(
                 origin.latitude(), origin.longitude(), date, start, end,
-                partySize, budget, tolerance, interests, slots, Set.of(), false));
+                partySize, budget, tolerance, interests, slots, Set.of(), assumeWet));
         if (origin.kind() == StartKind.LOCATION) {
             result = withSparseAreaNote(result, origin, slots);
+        }
+        if (theme != null) {
+            List<String> notes = new ArrayList<>(result.notes());
+            notes.addFirst(theme.note());
+            result = new PlanResult(result.stops(), notes, result.forecast(), result.weatherAdvice());
         }
 
         Route route = new Route();
@@ -126,6 +143,7 @@ public class RouteService {
         route.setBudget(budget);
         route.setWalkingTolerance(tolerance);
         route.setInterests(interests);
+        route.setAssumeWet(assumeWet);
         applyResult(route, result, List.of());
 
         return routeRepository.save(route);
@@ -209,21 +227,28 @@ public class RouteService {
     @Transactional
     public List<RouteSummary> listRoutes(Long userId, boolean savedOnly) {
         routeRepository.expireBefore(userId, LocalDate.now(clock));
-        List<Route> routes = savedOnly
+        List<Route> routes = new ArrayList<>(savedOnly
                 ? routeRepository.findByUserIdAndSavedTrueOrderByCreatedAtDesc(userId)
-                : routeRepository.findByUserIdOrderByCreatedAtDesc(userId);
+                : routeRepository.findByUserIdOrderByCreatedAtDesc(userId));
+        // Group plans the user joined are in "Gezi Rotalarım" too ("saved" is the owner's own flag)
+        if (!savedOnly && groups != null) {
+            routeRepository.findAllById(groups.memberRouteIds(userId)).forEach(r -> routes.add(expireIfPast(r)));
+            routes.sort(Comparator.comparing(Route::getCreatedAt).reversed());
+        }
         // A plan that found no place at all ("0 durak") is not a route to show
-        return routes.stream().filter(r -> !r.getStops().isEmpty()).map(routeMapper::toSummary).toList();
+        return routes.stream().filter(r -> !r.getStops().isEmpty())
+                .map(r -> routeMapper.toSummary(r, !r.getUserId().equals(userId))).toList();
     }
 
     @Transactional
     public RouteResponse getRoute(Long userId, Long routeId) {
-        return routeMapper.toResponse(findRoute(userId, routeId));
+        return respond(findRoute(userId, routeId), userId);
     }
 
+    // Renaming, saving and the route's status are the owner's
     @Transactional
     public RouteResponse updateRoute(Long userId, Long routeId, RouteUpdateRequest request) {
-        Route route = findRoute(userId, routeId);
+        Route route = findOwnedRoute(userId, routeId);
 
         if (request.status() != null && request.status() != route.getStatus()) {
             // A past day's route cannot be started again; saving / renaming it stays possible
@@ -239,12 +264,12 @@ public class RouteService {
             route.setTitle(request.title().trim());
         }
 
-        return routeMapper.toResponse(route);
+        return respond(route, userId);
     }
 
     @Transactional
     public void deleteRoute(Long userId, Long routeId) {
-        routeRepository.delete(findRoute(userId, routeId));
+        routeRepository.delete(findOwnedRoute(userId, routeId));
     }
 
     @Transactional
@@ -262,7 +287,7 @@ public class RouteService {
             route.setStatus(RouteStatus.COMPLETED);
         }
 
-        return routeMapper.toResponse(route);
+        return respond(route, userId);
     }
 
     /**
@@ -329,7 +354,7 @@ public class RouteService {
     public ReplanResponse replan(Long userId, Long routeId, ReplanRequest request) {
         Route route = findRoute(userId, routeId);
         List<String> changes = replanRoute(route, request);
-        return new ReplanResponse(routeMapper.toResponse(route), changes);
+        return new ReplanResponse(respond(route, userId), changes);
     }
 
     /**
@@ -394,6 +419,12 @@ public class RouteService {
                 RouteStop target = findRemainingStop(remaining, request.stopId());
                 slots.removeIf(slot -> Objects.equals(slot.pinnedPlaceId(), target.getPlace().getId()));
                 excluded.add(target.getPlace().getId());
+            }
+            case RUNNING_LATE -> {
+                // Every stop stays pinned; planning from now moves them later (describeChanges says so)
+                if (!route.getDate().equals(LocalDate.now(clock))) {
+                    throw new BusinessException(HttpStatus.BAD_REQUEST, "Only today's route can be shifted");
+                }
             }
             case REPLACE_STOP -> {
                 RouteStop target = findRemainingStop(remaining, request.stopId());
@@ -566,7 +597,7 @@ public class RouteService {
 
     @Transactional
     public Route getRouteEntity(Long userId, Long routeId) {
-        return findRoute(userId, routeId);
+        return findOwnedRoute(userId, routeId);
     }
 
     // A chat's route; empty when it was deleted meanwhile
@@ -579,11 +610,26 @@ public class RouteService {
         return routeMapper.toResponse(route);
     }
 
+    // The user's own route or a group plan they joined
     private Route findRoute(Long userId, Long routeId) {
+        if (groups == null) {
+            return findOwnedRoute(userId, routeId);
+        }
+        return groups.findAccessible(userId, routeId)
+                .map(this::expireIfPast)
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found with id: " + routeId));
+    }
+
+    private Route findOwnedRoute(Long userId, Long routeId) {
         // Filtering by user id means other users' routes look like they do not exist
         return routeRepository.findByIdAndUserId(routeId, userId)
                 .map(this::expireIfPast)
                 .orElseThrow(() -> new ResourceNotFoundException("Route not found with id: " + routeId));
+    }
+
+    // With the group's members and votes for the route screen
+    private RouteResponse respond(Route route, Long userId) {
+        return groups == null ? routeMapper.toResponse(route) : groups.toResponse(route, userId);
     }
 
     // On read: the daily job may not have run yet (e.g. just after midnight)
