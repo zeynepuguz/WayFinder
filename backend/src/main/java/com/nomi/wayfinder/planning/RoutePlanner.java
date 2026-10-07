@@ -927,6 +927,11 @@ public class RoutePlanner {
                         : count + " stops have no price info; they are not included in the estimated total.");
     }
 
+    // Straight-line distance covered in this many minutes on foot (the inverse of walkingMinutes)
+    public static double metersWithin(int walkingMinutes) {
+        return walkingMinutes * WALKING_METERS_PER_MINUTE / DETOUR_FACTOR;
+    }
+
     public static int walkingMinutes(double distanceMeters) {
         return (int) Math.ceil(distanceMeters * DETOUR_FACTOR / WALKING_METERS_PER_MINUTE);
     }

@@ -1,5 +1,5 @@
 import {
-  ChevronRight, CircleHelp, Crown, FileText, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
+  ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
   SlidersHorizontal, Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
@@ -12,7 +12,7 @@ import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
 import { errorMessage, formatDateTime } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
-import { LEGAL_LINKS } from '../lib/legal'
+import { LEGAL_PATHS, SUPPORT_EMAIL } from '../lib/legal'
 
 export function ProfilePage() {
   const { user, hasAccess, logout, deleteAccount } = useAuth()
@@ -124,8 +124,8 @@ export function ProfilePage() {
             <span className="grow">{t('Satın alımları geri yükle', 'Restore purchases')}</span>
           </button>
         )}
-        {LEGAL_LINKS.support && (
-          <a className="list-item" href={`mailto:${LEGAL_LINKS.support}`}>
+        {SUPPORT_EMAIL && (
+          <a className="list-item" href={`mailto:${SUPPORT_EMAIL}`}>
             <span className="list-item-icon"><CircleHelp size={18} /></span>
             <span className="grow">{t('Destek', 'Support')}</span>
             <ChevronRight size={18} className="muted" />
@@ -177,21 +177,20 @@ function LanguageRow() {
 
 function LegalLinks() {
   const t = useT()
-  if (!LEGAL_LINKS.privacy && !LEGAL_LINKS.terms) return null
   return (
     <div className="list-group">
-      {LEGAL_LINKS.privacy && (
-        <a className="list-item" href={LEGAL_LINKS.privacy} target="_blank" rel="noreferrer">
-          <span className="list-item-icon"><ShieldCheck size={18} /></span><span className="grow">{t('Gizlilik Politikası', 'Privacy Policy')}</span>
-          <ChevronRight size={18} className="muted" />
-        </a>
-      )}
-      {LEGAL_LINKS.terms && (
-        <a className="list-item" href={LEGAL_LINKS.terms} target="_blank" rel="noreferrer">
-          <span className="list-item-icon"><FileText size={18} /></span><span className="grow">{t('Kullanım Koşulları', 'Terms of Use')}</span>
-          <ChevronRight size={18} className="muted" />
-        </a>
-      )}
+      <Link className="list-item" to={LEGAL_PATHS.about}>
+        <span className="list-item-icon"><Info size={18} /></span><span className="grow">{t('Hakkımızda ve İletişim', 'About & Contact')}</span>
+        <ChevronRight size={18} className="muted" />
+      </Link>
+      <Link className="list-item" to={LEGAL_PATHS.privacy}>
+        <span className="list-item-icon"><ShieldCheck size={18} /></span><span className="grow">{t('Gizlilik Politikası', 'Privacy Policy')}</span>
+        <ChevronRight size={18} className="muted" />
+      </Link>
+      <Link className="list-item" to={LEGAL_PATHS.terms}>
+        <span className="list-item-icon"><FileText size={18} /></span><span className="grow">{t('Kullanım Koşulları', 'Terms of Use')}</span>
+        <ChevronRight size={18} className="muted" />
+      </Link>
     </div>
   )
 }

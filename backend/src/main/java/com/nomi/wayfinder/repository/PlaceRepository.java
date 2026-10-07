@@ -92,6 +92,25 @@ public interface PlaceRepository extends JpaRepository<Place, Long>, JpaSpecific
             @Param("limit") int limit
     );
 
+    // Like findCandidates, but a random sample of the whole circle (home suggestions: not always the nearest few)
+    @Query(value = """
+            SELECT p.id AS id,
+                   ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography)) AS "distanceMeters"
+            FROM places p
+            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(:lon, :lat), 4326) AS geography), :radius)
+            """ + FILLS_STOP + """
+            ORDER BY random()
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<PlaceDistance> sampleCandidates(
+            @Param("lat") double latitude,
+            @Param("lon") double longitude,
+            @Param("radius") double radiusMeters,
+            @Param("categories") Collection<String> categories,
+            @Param("tag") String tag,
+            @Param("limit") int limit
+    );
+
     /**
      * Like findCandidates, but only places that match the user's interests (planning/InterestMatcher): one of the
      * interest tags (comma separated, "" for none) or, when nearSea, within ~300 m of the coast. The nearest 40

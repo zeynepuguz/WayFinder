@@ -133,7 +133,7 @@ Let's Encrypt) kurar. Dışarıya yalnızca 80/443 açılır. Site, API ve yasal
 |---|---|
 | `/`, `/places/{id}`, `/kadikoy/{kafe,restoran,…}` | Web sitesi; Google için önceden oluşturulmuş sayfalar |
 | `/api/v1/...` | Backend |
-| `/gizlilik`, `/kosullar`, `/iletisim` | Yasal sayfalar (`deploy/site/`) |
+| `/gizlilik`, `/kosullar`, `/iletisim` | Gizlilik, koşullar, hakkımızda (`frontend/src/pages/LegalPage.tsx`) |
 | `/sitemap.xml`, `/robots.txt` | Arama motorları için |
 
 `web` servisi kurulumda backend hazır olunca mekanları okuyup her mekan ve kategori için başlık, açıklama ve
@@ -149,9 +149,9 @@ docker compose -f docker-compose.prod.yml up -d --build
 curl https://<DOMAIN>/actuator/health            # {"status":"UP"}
 ```
 
-- `deploy/site/` içindeki `[...]` yer tutucularını (geliştirici adı, destek e-postası, sağlayıcılar) doldur.
-- Android uygulaması için: `frontend/.env.production` içinde `VITE_API_BASE_URL=https://<DOMAIN>/api/v1`,
-  `VITE_PRIVACY_URL=https://<DOMAIN>/gizlilik`.
+- Destek e-postasını `VITE_SUPPORT_EMAIL` ile ver (web: `deploy/.env`, uygulama: `frontend/.env.production`);
+  yasal sayfalar ve Profil > Destek bunu gösterir.
+- Android uygulaması için: `frontend/.env.production` içinde `VITE_API_BASE_URL=https://<DOMAIN>/api/v1`.
 - Güncelleme: `git pull && docker compose -f docker-compose.prod.yml up -d --build`
 
 ### Rehberler ve İngilizce sayfalar
@@ -196,8 +196,8 @@ Play Store'a çıkmadan önce yapılacaklar:
    uygulama içi ürün** olarak tanımla.
 4. Google Cloud'da servis hesabı oluştur, Play Console'da bu hesaba "Finansal verileri görüntüle / siparişleri yönet"
    izni ver, JSON anahtarının yolunu `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`'a yaz.
-5. Gizlilik politikası ve kullanım koşulları: `deploy/site/` sayfalarını doldur, sunucuyla birlikte yayınlanır
-   (`VITE_PRIVACY_URL`, `VITE_TERMS_URL`).
+5. Gizlilik politikası ve kullanım koşulları uygulamanın içindedir (`LegalPage.tsx`); Play Console'a
+   `https://<DOMAIN>/gizlilik` adresini yaz.
 6. Harita için ticari kullanıma uygun bir karo sağlayıcısı (MapTiler, Stadia vb.) ve `VITE_MAP_TILE_URL`.
 7. İmza anahtarı (upload key) oluştur, Android Studio'dan imzalı **AAB** üret, dahili test kanalına yükle.
 

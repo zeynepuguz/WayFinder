@@ -21,14 +21,6 @@
 		file_server
 	}
 
-	# Legal pages: https://DOMAIN/gizlilik, /kosullar, ...
-	@legal path /gizlilik /kosullar /iletisim /legal.css
-	handle @legal {
-		root * /srv/site
-		try_files {path}.html {path}
-		file_server
-	}
-
 	# Website: prerendered pages (/, /places/1, /kadikoy/kafe), else the plain app shell
 	handle {
 		root * /srv/app

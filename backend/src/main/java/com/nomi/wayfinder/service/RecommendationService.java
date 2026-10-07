@@ -34,6 +34,10 @@ public class RecommendationService {
     // When nothing nearby is open / suitable, farther places still need to be a decent fit
     static final double MIN_FIT_WITHOUT_NEARBY = 70;
     static final int FARTHER_CANDIDATE_LIMIT = 150;
+    // Home suggestions: how far (minutes on foot), how many places to look at and how many good ones to pick from
+    static final int HOME_WALK_MINUTES = 30;
+    static final int HOME_CANDIDATE_LIMIT = 250;
+    static final int HOME_POOL = 12;
 
     private final PlaceRepository placeRepository;
     private final PlaceService placeService;
@@ -65,6 +69,31 @@ public class RecommendationService {
     public List<Recommendation> recommend(double latitude, double longitude, StopType type, Long userId, int limit) {
         Context ctx = context(latitude, longitude, userId);
         return toNearby(evaluate(ctx, type, nearbyCandidates(ctx, type)), type, limit);
+    }
+
+    /**
+     * Home screen "Şimdi için": anywhere within a HOME_WALK_MINUTES walk, a different few of the best HOME_POOL places on
+     * each visit. Candidates are a random sample of the whole circle: by distance, the same nearest few would always win.
+     */
+    @Transactional
+    public List<Recommendation> recommendAround(double latitude, double longitude, StopType type, Long userId,
+                                                int limit) {
+        Context near = context(latitude, longitude, userId);
+        double radius = RoutePlanner.metersWithin(HOME_WALK_MINUTES);
+        Context ctx = new Context(latitude, longitude, near.today(), near.now(), near.interests(), near.forecast(),
+                radius);
+        List<PlaceDistance> found = placeRepository.sampleCandidates(latitude, longitude, radius, categories(type),
+                type.getMatchingTag(), HOME_CANDIDATE_LIMIT);
+        // The best fits (open, weather, interests, rating), distance left out: anywhere in the circle is fine
+        List<Evaluated> best = evaluate(ctx, type, found).stream()
+                .sorted(Comparator.comparingDouble((Evaluated e) -> e.scored().fitScore()).reversed())
+                .limit(HOME_POOL)
+                .toList();
+        List<Recommendation> pool = new ArrayList<>(toNearby(best, type, HOME_POOL));
+        Collections.shuffle(pool);
+        return pool.stream().limit(limit)
+                .sorted(Comparator.comparingDouble(r -> r.place().getDistanceMeters()))
+                .toList();
     }
 
     /**

@@ -1,8 +1,9 @@
 import {
-  ArrowUp, ChevronRight, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Route as RouteIcon, Sparkles, UserRound, Waves, Wallet, Coffee,
+  ArrowUp, ChevronRight, Crown, Map as MapIcon, MapPin, Navigation, Route as RouteIcon, Sparkles, UserRound, Waves, Wallet, Coffee,
   type LucideIcon,
 } from 'lucide-react'
 import { Link, useNavigate } from 'react-router'
+import { LEGAL_PATHS } from '../lib/legal'
 import { api } from '../api'
 import type { PlaceCategory } from '../api/types'
 import { useGate } from '../components/gate'
@@ -27,13 +28,6 @@ const ideas = (t: Translate): { title: string; text: string; prompt: string; ico
     prompt: t('Kahve ve tatlı ağırlıklı, az yürümeli bir rota planla', 'Plan a route focused on coffee and desserts, with little walking'),
     icon: Coffee,
     gradient: 'linear-gradient(145deg, #b98a61, #5e3f2a)',
-  },
-  {
-    title: t('Tarihi Kadıköy', 'Historic Kadıköy'),
-    text: t('Kiliseler, çarşı ve eski yapılar', 'Churches, the market and old buildings'),
-    prompt: t('Tarihi yerler ağırlıklı bir günlük gezi planla, öğle yemeği de olsun', 'Plan a day trip focused on historic places, including lunch'),
-    icon: Landmark,
-    gradient: 'linear-gradient(145deg, #8f7cf8, #4a2bbd)',
   },
   {
     title: t('Uygun Bütçeli Gün', 'Day on a Budget'),
@@ -245,10 +239,9 @@ export function HomePage() {
       {!isNativeApp() && (
         <footer className="site-footer">
           <nav aria-label={t('Site bağlantıları', 'Site links')}>
-            <a href={t('/rehber', '/en/')}>{t('Kadıköy rehberleri', 'Kadıköy travel guides')}</a>
-            <a href="/iletisim">{t('Hakkımızda ve İletişim', 'About & Contact')}</a>
-            <a href="/kosullar">{t('Kullanım Koşulları', 'Terms of Use')}</a>
-            <a href="/gizlilik">{t('Gizlilik Politikası', 'Privacy Policy')}</a>
+            <Link to={LEGAL_PATHS.about}>{t('Hakkımızda ve İletişim', 'About & Contact')}</Link>
+            <Link to={LEGAL_PATHS.terms}>{t('Kullanım Koşulları', 'Terms of Use')}</Link>
+            <Link to={LEGAL_PATHS.privacy}>{t('Gizlilik Politikası', 'Privacy Policy')}</Link>
           </nav>
         </footer>
       )}

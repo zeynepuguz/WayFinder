@@ -5,7 +5,7 @@ import { ApiRequestError } from '../api/client'
 import { Alert, BackButton, Segmented, Spinner } from '../components/ui'
 import { BrandMark } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
-import { LEGAL_LINKS } from '../lib/legal'
+import { LEGAL_PATHS } from '../lib/legal'
 import { safeNext } from '../lib/nav'
 import { tr, useT } from '../lib/i18n'
 
@@ -111,15 +111,13 @@ export function AuthPage() {
           </button>
         </form>
 
-        {(LEGAL_LINKS.terms || LEGAL_LINKS.privacy) && (
-          <p className="fine-print">
-            {t('Devam ederek', 'By continuing you accept the')}{' '}
-            {LEGAL_LINKS.terms && <a href={LEGAL_LINKS.terms} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{t('Kullanım Koşulları', 'Terms of Use')}</a>}
-            {LEGAL_LINKS.terms && LEGAL_LINKS.privacy && t(' ve ', ' and ')}
-            {LEGAL_LINKS.privacy && <a href={LEGAL_LINKS.privacy} target="_blank" rel="noreferrer" style={{ textDecoration: 'underline' }}>{t('Gizlilik Politikası', 'Privacy Policy')}</a>}
-            {t('’nı kabul etmiş olursun.', '.')}
-          </p>
-        )}
+        <p className="fine-print">
+          {t('Devam ederek', 'By continuing you accept the')}{' '}
+          <Link to={LEGAL_PATHS.terms} style={{ textDecoration: 'underline' }}>{t('Kullanım Koşulları', 'Terms of Use')}</Link>
+          {t(' ve ', ' and ')}
+          <Link to={LEGAL_PATHS.privacy} style={{ textDecoration: 'underline' }}>{t('Gizlilik Politikası', 'Privacy Policy')}</Link>
+          {t('’nı kabul etmiş olursun.', '.')}
+        </p>
       </div>
     </div>
   )

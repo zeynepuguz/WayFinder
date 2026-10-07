@@ -16,6 +16,7 @@ import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { ExplorePage } from './pages/ExplorePage'
 import { HomePage } from './pages/HomePage'
 import { JoinPage } from './pages/JoinPage'
+import { LegalPage } from './pages/LegalPage'
 import { hasOnboarded, OnboardingPage } from './pages/OnboardingPage'
 import { PlaceDetailPage } from './pages/PlaceDetailPage'
 import { PremiumPage } from './pages/PremiumPage'
@@ -82,6 +83,9 @@ function AppRoutes() {
           <Route path="profile" element={<ProfilePage />} />
           <Route path="admin" element={<AdminPage />} />
           <Route path="join/:token" element={<JoinPage />} />
+          <Route path="iletisim" element={<LegalPage doc="about" />} />
+          <Route path="kosullar" element={<LegalPage doc="terms" />} />
+          <Route path="gizlilik" element={<LegalPage doc="privacy" />} />
         </Route>
         <Route element={<AppLayout />}>
           <Route index element={<HomeEntry />} />

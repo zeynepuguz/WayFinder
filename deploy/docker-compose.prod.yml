@@ -92,7 +92,6 @@ services:
       DOMAIN: ${DOMAIN}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./site:/srv/site:ro
       - web-root:/srv/app:ro
       - photos:/srv/photos:ro
       - caddy-data:/data

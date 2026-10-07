@@ -72,8 +72,8 @@ public class HomeController {
                 .orElse(null);
 
         StopType suggestedType = RecommendationService.suggestedTypeAt(now);
-        // Nearby only; "better but farther" places are offered by the assistant when the user asks for suggestions
-        List<Recommendation> suggestions = recommendationService.recommend(lat, lon, suggestedType, userId, 3);
+        // Within a 30-minute walk, a different few on each visit; the assistant offers "better but farther" places
+        List<Recommendation> suggestions = recommendationService.recommendAround(lat, lon, suggestedType, userId, 3);
 
         // Only a route of today is "Aktif rotan"; past days never are. Without one, tomorrow's plan is shown instead
         RouteSummary currentRoute = userId == null ? null
