@@ -111,6 +111,27 @@ export interface ReviewCounts {
   unreadFeedback: number
 }
 
+// GET /admin/ai-usage: OpenAI spending (estimated from token counts and list prices, USD)
+export interface AiUsageTotals {
+  calls: number
+  failures: number
+  inputTokens: number
+  outputTokens: number
+  costUsd: number
+}
+
+export interface AiUsageSummary {
+  today: AiUsageTotals
+  month: AiUsageTotals
+  // 0 = no lock
+  monthlyBudgetUsd: number
+  // The assistant answers without OpenAI until next month
+  budgetReached: boolean
+  // Last 30 days with calls, oldest first
+  days: { day: string; calls: number; costUsd: number }[]
+  topUsersMonth: { userId: number; email: string | null; calls: number; costUsd: number }[]
+}
+
 // GET /places/{id}/availability: Google Places says whether the place is still there (when the backend has a key)
 export interface PlaceAvailability {
   status: 'OPEN' | 'CLOSED_TEMPORARILY' | 'CLOSED_PERMANENTLY' | 'NOT_FOUND' | 'UNCHECKED'

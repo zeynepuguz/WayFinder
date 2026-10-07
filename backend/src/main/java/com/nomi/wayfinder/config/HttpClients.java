@@ -1,6 +1,7 @@
 package com.nomi.wayfinder.config;
 
 import org.slf4j.MDC;
+import org.springframework.http.client.ClientHttpRequestInterceptor;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
@@ -25,9 +26,11 @@ public final class HttpClients {
 
     /**
      * The Python AI service: its base URL (when enabled) and X-API-Key (when set). Our request id is forwarded as
-     * X-Request-Id, so one user request can be followed in both services' logs.
+     * X-Request-Id, so one user request can be followed in both services' logs. usage records every call's
+     * OpenAI tokens (AiUsageInterceptor).
      */
-    public static RestClient.Builder aiService(NomiProperties.Ai ai, Duration readTimeout) {
+    public static RestClient.Builder aiService(NomiProperties.Ai ai, Duration readTimeout,
+                                               ClientHttpRequestInterceptor usage) {
         RestClient.Builder builder = restClient(ai.connectTimeout(), readTimeout)
                 .requestInterceptor((request, body, execution) -> {
                     String requestId = MDC.get("requestId");
@@ -35,7 +38,8 @@ public final class HttpClients {
                         request.getHeaders().add("X-Request-Id", requestId);
                     }
                     return execution.execute(request, body);
-                });
+                })
+                .requestInterceptor(usage);
         if (ai.enabled()) {
             builder.baseUrl(ai.baseUrl());
         }

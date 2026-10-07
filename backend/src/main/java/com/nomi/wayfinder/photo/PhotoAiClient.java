@@ -1,6 +1,8 @@
 package com.nomi.wayfinder.photo;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.nomi.wayfinder.aiusage.AiUsageInterceptor;
+import com.nomi.wayfinder.aiusage.AiUsageService;
 import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
 import org.springframework.http.MediaType;
@@ -17,15 +19,23 @@ public class PhotoAiClient {
 
     private final NomiProperties.Ai properties;
     private final RestClient restClient;
+    private final AiUsageService usage;
 
-    public PhotoAiClient(NomiProperties nomiProperties, PhotoProperties photoProperties) {
+    public PhotoAiClient(NomiProperties nomiProperties, PhotoProperties photoProperties, AiUsageService usage,
+                         AiUsageInterceptor interceptor) {
         this.properties = nomiProperties.ai();
+        this.usage = usage;
         // Vision checks take longer than intent parsing: the photo read timeout
-        this.restClient = HttpClients.aiService(properties, photoProperties.aiReadTimeout()).build();
+        this.restClient = HttpClients.aiService(properties, photoProperties.aiReadTimeout(), interceptor).build();
     }
 
     public boolean isEnabled() {
         return properties.enabled();
+    }
+
+    // This month's OpenAI budget (AI_MONTHLY_BUDGET_USD) is used up
+    public boolean budgetReached() {
+        return usage.budgetReached();
     }
 
     public Verdict verify(VerifyRequest request) {

@@ -1,5 +1,7 @@
 package com.nomi.wayfinder.assistant;
 
+import com.nomi.wayfinder.aiusage.AiUsageInterceptor;
+import com.nomi.wayfinder.aiusage.AiUsageService;
 import com.nomi.wayfinder.config.HttpClients;
 import com.nomi.wayfinder.config.NomiProperties;
 import org.springframework.http.MediaType;
@@ -19,14 +21,21 @@ public class AiServiceIntentParser implements IntentParser {
 
     private final NomiProperties.Ai properties;
     private final RestClient restClient;
+    private final AiUsageService usage;
 
-    public AiServiceIntentParser(NomiProperties nomiProperties) {
+    public AiServiceIntentParser(NomiProperties nomiProperties, AiUsageService usage, AiUsageInterceptor interceptor) {
         this.properties = nomiProperties.ai();
-        this.restClient = HttpClients.aiService(properties, properties.readTimeout()).build();
+        this.usage = usage;
+        this.restClient = HttpClients.aiService(properties, properties.readTimeout(), interceptor).build();
     }
 
     public boolean isEnabled() {
         return properties.enabled();
+    }
+
+    // This month's OpenAI budget (AI_MONTHLY_BUDGET_USD) is used up
+    public boolean budgetReached() {
+        return usage.budgetReached();
     }
 
     @Override

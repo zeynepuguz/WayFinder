@@ -1,11 +1,11 @@
-import { AlertTriangle, EyeOff, Flag, Inbox, MessageSquare, RotateCcw, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Bot, EyeOff, Flag, Inbox, MessageSquare, RotateCcw, Trash2, X } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { Link, Navigate } from 'react-router'
 import { api } from '../api'
 import type { ReviewAction, ReviewedPlace } from '../api/types'
-import { BackButton, EmptyState, ErrorState, Segmented, Skeleton, useToast } from '../components/ui'
+import { Alert, BackButton, EmptyState, ErrorState, Segmented, Skeleton, useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORY_LABELS, errorMessage, formatDateTime } from '../lib/format'
+import { CATEGORY_LABELS, errorMessage, formatDate, formatDateTime } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -33,6 +33,7 @@ function AdminArea() {
         <BackButton />
         <h1 className="t-title">{t('Yönetim', 'Admin')}</h1>
       </div>
+      <AiUsageCard />
       <Segmented<Tab> value={tab} onChange={setTab} options={[
         { value: 'reports', label: label(t('Bildirilenler', 'Reports'), c?.openReports) },
         { value: 'suspects', label: label(t('Şüpheliler', 'Suspects'), c?.suspects) },
@@ -46,6 +47,66 @@ function AdminArea() {
         {tab === 'feedback' && <FeedbackList onChanged={counts.reload} />}
       </div>
     </main>
+  )
+}
+
+// Estimated USD; a single call costs fractions of a cent
+function usd(value: number): string {
+  return `$${value > 0 && value < 0.01 ? value.toFixed(4) : value.toFixed(2)}`
+}
+
+// OpenAI spending: this month against the budget lock, today, last days and the heaviest users (details folded)
+function AiUsageCard() {
+  const t = useT()
+  const usage = useAsync(() => api.aiUsage(), [])
+  if (usage.loading) return <div style={{ marginBottom: 16 }}><Skeleton height={72} /></div>
+  if (usage.error || !usage.data) return null
+  const u = usage.data
+  const share = u.monthlyBudgetUsd > 0 ? Math.min(1, u.month.costUsd / u.monthlyBudgetUsd) : 0
+  const barColor = u.budgetReached ? 'var(--danger)' : share >= 0.8 ? 'var(--warning)' : 'var(--success)'
+  return (
+    <details className="card stack-sm" style={{ marginBottom: 16 }}>
+      <summary className="row" style={{ gap: 10, cursor: 'pointer', listStyle: 'none' }}>
+        <Bot size={18} />
+        <span className="grow t-headline">{t('Yapay zekâ bu ay', 'AI this month')}</span>
+        <span className="t-headline">{usd(u.month.costUsd)}{u.monthlyBudgetUsd > 0 ? ` / ${usd(u.monthlyBudgetUsd)}` : ''}</span>
+      </summary>
+      {u.monthlyBudgetUsd > 0 && (
+        <div style={{ height: 6, borderRadius: 3, background: 'var(--line)', overflow: 'hidden' }}
+             role="meter" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(share * 100)}
+             aria-label={t('Aylık bütçe', 'Monthly budget')}>
+          <div style={{ width: `${share * 100}%`, height: '100%', background: barColor }} />
+        </div>
+      )}
+      {u.budgetReached && (
+        <Alert tone="warning">{t('Aylık bütçe doldu: asistan ay sonuna kadar yapay zekâsız cevap veriyor, fotoğraflar bekliyor.',
+          'Monthly budget used up: the assistant answers without AI and photos wait until next month.')}</Alert>
+      )}
+      <span className="t-caption">
+        {t(`Bugün ${u.today.calls} istek · ${usd(u.today.costUsd)}`, `Today ${u.today.calls} calls · ${usd(u.today.costUsd)}`)}
+        {' · '}
+        {t(`Bu ay ${u.month.calls} istek, ${u.month.failures} hata`, `This month ${u.month.calls} calls, ${u.month.failures} failed`)}
+        {' · '}
+        {(u.month.inputTokens + u.month.outputTokens).toLocaleString()} token
+      </span>
+      {u.days.length > 0 && (
+        <div className="stack-sm">
+          <span className="field-label">{t('Son günler', 'Last days')}</span>
+          {u.days.slice(-7).reverse().map(d => (
+            <span key={d.day} className="t-caption">{formatDate(d.day)} · {t(`${d.calls} istek`, `${d.calls} calls`)} · {usd(d.costUsd)}</span>
+          ))}
+        </div>
+      )}
+      {u.topUsersMonth.length > 0 && (
+        <div className="stack-sm">
+          <span className="field-label">{t('En çok kullananlar (bu ay)', 'Top users (this month)')}</span>
+          {u.topUsersMonth.map(x => (
+            <span key={x.userId} className="t-caption">{x.email ?? t('Silinmiş hesap', 'Deleted account')} · {t(`${x.calls} istek`, `${x.calls} calls`)} · {usd(x.costUsd)}</span>
+          ))}
+        </div>
+      )}
+      <span className="t-caption">{t('Tahmini tutar (token × liste fiyatı). Kesin fatura OpenAI panelindedir.', 'Estimate (tokens × list price). The exact bill is in the OpenAI dashboard.')}</span>
+    </details>
   )
 }
 

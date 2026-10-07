@@ -63,6 +63,10 @@ public class PhotoVerifier {
             log.debug("Photo {} stays pending: AI_SERVICE_URL is not set", photoId);
             return;
         }
+        if (ai.budgetReached()) {
+            log.debug("Photo {} stays pending: this month's AI budget is used up", photoId);
+            return;
+        }
 
         PhotoAiClient.Verdict verdict;
         try {

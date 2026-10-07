@@ -11,6 +11,7 @@ import re
 from datetime import date, datetime, timedelta, timezone
 from typing import Protocol
 
+from . import usage
 from .config import Settings, openai_client
 from .schemas import ALLOWED_INTERESTS, AssistantIntent, IntentRequest, IntentType, ReplanType
 
@@ -113,6 +114,7 @@ class OpenAIIntentExtractor:
             text_format=AssistantIntent,
             temperature=0,
         )
+        usage.record(response)
 
         intent = response.output_parsed
         if intent is None:

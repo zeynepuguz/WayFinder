@@ -3,10 +3,11 @@ import secrets
 import time
 import uuid
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from . import usage
 from .config import Settings, get_settings
 from .intent import IntentExtractor, OpenAIIntentExtractor
 from .photos import OpenAIPhotoVerifier, PhotoVerdict, PhotoVerifier, PhotoVerifyRequest
@@ -67,14 +68,19 @@ def health(settings: Settings = Depends(get_settings)) -> dict:
 
 
 @app.post("/v1/intent", response_model=AssistantIntent, dependencies=[Depends(require_api_key)])
-def parse_intent(request: IntentRequest, extractor: IntentExtractor = Depends(get_extractor)) -> AssistantIntent:
+def parse_intent(request: IntentRequest, response: Response,
+                 extractor: IntentExtractor = Depends(get_extractor)) -> AssistantIntent:
+    # Token counts go back as headers, also on failure (an unparsable answer was still paid for)
+    used = usage.start()
     try:
-        return extractor.extract(request)
+        intent = extractor.extract(request)
     except HTTPException:
         raise
     except Exception as e:  # LLM timeout, rate limit, invalid output...
         log.warning("Intent extraction failed: %s", e)
-        raise HTTPException(status_code=502, detail="Intent extraction failed") from e
+        raise HTTPException(status_code=502, detail="Intent extraction failed", headers=used.headers()) from e
+    response.headers.update(used.headers())
+    return intent
 
 
 _photo_verifier: PhotoVerifier | None = None
@@ -89,15 +95,19 @@ def get_photo_verifier(settings: Settings = Depends(get_settings)) -> PhotoVerif
 
 
 @app.post("/v1/photos/verify", response_model=PhotoVerdict, dependencies=[Depends(require_api_key)])
-def verify_photo(request: PhotoVerifyRequest, verifier: PhotoVerifier = Depends(get_photo_verifier)) -> PhotoVerdict:
+def verify_photo(request: PhotoVerifyRequest, response: Response,
+                 verifier: PhotoVerifier = Depends(get_photo_verifier)) -> PhotoVerdict:
+    used = usage.start()
     try:
-        return verifier.verify(request)
+        verdict = verifier.verify(request)
     except HTTPException:
         raise
     except Exception as e:  # moderation / LLM timeout, rate limit, invalid output...
         # Never log the image; the target name is enough to follow it
         log.warning("Photo verification failed for %s '%s': %s", request.target_type, request.name, e)
-        raise HTTPException(status_code=502, detail="Photo verification failed") from e
+        raise HTTPException(status_code=502, detail="Photo verification failed", headers=used.headers()) from e
+    response.headers.update(used.headers())
+    return verdict
 
 
 @app.exception_handler(RequestValidationError)

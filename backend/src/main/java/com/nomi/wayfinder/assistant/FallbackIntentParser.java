@@ -7,7 +7,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
-// Uses the AI service when configured, healthy and within the user's daily quota, otherwise the rule-based parser
+// Uses the AI service when configured, healthy, within the monthly budget and the user's daily quota,
+// otherwise the rule-based parser
 @Component
 @Primary
 public class FallbackIntentParser implements IntentParser {
@@ -27,7 +28,7 @@ public class FallbackIntentParser implements IntentParser {
 
     @Override
     public AssistantIntent parse(String message, IntentContext context) {
-        if (aiParser.isEnabled() && usageLimiter.tryAcquire(currentUser())) {
+        if (aiParser.isEnabled() && !aiParser.budgetReached() && usageLimiter.tryAcquire(currentUser())) {
             try {
                 return aiParser.parse(message, context);
             } catch (Exception e) {

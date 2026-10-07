@@ -99,6 +99,12 @@ nomi:
     api-key: ${AI_SERVICE_API_KEY:}
     connect-timeout: 2s
     read-timeout: 10s
+  # OpenAI spending (admin area "Yapay zekâ"): list prices in USD per 1M tokens of OPENAI_MODEL (defaults: gpt-4.1-mini)
+  ai-usage:
+    input-price-per-million: ${AI_PRICE_INPUT_PER_MILLION:0.40}
+    output-price-per-million: ${AI_PRICE_OUTPUT_PER_MILLION:1.60}
+    # Our own lock under the OpenAI project limit; 0 = none
+    monthly-budget-usd: ${AI_MONTHLY_BUDGET_USD:10}
   billing:
     dev-mode: ${BILLING_DEV_MODE:false}
     google-play-package-name: ${GOOGLE_PLAY_PACKAGE_NAME:com.nomi.app}

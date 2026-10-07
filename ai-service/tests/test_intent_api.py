@@ -202,3 +202,37 @@ def test_sanitize_caps_budget_and_target_text():
     intent = AssistantIntent(type=IntentType.REPLAN, plan=None, edits=[edit], recommendType=None, source=None)
     result = sanitize(intent, IntentRequest(message="x", context=IntentContext(hasRoute=True)))
     assert len(result.edits[0].targetText) == 100
+
+
+class UsageReportingExtractor(FakeExtractor):
+    """Reports token usage the way the OpenAI extractor does."""
+
+    def extract(self, request: IntentRequest) -> AssistantIntent:
+        from types import SimpleNamespace
+
+        from app import usage
+        usage.record(SimpleNamespace(model="gpt-4.1-mini",
+                                     usage=SimpleNamespace(input_tokens=1200, output_tokens=80)))
+        return super().extract(request)
+
+
+def test_intent_response_reports_token_usage():
+    client = client_with(UsageReportingExtractor(plan_intent()))
+    response = client.post("/v1/intent", json={"message": "kahve", "context": {}}, headers={"X-API-Key": "secret"})
+    assert response.status_code == 200
+    assert response.headers["X-AI-Model"] == "gpt-4.1-mini"
+    assert response.headers["X-AI-Input-Tokens"] == "1200"
+    assert response.headers["X-AI-Output-Tokens"] == "80"
+
+
+def test_failed_intent_still_reports_paid_tokens():
+    client = client_with(UsageReportingExtractor(plan_intent(), error=ValueError("bad output")))
+    response = client.post("/v1/intent", json={"message": "kahve", "context": {}}, headers={"X-API-Key": "secret"})
+    assert response.status_code == 502
+    assert response.headers["X-AI-Input-Tokens"] == "1200"
+
+
+def test_no_usage_headers_without_an_llm_call():
+    client = client_with(FakeExtractor(plan_intent()))
+    response = client.post("/v1/intent", json={"message": "kahve", "context": {}}, headers={"X-API-Key": "secret"})
+    assert "X-AI-Model" not in response.headers

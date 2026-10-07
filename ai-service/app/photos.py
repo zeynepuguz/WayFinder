@@ -18,6 +18,7 @@ from urllib.parse import urlparse
 
 from pydantic import BaseModel, Field, field_validator
 
+from . import usage
 from .config import Settings, openai_client
 
 log = logging.getLogger(__name__)
@@ -201,6 +202,7 @@ class OpenAIPhotoVerifier:
             text_format=PhotoJudgement,
             temperature=0,
         )
+        usage.record(response)
         judgement = response.output_parsed
         if judgement is None:
             raise ValueError("LLM returned no parsable photo judgement")

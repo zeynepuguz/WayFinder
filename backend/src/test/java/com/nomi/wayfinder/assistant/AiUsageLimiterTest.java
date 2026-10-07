@@ -79,4 +79,20 @@ class AiUsageLimiterTest {
         verify(ai, times(1)).parse(anyString(), any());
         verify(rules).parse("yağmur başladı", context);
     }
+
+    @Test
+    void monthlyBudgetReachedUsesTheRuleBasedParser() {
+        AiServiceIntentParser ai = mock(AiServiceIntentParser.class);
+        RuleBasedIntentParser rules = mock(RuleBasedIntentParser.class);
+        when(ai.isEnabled()).thenReturn(true);
+        when(ai.budgetReached()).thenReturn(true);
+        FallbackIntentParser parser = new FallbackIntentParser(ai, rules,
+                limiter(150, LocalDateTime.of(2026, 9, 27, 12, 0)));
+        IntentParser.IntentContext context = new IntentParser.IntentContext(false, List.of());
+
+        parser.parse("kahve içmek istiyorum", context);
+
+        verify(ai, never()).parse(anyString(), any());
+        verify(rules).parse("kahve içmek istiyorum", context);
+    }
 }

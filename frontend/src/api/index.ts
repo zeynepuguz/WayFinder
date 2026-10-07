@@ -1,6 +1,6 @@
 import { http } from './client'
 import type {
-  AccessPlan, AccessStatus, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
+  AccessPlan, AccessStatus, AiUsageSummary, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
   AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
@@ -71,6 +71,7 @@ export const api = {
   dismissReports: (placeId: number) => http.post<void>(`/admin/review/reports/${placeId}/dismiss`),
   feedbackList: () => http.get<AppFeedback[]>('/admin/review/feedback'),
   markFeedbackRead: (id: number) => http.post<void>(`/admin/review/feedback/${id}/read`),
+  aiUsage: () => http.get<AiUsageSummary>('/admin/ai-usage'),
   recommendations: (lat: number, lon: number, type?: StopType) =>
     http.get<Recommendation[]>('/recommendations', { lat, lon, type, limit: 5 }),
 

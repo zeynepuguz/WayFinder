@@ -68,6 +68,11 @@ kaydetme için giriş + aktif paket gerekir (backend 402 döner, uygulama paywal
 - Kullanıcı başına günlük sınır: `AI_DAILY_LIMIT_PER_USER` (varsayılan 150, İstanbul gününe göre sıfırlanır).
   Sınırı aşan kullanıcı engellenmez; o gün kural tabanlı parser cevap verir. Botlara ve hesap paylaşımına karşıdır.
 - Dakikada 30 istek sınırı ve mesaj başına 1000 karakter sınırı ayrıca geçerlidir.
+- Her AI çağrısı (asistan + fotoğraf kontrolü) `ai_usage` tablosuna yazılır: kullanıcı, tür, model, token, tahmini
+  maliyet, hata/süre (mesaj ve fotoğraf saklanmaz). Yönetim sayfasındaki "Yapay zekâ bu ay" kartında görünür.
+  Fiyatlar `AI_PRICE_INPUT_PER_MILLION` / `AI_PRICE_OUTPUT_PER_MILLION` (USD, 1M token).
+- Kendi aylık kilidimiz: `AI_MONTHLY_BUDGET_USD` (varsayılan 10 $). Tahmini aylık tutar buna ulaşınca asistan ay
+  sonuna kadar kural tabanlı parser ile cevap verir, fotoğraflar bekler. 0 = kilit yok.
 - **OpenAI panelinde** (platform.openai.com → Settings → Limits) aylık bütçe limiti ve e-posta uyarısı koy.
   Limit dolarsa backend yine kural tabanlı parser'a düşer, uygulama çalışmaya devam eder.
 
