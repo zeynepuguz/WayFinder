@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { api } from '../api'
-import { setUnauthorizedHandler, tokenStore } from '../api/client'
-import type { AccessStatus, AuthResponse, User } from '../api/types'
+import { setRenewedHandler, setUnauthorizedHandler, tokenStore } from '../api/client'
+import type { AccessStatus, AuthResponse, CodePurpose, CodeSent, RegisterRequest, User } from '../api/types'
 import { setAccessChangedHandler } from '../lib/billing'
 
 interface AuthState {
@@ -9,8 +9,11 @@ interface AuthState {
   loading: boolean
   // Signed in and has a running pass
   hasAccess: boolean
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, displayName: string) => Promise<void>
+  // Step one: the password / sign-up form; a code goes to the e-mail
+  login: (email: string, password: string) => Promise<CodeSent>
+  register: (request: RegisterRequest) => Promise<CodeSent>
+  // Step two: the e-mailed code signs in
+  verifyCode: (purpose: CodePurpose, email: string, code: string) => Promise<void>
   // Sets a new password with the e-mailed code and signs in
   resetPassword: (email: string, code: string, newPassword: string) => Promise<void>
   logout: () => void
@@ -20,17 +23,27 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null)
 
+const hasSession = () => tokenStore.get() !== null || tokenStore.getRefresh() !== null
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [loading, setLoading] = useState(() => tokenStore.get() !== null)
+  const [loading, setLoading] = useState(hasSession)
 
-  const logout = useCallback(() => {
+  // The session ended (expired, signed out elsewhere): forget the tokens here
+  const forget = useCallback(() => {
     tokenStore.set(null)
     setUser(null)
   }, [])
 
+  // Signing out also ends the session on the server, so the refresh token cannot be used again
+  const logout = useCallback(() => {
+    const refreshToken = tokenStore.getRefresh()
+    if (refreshToken) void api.logout(refreshToken).catch(() => {})
+    forget()
+  }, [forget])
+
   const accept = useCallback((response: AuthResponse) => {
-    tokenStore.set(response.accessToken)
+    tokenStore.set(response.accessToken, response.refreshToken)
     setUser(response.user)
   }, [])
 
@@ -38,16 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(await api.me())
   }, [])
 
-  // Restore the session from a saved token; keep access in sync after purchases
+  // Restore the session from saved tokens (renewed by the client when the access token ran out);
+  // keep access in sync after purchases
   useEffect(() => {
-    setUnauthorizedHandler(logout)
+    setUnauthorizedHandler(forget)
+    setRenewedHandler(setUser)
     setAccessChangedHandler((access: AccessStatus) => setUser(current => current ? { ...current, access } : current))
-    if (!tokenStore.get()) return
+    if (!hasSession()) return
     api.me()
       .then(setUser)
-      .catch(() => logout())
+      // Only a finished session signs out (the client calls forget); offline keeps the tokens for the next start
+      .catch(() => {})
       .finally(() => setLoading(false))
-  }, [logout])
+  }, [forget])
 
   // A pass can run out while the app is open
   const expiresAt = user?.access.expiresAt
@@ -67,16 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     user,
     loading,
     hasAccess,
-    login: async (email, password) => accept(await api.login(email, password)),
-    register: async (email, password, displayName) => accept(await api.register(email, password, displayName)),
+    login: (email, password) => api.login(email, password),
+    register: request => api.register(request),
+    verifyCode: async (purpose, email, code) =>
+      accept(await (purpose === 'SIGN_UP' ? api.verifyRegister(email, code) : api.verifyLogin(email, code))),
     resetPassword: async (email, code, newPassword) => accept(await api.resetPassword(email, code, newPassword)),
     logout,
     deleteAccount: async () => {
       await api.deleteAccount()
-      logout()
+      forget()
     },
     refreshUser,
-  }), [user, loading, hasAccess, accept, logout, refreshUser])
+  }), [user, loading, hasAccess, accept, logout, forget, refreshUser])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

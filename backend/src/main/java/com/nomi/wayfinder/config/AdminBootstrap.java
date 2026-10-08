@@ -9,6 +9,8 @@ import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+
 // Creates the first ADMIN from ADMIN_EMAIL / ADMIN_PASSWORD so places can be managed through the API
 @Component
 public class AdminBootstrap implements ApplicationRunner {
@@ -37,7 +39,8 @@ public class AdminBootstrap implements ApplicationRunner {
             return;
         }
 
-        userService.createUser(email, password, "Admin", UserRole.ADMIN);
+        // Set by the owner in .env, so taken as verified; signing in still needs the code e-mailed to it
+        userService.createUser(email, password, "Nomi", "Admin", UserRole.ADMIN, Instant.now());
         log.info("Created admin user {}", email);
     }
 }

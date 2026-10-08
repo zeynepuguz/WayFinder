@@ -90,6 +90,18 @@ verdikleri paket `REVOKED` olur (`VoidedPurchaseSync`). Servis hesabı ayarlanan
 - Backend asistan cevaplarını, rota notlarını, hava önerilerini ve mekan açıklamalarını (`places.description_en`)
   isteğin dilinde döner. Kural tabanlı parser temel İngilizce cümleleri de anlar.
 
+## Kayıt, giriş ve oturum
+
+- **Kayıt:** ad, soyad, e-posta, şifre → `POST /auth/register` e-postaya 6 haneli kod yollar → `POST /auth/register/verify`
+  ile hesap açılır. Kod girilmeyen kayıtlar giriş yapamaz ve bir gün sonra silinir.
+- **Giriş:** şifre doğruysa `POST /auth/login` yalnızca kod yollar; oturumu `POST /auth/login/verify` (kod) açar.
+  Şifreyi bilen biri e-postaya erişemiyorsa giremez (owner/admin hesabı dahil). Aynı e-postaya 15 dakikada 5 yanlış
+  şifre → 15 dakika kilit. Kod: 10 dk geçerli, 5 deneme, dakikada 1 yeni kod (`POST /auth/code/resend`).
+- **Oturum:** 15 dakikalık erişim token'ı + yenileme token'ı. `POST /auth/refresh` her kullanımda yeni token verir ve
+  oturumu 7 gün uzatır; 7 gün kullanılmayan oturum biter. Değiştirilmiş eski bir token 1 dakikadan sonra tekrar
+  gelirse (çalınmış kopya) oturum kapanır. Şifre sıfırlama tüm cihazlardaki oturumları kapatır.
+- `OWNER_EMAILS` hesabı yalnızca e-postası kodla doğrulandıktan sonra ADMIN olur.
+
 ## Şifremi unuttum
 
 `POST /api/v1/auth/password/forgot` e-postaya 6 haneli kod yollar (15 dk geçerli, 5 deneme, dakikada 1 yeni kod);

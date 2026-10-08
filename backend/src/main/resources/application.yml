@@ -81,7 +81,8 @@ nomi:
   timezone: Europe/Istanbul
   security:
     jwt-secret: ${JWT_SECRET:}
-    jwt-expiration-minutes: ${JWT_EXPIRATION_MINUTES:1440}
+    # Access token only; the session itself lasts 7 days after the last use (refresh token, SessionService)
+    jwt-expiration-minutes: ${JWT_EXPIRATION_MINUTES:15}
     admin-email: ${ADMIN_EMAIL:}
     admin-password: ${ADMIN_PASSWORD:}
     # The owner's accounts, comma separated: ADMIN when they register or sign in (admin area). Keep it in .env

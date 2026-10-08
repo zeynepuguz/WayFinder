@@ -5,6 +5,7 @@ import com.nomi.wayfinder.entity.User;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.repository.PasswordResetCodeRepository;
 import com.nomi.wayfinder.repository.UserRepository;
+import com.nomi.wayfinder.security.SessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -45,6 +46,7 @@ class PasswordResetServiceTest {
     private UserRepository users;
     private MailService mail;
     private UserService userService;
+    private SessionService sessions;
 
     @BeforeEach
     void setUp() {
@@ -58,6 +60,7 @@ class PasswordResetServiceTest {
         when(users.findByEmailIgnoreCase("zeynep@example.com")).thenReturn(Optional.of(user));
         mail = mock(MailService.class);
         userService = mock(UserService.class);
+        sessions = mock(SessionService.class);
     }
 
     private PasswordResetService service(Instant now) {
@@ -75,7 +78,8 @@ class PasswordResetServiceTest {
         }).when(repository).deleteByUserId(7L);
         when(repository.findFirstByUserIdOrderByCreatedAtDesc(7L)).thenAnswer(inv ->
                 codes.stream().max(Comparator.comparing(PasswordResetCode::getCreatedAt)));
-        return new PasswordResetService(users, repository, ENCODER, mail, userService, Clock.fixed(now, ZoneOffset.UTC));
+        return new PasswordResetService(users, repository, ENCODER, mail, userService, sessions,
+                Clock.fixed(now, ZoneOffset.UTC));
     }
 
     private String requestAndCaptureCode(Instant now) {
@@ -91,11 +95,13 @@ class PasswordResetServiceTest {
         assertThat(code).matches("\\d{6}");
         assertThat(codes.getFirst().getCodeHash()).isNotEqualTo(code);
 
-        service(NOW.plusSeconds(60)).resetPassword("zeynep@example.com", code, "new-password");
+        service(NOW.plusSeconds(60)).resetPassword("zeynep@example.com", code, "new-password", "test");
 
         assertThat(user.getPasswordHash()).isEqualTo("hash:new-password");
-        verify(userService).toAuthResponse(user);
-        assertThatThrownBy(() -> service(NOW.plusSeconds(90)).resetPassword("zeynep@example.com", code, "again-123"))
+        verify(userService).signIn(user, "test");
+        // Whoever knew the old password is signed out everywhere
+        verify(sessions).endAll(7L);
+        assertThatThrownBy(() -> service(NOW.plusSeconds(90)).resetPassword("zeynep@example.com", code, "again-123", "test"))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -112,7 +118,7 @@ class PasswordResetServiceTest {
         String code = requestAndCaptureCode(NOW);
 
         assertThatThrownBy(() -> service(NOW.plus(Duration.ofMinutes(16)))
-                .resetPassword("zeynep@example.com", code, "new-password"))
+                .resetPassword("zeynep@example.com", code, "new-password", "test"))
                 .isInstanceOf(BusinessException.class);
         assertThat(user.getPasswordHash()).isEqualTo("hash:old-password");
     }
@@ -123,11 +129,11 @@ class PasswordResetServiceTest {
         String wrong = code.equals("000000") ? "111111" : "000000";
 
         for (int i = 0; i < PasswordResetService.MAX_ATTEMPTS; i++) {
-            assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", wrong, "new-password"))
+            assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", wrong, "new-password", "test"))
                     .isInstanceOf(BusinessException.class);
         }
 
-        assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", code, "new-password"))
+        assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", code, "new-password", "test"))
                 .isInstanceOf(BusinessException.class);
         assertThat(user.getPasswordHash()).isEqualTo("hash:old-password");
     }
@@ -143,7 +149,7 @@ class PasswordResetServiceTest {
         assertThat(codes).hasSize(1);
 
         if (!codes.getFirst().getCodeHash().equals("hash:" + first)) {
-            assertThatThrownBy(() -> service(NOW.plusSeconds(70)).resetPassword("zeynep@example.com", first, "new-password"))
+            assertThatThrownBy(() -> service(NOW.plusSeconds(70)).resetPassword("zeynep@example.com", first, "new-password", "test"))
                     .isInstanceOf(BusinessException.class);
         }
     }

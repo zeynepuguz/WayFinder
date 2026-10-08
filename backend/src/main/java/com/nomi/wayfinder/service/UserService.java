@@ -11,12 +11,19 @@ import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.photo.PhotoService;
 import com.nomi.wayfinder.repository.UserPreferencesRepository;
 import com.nomi.wayfinder.repository.UserRepository;
+import com.nomi.wayfinder.security.EmailCodeService;
+import com.nomi.wayfinder.security.EmailCodeService.Purpose;
 import com.nomi.wayfinder.security.JwtService;
+import com.nomi.wayfinder.security.LoginAttemptLimiter;
+import com.nomi.wayfinder.security.SessionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -31,8 +38,17 @@ public class UserService {
     private final JwtService jwtService;
     private final BillingService billingService;
     private final PhotoService photoService;
-    // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they register or sign in
+    private final EmailCodeService emailCodes;
+    private final SessionService sessions;
+    private final LoginAttemptLimiter loginAttempts;
+    private final MailService mailService;
+    private final Clock clock;
+    // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they sign up or sign in with a proven e-mail
     private final Set<String> ownerEmails;
+
+    static final String INVALID_CODE = "Invalid or expired code";
+    // Resend only works this long after step one (password / sign-up form) passed
+    static final Duration RESEND_WINDOW = Duration.ofMinutes(30);
 
     public UserService(
             UserRepository userRepository,
@@ -41,8 +57,18 @@ public class UserService {
             JwtService jwtService,
             BillingService billingService,
             PhotoService photoService,
+            EmailCodeService emailCodes,
+            SessionService sessions,
+            LoginAttemptLimiter loginAttempts,
+            MailService mailService,
+            Clock clock,
             NomiProperties properties
     ) {
+        this.emailCodes = emailCodes;
+        this.sessions = sessions;
+        this.loginAttempts = loginAttempts;
+        this.mailService = mailService;
+        this.clock = clock;
         List<String> owners = properties.security() == null ? null : properties.security().ownerEmails();
         this.ownerEmails = (owners == null ? List.<String>of() : owners).stream()
                 .map(e -> e.trim().toLowerCase(Locale.ROOT)).filter(e -> !e.isEmpty())
@@ -55,15 +81,42 @@ public class UserService {
         this.photoService = photoService;
     }
 
+    /**
+     * Sign-up step one: the account is created unverified and a code goes to the e-mail. Signing up again before the
+     * code was entered replaces the name and password (only the e-mail's owner can finish it with the code).
+     */
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        User user = createUser(request.email(), request.password(), request.displayName(), UserRole.USER);
-        return toAuthResponse(promoteOwner(user));
+    public CodeSentResponse register(RegisterRequest request) {
+        String email = normalize(request.email());
+        User user = userRepository.findByEmailIgnoreCase(email).orElse(null);
+        if (user != null && user.isEmailVerified()) {
+            throw new BusinessException(HttpStatus.CONFLICT, "Email is already registered");
+        }
+        if (user == null) {
+            user = createUser(email, request.password(), request.firstName().trim(), request.lastName().trim(),
+                    UserRole.USER, null);
+        } else {
+            user.setName(request.firstName().trim(), request.lastName().trim());
+            user.setPasswordHash(passwordEncoder.encode(request.password()));
+            userRepository.save(user);
+        }
+        sendCode(user, Purpose.SIGN_UP);
+        return codeSent(email);
     }
 
+    // noRollbackFor: a wrong guess must still be counted
+    @Transactional(noRollbackFor = BusinessException.class)
+    public AuthResponse verifySignUp(VerifyCodeRequest request, String userAgent) {
+        return verify(request, Purpose.SIGN_UP, userAgent);
+    }
+
+    /**
+     * @param verifiedAt null = the e-mail still has to be proven with the sign-up code
+     */
     @Transactional
-    public User createUser(String email, String password, String displayName, UserRole role) {
-        String normalizedEmail = email.trim().toLowerCase(Locale.ROOT);
+    public User createUser(String email, String password, String firstName, String lastName, UserRole role,
+                           Instant verifiedAt) {
+        String normalizedEmail = normalize(email);
 
         if (userRepository.existsByEmailIgnoreCase(normalizedEmail)) {
             throw new BusinessException(HttpStatus.CONFLICT, "Email is already registered");
@@ -72,27 +125,117 @@ public class UserService {
         User user = new User();
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(password));
-        user.setDisplayName(displayName.trim());
+        user.setName(firstName, lastName);
         user.setRole(role);
+        if (verifiedAt != null) {
+            user.markEmailVerified(verifiedAt);
+        }
         User saved = userRepository.save(user);
 
         preferencesRepository.save(new UserPreferences(saved.getId()));
         return saved;
     }
 
+    /**
+     * Sign-in step one: the right password sends a code to the e-mail; only the code signs in. So knowing the
+     * password is not enough to get into an account (also the owner's admin account).
+     */
     @Transactional
-    public AuthResponse login(LoginRequest request) {
+    public CodeSentResponse login(LoginRequest request) {
+        String email = normalize(request.email());
+        if (loginAttempts.locked(email)) {
+            throw new BusinessException(HttpStatus.TOO_MANY_REQUESTS, "Too many attempts, try again in 15 minutes");
+        }
         // Same message for unknown email and wrong password, so emails cannot be probed
-        User user = userRepository.findByEmailIgnoreCase(request.email().trim())
+        User user = userRepository.findByEmailIgnoreCase(email)
                 .filter(u -> passwordEncoder.matches(request.password(), u.getPasswordHash()))
-                .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
-
-        return toAuthResponse(promoteOwner(user));
+                .orElse(null);
+        if (user == null) {
+            loginAttempts.failed(email);
+            throw new BusinessException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
+        loginAttempts.succeeded(email);
+        // An account whose sign-up code was never entered finishes the sign-up instead
+        Purpose purpose = user.isEmailVerified() ? Purpose.SIGN_IN : Purpose.SIGN_UP;
+        sendCode(user, purpose);
+        return codeSent(email);
     }
 
-    // An owner account becomes ADMIN (admin area, place reviews); the role is in the token from this sign-in on
+    @Transactional(noRollbackFor = BusinessException.class)
+    public AuthResponse verifySignIn(VerifyCodeRequest request, String userAgent) {
+        return verify(request, Purpose.SIGN_IN, userAgent);
+    }
+
+    /**
+     * A new code, at most once a minute, only while a sign-up / sign-in is running (step one passed within the
+     * last half hour): nobody can make Nomi mail codes to an address. Always 202.
+     */
+    @Transactional
+    public void resendCode(ResendCodeRequest request) {
+        userRepository.findByEmailIgnoreCase(normalize(request.email()))
+                .filter(user -> emailCodes.sentWithin(user.getId(), request.purpose(), RESEND_WINDOW))
+                .ifPresent(user -> sendCode(user, request.purpose()));
+    }
+
+    private AuthResponse verify(VerifyCodeRequest request, Purpose purpose, String userAgent) {
+        User user = userRepository.findByEmailIgnoreCase(normalize(request.email()))
+                .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, INVALID_CODE));
+        // A not yet verified account signs in with its sign-up code
+        Purpose expected = user.isEmailVerified() ? purpose : Purpose.SIGN_UP;
+        if (!emailCodes.verify(user.getId(), expected, request.code())) {
+            throw new BusinessException(HttpStatus.BAD_REQUEST, INVALID_CODE);
+        }
+        user.markEmailVerified(clock.instant());
+        userRepository.save(user);
+        return signIn(promoteOwner(user), userAgent);
+    }
+
+    private void sendCode(User user, Purpose purpose) {
+        emailCodes.send(user.getId(), purpose, code -> {
+            long minutes = EmailCodeService.CODE_TTL.toMinutes();
+            if (purpose == Purpose.SIGN_UP) {
+                String name = user.getFirstName() != null ? user.getFirstName() : user.getDisplayName();
+                mailService.sendSignUpCode(user.getEmail(), name, code, minutes);
+            } else {
+                mailService.sendSignInCode(user.getEmail(), code, minutes);
+            }
+        });
+    }
+
+    private static CodeSentResponse codeSent(String email) {
+        return new CodeSentResponse(maskEmail(email), EmailCodeService.CODE_TTL.toMinutes(),
+                EmailCodeService.RESEND_AFTER.toSeconds());
+    }
+
+    // "zeynep@gmail.com" -> "ze****@gmail.com": the user sees where the code went, a screenshot does not leak it
+    static String maskEmail(String email) {
+        int at = email.indexOf('@');
+        if (at <= 0) {
+            return email;
+        }
+        String local = email.substring(0, at);
+        String shown = local.substring(0, local.length() > 2 ? 2 : 1);
+        return shown + "****" + email.substring(at);
+    }
+
+    /** POST /auth/refresh: a new token pair for a valid refresh token; the session runs 7 more days. */
+    @Transactional(noRollbackFor = BusinessException.class)
+    public AuthResponse refresh(String refreshToken) {
+        SessionService.Issued session = sessions.refresh(refreshToken);
+        User user = userRepository.findById(session.userId())
+                .orElseThrow(() -> new BusinessException(HttpStatus.UNAUTHORIZED, SessionService.SIGN_IN_AGAIN));
+        return toAuthResponse(user, session);
+    }
+
+    public void logout(String refreshToken) {
+        sessions.end(refreshToken);
+    }
+
+    // An owner account becomes ADMIN (admin area, place reviews) once its e-mail is proven; the role is in the
+    // token from this sign-in on
     User promoteOwner(User user) {
-        if (user.getRole() != UserRole.ADMIN && ownerEmails.contains(user.getEmail().toLowerCase(Locale.ROOT))) {
+        if (user.getRole() != UserRole.ADMIN && user.isEmailVerified()
+                && ownerEmails.contains(user.getEmail().toLowerCase(Locale.ROOT))) {
             user.setRole(UserRole.ADMIN);
             return userRepository.save(user);
         }
@@ -136,10 +279,19 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    // Signs the user in: new JWT + profile
-    public AuthResponse toAuthResponse(User user) {
+    // Signs the user in on this device: a new session (7 days while used), JWT + profile
+    public AuthResponse signIn(User user, String userAgent) {
+        return toAuthResponse(user, sessions.start(user.getId(), userAgent));
+    }
+
+    private AuthResponse toAuthResponse(User user, SessionService.Issued session) {
         JwtService.IssuedToken token = jwtService.issue(user);
-        return new AuthResponse(token.value(), "Bearer", token.expiresAt(), toUserResponse(user));
+        return new AuthResponse(token.value(), "Bearer", token.expiresAt(), session.refreshToken(),
+                session.expiresAt(), toUserResponse(user));
+    }
+
+    private static String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private UserResponse toUserResponse(User user) {
@@ -147,6 +299,8 @@ public class UserService {
                 user.getId(),
                 user.getEmail(),
                 user.getDisplayName(),
+                user.getFirstName(),
+                user.getLastName(),
                 user.getRole(),
                 toPreferencesResponse(getPreferences(user.getId())),
                 billingService.status(user.getId())

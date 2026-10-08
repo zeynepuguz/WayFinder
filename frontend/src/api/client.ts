@@ -1,9 +1,10 @@
 import { currentLang, tr } from '../lib/i18n'
-import type { ApiError } from './types'
+import type { ApiError, AuthResponse, User } from './types'
 
 // Web (dev): same origin through the Vite proxy. Android app: the public API URL (VITE_API_BASE_URL).
 const BASE = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 const TOKEN_KEY = 'nomi.token'
+const REFRESH_KEY = 'nomi.refresh'
 export const PAYMENT_REQUIRED_EVENT = 'nomi:payment-required'
 
 export class ApiRequestError extends Error {
@@ -17,28 +18,84 @@ export class ApiRequestError extends Error {
   }
 }
 
+function read(key: string): string | null {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function write(key: string, value: string | null) {
+  try {
+    if (value) localStorage.setItem(key, value)
+    else localStorage.removeItem(key)
+  } catch {
+    // private mode etc.: the session just will not survive a reload
+  }
+}
+
+/**
+ * The short access token (15 min) for API calls and the refresh token that renews it. The session lasts 7 days
+ * after the last use: every renewal moves its end (backend SessionService).
+ */
 export const tokenStore = {
-  get(): string | null {
-    try {
-      return localStorage.getItem(TOKEN_KEY)
-    } catch {
-      return null
-    }
-  },
-  set(token: string | null) {
-    try {
-      if (token) localStorage.setItem(TOKEN_KEY, token)
-      else localStorage.removeItem(TOKEN_KEY)
-    } catch {
-      // private mode etc.: the session just will not survive a reload
-    }
+  get: () => read(TOKEN_KEY),
+  getRefresh: () => read(REFRESH_KEY),
+  // null signs out: both tokens go
+  set(token: string | null, refreshToken?: string | null) {
+    write(TOKEN_KEY, token)
+    if (token === null) write(REFRESH_KEY, null)
+    else if (refreshToken !== undefined) write(REFRESH_KEY, refreshToken)
   },
 }
 
-// Called when the backend says the token is no longer valid (set by AuthProvider)
+// Called when the backend says the session is over (set by AuthProvider)
 let onUnauthorized: () => void = () => {}
 export function setUnauthorizedHandler(handler: () => void) {
   onUnauthorized = handler
+}
+
+// Called with the fresh profile after a renewal (set by AuthProvider)
+let onRenewed: (user: User) => void = () => {}
+export function setRenewedHandler(handler: (user: User) => void) {
+  onRenewed = handler
+}
+
+type Renewal = 'renewed' | 'ended' | 'offline'
+let renewing: Promise<Renewal> | null = null
+
+/**
+ * Renews the session with the refresh token; parallel callers share one renewal (the backend replaces the refresh
+ * token, a second renewal with the old one would be refused).
+ */
+export function renewSession(): Promise<Renewal> {
+  renewing ??= doRenew().finally(() => { renewing = null })
+  return renewing
+}
+
+async function doRenew(): Promise<Renewal> {
+  const used = tokenStore.getRefresh()
+  if (!used) return 'ended'
+  let response: Response
+  try {
+    response = await fetch(`${BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken: used }),
+    })
+  } catch {
+    return 'offline'
+  }
+  if (response.ok) {
+    const body = await response.json() as AuthResponse
+    tokenStore.set(body.accessToken, body.refreshToken)
+    onRenewed(body.user)
+    return 'renewed'
+  }
+  // Another tab renewed with the same token a moment earlier: its new tokens are in the shared storage
+  if (response.status === 401 && tokenStore.getRefresh() !== used) return 'renewed'
+  return response.status === 401 ? 'ended' : 'offline'
 }
 
 /**
@@ -66,7 +123,8 @@ export function buildQuery(query?: Query): string {
   return text ? `?${text}` : ''
 }
 
-async function request<T>(method: string, path: string, body?: unknown, query?: Query, signal?: AbortSignal): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, query?: Query, signal?: AbortSignal,
+                          retried = false): Promise<T> {
   // Accept-Language: the backend answers (assistant, route notes, place texts) in the app's language
   const headers: Record<string, string> = { Accept: 'application/json', 'Accept-Language': currentLang() }
   const token = tokenStore.get()
@@ -94,8 +152,12 @@ async function request<T>(method: string, path: string, body?: unknown, query?: 
     window.dispatchEvent(new CustomEvent(PAYMENT_REQUIRED_EVENT))
   }
 
-  if (response.status === 401 && token) {
-    onUnauthorized()
+  // Expired access token: renew the session once and repeat the request. Sign-in calls answer 401 for a wrong
+  // password, which has nothing to renew
+  if (response.status === 401 && !path.startsWith('/auth/') && (token || tokenStore.getRefresh())) {
+    const renewal = retried ? 'ended' : await renewSession()
+    if (renewal === 'renewed') return request<T>(method, path, body, query, signal, true)
+    if (renewal === 'ended') onUnauthorized()
   }
 
   if (!response.ok) {

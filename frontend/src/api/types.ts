@@ -32,7 +32,10 @@ export interface Preferences {
 export interface User {
   id: number
   email: string
+  // "Ad Soyad"; accounts from before name and surname were asked only have this
   displayName: string
+  firstName: string | null
+  lastName: string | null
   role: 'USER' | 'ADMIN'
   preferences: Preferences
   access: AccessStatus
@@ -64,10 +67,29 @@ export interface PlansResponse {
 }
 
 export interface AuthResponse {
+  // Short (15 min); renewed with refreshToken, which keeps the session for 7 days after the last use
   accessToken: string
   tokenType: string
   expiresAt: string
+  refreshToken: string
+  refreshExpiresAt: string
   user: User
+}
+
+export interface RegisterRequest {
+  firstName: string
+  lastName: string
+  email: string
+  password: string
+}
+
+export type CodePurpose = 'SIGN_UP' | 'SIGN_IN'
+
+// Step one of sign-up / sign-in passed: a code went to the (partly hidden) address
+export interface CodeSent {
+  email: string
+  validMinutes: number
+  resendAfterSeconds: number
 }
 
 // ---------- places ----------

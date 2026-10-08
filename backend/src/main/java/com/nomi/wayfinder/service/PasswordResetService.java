@@ -6,6 +6,7 @@ import com.nomi.wayfinder.entity.User;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.repository.PasswordResetCodeRepository;
 import com.nomi.wayfinder.repository.UserRepository;
+import com.nomi.wayfinder.security.SessionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -38,6 +39,7 @@ public class PasswordResetService {
     private final PasswordEncoder passwordEncoder;
     private final MailService mailService;
     private final UserService userService;
+    private final SessionService sessions;
     private final Clock clock;
 
     public PasswordResetService(
@@ -46,8 +48,10 @@ public class PasswordResetService {
             PasswordEncoder passwordEncoder,
             MailService mailService,
             UserService userService,
+            SessionService sessions,
             Clock clock
     ) {
+        this.sessions = sessions;
         this.userRepository = userRepository;
         this.codeRepository = codeRepository;
         this.passwordEncoder = passwordEncoder;
@@ -80,7 +84,7 @@ public class PasswordResetService {
 
     // noRollbackFor: a wrong guess must still be counted
     @Transactional(noRollbackFor = BusinessException.class)
-    public AuthResponse resetPassword(String email, String code, String newPassword) {
+    public AuthResponse resetPassword(String email, String code, String newPassword, String userAgent) {
         User user = userRepository.findByEmailIgnoreCase(email.trim())
                 .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, INVALID_CODE));
         Instant now = clock.instant();
@@ -97,7 +101,11 @@ public class PasswordResetService {
 
         resetCode.markUsed(now);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
+        // The code came by e-mail, so the address is proven too
+        user.markEmailVerified(now);
         userRepository.save(user);
-        return userService.toAuthResponse(user);
+        // Whoever knew the old password is signed out everywhere
+        sessions.endAll(user.getId());
+        return userService.signIn(user, userAgent);
     }
 }

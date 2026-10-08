@@ -18,8 +18,16 @@ public class User {
     @Column(nullable = false)
     private String passwordHash;
 
+    // "Ad Soyad"; accounts from before sign-up asked for both only have this
     @Column(nullable = false)
     private String displayName;
+
+    private String firstName;
+
+    private String lastName;
+
+    // Null until the sign-up code is entered: such an account cannot sign in
+    private Instant emailVerifiedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -74,5 +82,33 @@ public class User {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setName(String firstName, String lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+        this.displayName = firstName + " " + lastName;
+    }
+
+    public Instant getEmailVerifiedAt() {
+        return emailVerifiedAt;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerifiedAt != null;
+    }
+
+    public void markEmailVerified(Instant at) {
+        if (emailVerifiedAt == null) {
+            emailVerifiedAt = at;
+        }
     }
 }

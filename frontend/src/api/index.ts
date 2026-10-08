@@ -1,7 +1,7 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, AiUsageSummary, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
+  AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
@@ -24,9 +24,13 @@ const photosPath = (target: PhotoTarget) => (target.type === 'PLACE'
 
 // One function per backend endpoint, so pages never build URLs themselves
 export const api = {
-  register: (email: string, password: string, displayName: string) =>
-    http.post<AuthResponse>('/auth/register', { email, password, displayName }),
-  login: (email: string, password: string) => http.post<AuthResponse>('/auth/login', { email, password }),
+  // Sign-up and sign-in: step one e-mails a 6-digit code, step two (verify) signs in with it
+  register: (request: RegisterRequest) => http.post<CodeSent>('/auth/register', request),
+  verifyRegister: (email: string, code: string) => http.post<AuthResponse>('/auth/register/verify', { email, code }),
+  login: (email: string, password: string) => http.post<CodeSent>('/auth/login', { email, password }),
+  verifyLogin: (email: string, code: string) => http.post<AuthResponse>('/auth/login/verify', { email, code }),
+  resendCode: (email: string, purpose: CodePurpose) => http.post<void>('/auth/code/resend', { email, purpose }),
+  logout: (refreshToken: string) => http.post<void>('/auth/logout', { refreshToken }),
   forgotPassword: (email: string) => http.post<void>('/auth/password/forgot', { email }),
   resetPassword: (email: string, code: string, newPassword: string) =>
     http.post<AuthResponse>('/auth/password/reset', { email, code, newPassword }),
