@@ -12,6 +12,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
+import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -20,6 +21,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -192,6 +194,99 @@ class AuthFlowTest {
                 {"refreshToken": "%s"}""".formatted(third)).andExpect(status().isNoContent());
         postJson("/refresh", """
                 {"refreshToken": "%s"}""".formatted(third)).andExpect(status().isUnauthorized());
+    }
+
+    private static final String WINDOWS_CHROME = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+    private static final String ANDROID_APP = "Mozilla/5.0 (Linux; Android 14; Pixel 7; wv) AppleWebKit/537.36 "
+            + "(KHTML, like Gecko) Version/4.0 Chrome/141.0.0.0 Mobile Safari/537.36";
+
+    // Sign-in from a device (User-Agent); returns the answer with tokens
+    private JsonNode signInFrom(String email, String userAgent) throws Exception {
+        postJson("/login", """
+                {"email": "%s", "password": "%s"}""".formatted(email, PASSWORD)).andExpect(status().isAccepted());
+        return body(mvc.perform(post("/api/v1/auth/login/verify").contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", userAgent)
+                        .content("""
+                                {"email": "%s", "code": "%s"}""".formatted(email, lastSignInCode(email))))
+                .andExpect(status().isOk()));
+    }
+
+    private JsonNode signedUpFrom(String email, String userAgent) throws Exception {
+        register(email).andExpect(status().isAccepted());
+        return body(mvc.perform(post("/api/v1/auth/register/verify").contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", userAgent)
+                        .content("""
+                                {"email": "%s", "code": "%s"}""".formatted(email, lastSignUpCode(email))))
+                .andExpect(status().isCreated()));
+    }
+
+    private ResultActions authorized(MockHttpServletRequestBuilder request,
+                                     JsonNode signedIn) throws Exception {
+        return mvc.perform(request.header("Authorization", "Bearer " + signedIn.get("accessToken").asString()));
+    }
+
+    @Test
+    void aSignInFromANewDeviceIsReportedByEmail() throws Exception {
+        String email = newEmail();
+        signedUpFrom(email, WINDOWS_CHROME);
+        signInFrom(email, WINDOWS_CHROME);
+        // The sign-up device and the same browser again: no alert
+        verify(mail, never()).sendNewDeviceAlert(anyString(), any(), any(), anyString());
+
+        signInFrom(email, ANDROID_APP);
+
+        verify(mail).sendNewDeviceAlert(eq(email), eq("Nomi · Android"), anyString(), anyString());
+    }
+
+    @Test
+    void theProfileListsOpenSessionsAndEndsOneAtOnce() throws Exception {
+        String email = newEmail();
+        JsonNode laptop = signedUpFrom(email, WINDOWS_CHROME);
+        JsonNode phone = signInFrom(email, ANDROID_APP);
+
+        JsonNode list = body(authorized(get("/api/v1/users/me/sessions"), laptop).andExpect(status().isOk()));
+        assertThat(list.size()).isEqualTo(2);
+        JsonNode first = list.get(0);
+        JsonNode second = list.get(1);
+        JsonNode phoneRow = first.get("device").asString().equals("Nomi · Android") ? first : second;
+        JsonNode laptopRow = phoneRow == first ? second : first;
+        assertThat(laptopRow.get("current").asBoolean()).isTrue();
+        assertThat(phoneRow.get("current").asBoolean()).isFalse();
+
+        authorized(delete("/api/v1/users/me/sessions/" + phoneRow.get("id").asLong()), laptop)
+                .andExpect(status().isNoContent());
+
+        // The phone's access token stops working right away, not in 15 minutes, and cannot be renewed
+        authorized(get("/api/v1/users/me"), phone).andExpect(status().isUnauthorized());
+        postJson("/refresh", """
+                {"refreshToken": "%s"}""".formatted(phone.get("refreshToken").asString())).andExpect(status().isUnauthorized());
+        authorized(get("/api/v1/users/me"), laptop).andExpect(status().isOk());
+    }
+
+    @Test
+    void endOthersKeepsOnlyThisDevice() throws Exception {
+        String email = newEmail();
+        JsonNode laptop = signedUpFrom(email, WINDOWS_CHROME);
+        JsonNode phone = signInFrom(email, ANDROID_APP);
+
+        JsonNode ended = body(authorized(post("/api/v1/users/me/sessions/end-others"), laptop)
+                .andExpect(status().isOk()));
+
+        assertThat(ended.get("ended").asInt()).isEqualTo(1);
+        authorized(get("/api/v1/users/me"), phone).andExpect(status().isUnauthorized());
+        assertThat(body(authorized(get("/api/v1/users/me/sessions"), laptop)).size()).isEqualTo(1);
+    }
+
+    @Test
+    void nobodyCanEndAnotherUsersSession() throws Exception {
+        JsonNode mine = signedUpFrom(newEmail(), WINDOWS_CHROME);
+        JsonNode theirs = signedUpFrom(newEmail(), ANDROID_APP);
+        long theirSession = body(authorized(get("/api/v1/users/me/sessions"), theirs)).get(0).get("id").asLong();
+
+        authorized(delete("/api/v1/users/me/sessions/" + theirSession), mine)
+                .andExpect(status().isNotFound());
+        authorized(get("/api/v1/users/me"), theirs).andExpect(status().isOk());
     }
 
     @Test

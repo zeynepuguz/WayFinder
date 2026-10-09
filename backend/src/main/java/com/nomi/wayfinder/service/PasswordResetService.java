@@ -7,6 +7,7 @@ import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.repository.PasswordResetCodeRepository;
 import com.nomi.wayfinder.repository.UserRepository;
 import com.nomi.wayfinder.security.SessionService;
+import com.nomi.wayfinder.security.SessionService.Client;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -84,7 +85,7 @@ public class PasswordResetService {
 
     // noRollbackFor: a wrong guess must still be counted
     @Transactional(noRollbackFor = BusinessException.class)
-    public AuthResponse resetPassword(String email, String code, String newPassword, String userAgent) {
+    public AuthResponse resetPassword(String email, String code, String newPassword, Client client) {
         User user = userRepository.findByEmailIgnoreCase(email.trim())
                 .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, INVALID_CODE));
         Instant now = clock.instant();
@@ -106,6 +107,6 @@ public class PasswordResetService {
         userRepository.save(user);
         // Whoever knew the old password is signed out everywhere
         sessions.endAll(user.getId());
-        return userService.signIn(user, userAgent);
+        return userService.signIn(user, client);
     }
 }

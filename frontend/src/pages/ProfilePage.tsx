@@ -1,10 +1,11 @@
 import {
   ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
-  SlidersHorizontal, Trash2,
+  MonitorSmartphone, SlidersHorizontal, Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LanguageSwitch } from '../components/LanguageSwitch'
+import { OpenSessions } from '../components/OpenSessions'
 import { FeedbackForm, PreferencesForm } from '../components/ProfileForms'
 import { BackButton, ConfirmSheet, Sheet, useToast } from '../components/ui'
 import { MyPhotos } from '../components/UserPhotos'
@@ -24,6 +25,7 @@ export function ProfilePage() {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
 
   if (!user) {
     return (
@@ -111,6 +113,11 @@ export function ProfilePage() {
           <span className="grow">{t('Tercihlerim', 'My preferences')}</span>
           <ChevronRight size={18} className="muted" />
         </button>
+        <button className="list-item" onClick={() => setSessionsOpen(true)}>
+          <span className="list-item-icon"><MonitorSmartphone size={18} /></span>
+          <span className="grow">{t('Açık oturumlar', 'Signed-in devices')}</span>
+          <ChevronRight size={18} className="muted" />
+        </button>
         <LanguageRow />
         {/* Suggestions are stored with the sender, so only signed-in users see this row */}
         <button className="list-item" onClick={() => setFeedbackOpen(true)}>
@@ -150,6 +157,10 @@ export function ProfilePage() {
 
       <Sheet open={feedbackOpen} onClose={() => setFeedbackOpen(false)} label={t('Uygulama için önerin var mı?', 'Any suggestions for the app?')}>
         <FeedbackForm onSent={() => { setFeedbackOpen(false); toast(t('Önerin için teşekkürler!', 'Thanks for your suggestion!')) }} />
+      </Sheet>
+
+      <Sheet open={sessionsOpen} onClose={() => setSessionsOpen(false)} label={t('Açık oturumlar', 'Signed-in devices')}>
+        {sessionsOpen && <OpenSessions />}
       </Sheet>
 
       <Sheet open={prefsOpen} onClose={() => setPrefsOpen(false)} label={t('Tercihlerim', 'My preferences')}>

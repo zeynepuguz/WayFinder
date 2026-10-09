@@ -9,8 +9,10 @@ import com.nomi.wayfinder.dto.AuthDtos.RegisterRequest;
 import com.nomi.wayfinder.dto.AuthDtos.ResendCodeRequest;
 import com.nomi.wayfinder.dto.AuthDtos.ResetPasswordRequest;
 import com.nomi.wayfinder.dto.AuthDtos.VerifyCodeRequest;
+import com.nomi.wayfinder.security.SessionService.Client;
 import com.nomi.wayfinder.service.PasswordResetService;
 import com.nomi.wayfinder.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -40,9 +42,8 @@ public class AuthController {
 
     @PostMapping("/register/verify")
     @ResponseStatus(HttpStatus.CREATED)
-    public AuthResponse verifyRegister(@Valid @RequestBody VerifyCodeRequest request,
-                                       @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        return userService.verifySignUp(request, userAgent);
+    public AuthResponse verifyRegister(@Valid @RequestBody VerifyCodeRequest request, HttpServletRequest http) {
+        return userService.verifySignUp(request, client(http));
     }
 
     @PostMapping("/login")
@@ -52,9 +53,8 @@ public class AuthController {
     }
 
     @PostMapping("/login/verify")
-    public AuthResponse verifyLogin(@Valid @RequestBody VerifyCodeRequest request,
-                                    @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        return userService.verifySignIn(request, userAgent);
+    public AuthResponse verifyLogin(@Valid @RequestBody VerifyCodeRequest request, HttpServletRequest http) {
+        return userService.verifySignIn(request, client(http));
     }
 
     // Always 202: a new code only while a sign-up / sign-in is running
@@ -84,8 +84,13 @@ public class AuthController {
 
     // Sets the new password, signs out every other device and signs the user in here
     @PostMapping("/password/reset")
-    public AuthResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request,
-                                      @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent) {
-        return passwordResetService.resetPassword(request.email(), request.code(), request.newPassword(), userAgent);
+    public AuthResponse resetPassword(@Valid @RequestBody ResetPasswordRequest request, HttpServletRequest http) {
+        return passwordResetService.resetPassword(request.email(), request.code(), request.newPassword(), client(http));
+    }
+
+    // The signing-in device (profile: open sessions, "new device" e-mail). Behind Caddy the IP is the forwarded one
+    // (server.forward-headers-strategy)
+    private static Client client(HttpServletRequest http) {
+        return new Client(http.getHeader(HttpHeaders.USER_AGENT), http.getRemoteAddr());
     }
 }

@@ -112,6 +112,17 @@
 			<artifactId>imageio-webp</artifactId>
 			<version>3.12.0</version>
 		</dependency>
+		<!-- Error reports to Sentry (only when SENTRY_DSN is set): unhandled exceptions and log.error lines -->
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-spring-boot-4-starter</artifactId>
+			<version>8.60.0</version>
+		</dependency>
+		<dependency>
+			<groupId>io.sentry</groupId>
+			<artifactId>sentry-logback</artifactId>
+			<version>8.60.0</version>
+		</dependency>
 		<!-- Overture Maps places (Foursquare, Meta, Microsoft): reads the public GeoParquet files on S3 by bounding box -->
 		<dependency>
 			<groupId>org.duckdb</groupId>

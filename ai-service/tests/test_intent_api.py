@@ -236,3 +236,19 @@ def test_no_usage_headers_without_an_llm_call():
     client = client_with(FakeExtractor(plan_intent()))
     response = client.post("/v1/intent", json={"message": "kahve", "context": {}}, headers={"X-API-Key": "secret"})
     assert "X-AI-Model" not in response.headers
+
+
+def test_sentry_stays_off_without_a_dsn():
+    from app.main import init_sentry
+    assert init_sentry(Settings(ai_sentry_dsn="")) is False
+
+
+def test_sentry_never_sends_messages_or_photos(monkeypatch):
+    from app import main
+    captured = {}
+    monkeypatch.setattr(main.sentry_sdk, "init", lambda **options: captured.update(options))
+
+    assert main.init_sentry(Settings(ai_sentry_dsn="https://key@o1.ingest.sentry.io/1")) is True
+    assert captured["send_default_pii"] is False
+    assert captured["max_request_body_size"] == "never"
+    assert captured["include_local_variables"] is False

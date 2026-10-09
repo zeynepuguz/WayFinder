@@ -3,6 +3,7 @@ import secrets
 import time
 import uuid
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -15,6 +16,24 @@ from .schemas import AssistantIntent, IntentRequest
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
 log = logging.getLogger("nomi.ai")
+
+def init_sentry(settings: Settings) -> bool:
+    """Error reports when AI_SENTRY_DSN is set. Never the user's message or photo: no request bodies, no local
+    variables (they hold both), no IP."""
+    if not settings.ai_sentry_dsn:
+        return False
+    sentry_sdk.init(
+        dsn=settings.ai_sentry_dsn,
+        environment=settings.sentry_environment,
+        send_default_pii=False,
+        max_request_body_size="never",
+        include_local_variables=False,
+        traces_sample_rate=0,
+    )
+    return True
+
+
+init_sentry(get_settings())
 
 app = FastAPI(title="Nomi AI Service", version="0.1.0")
 
@@ -78,6 +97,7 @@ def parse_intent(request: IntentRequest, response: Response,
         raise
     except Exception as e:  # LLM timeout, rate limit, invalid output...
         log.warning("Intent extraction failed: %s", e)
+        sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=502, detail="Intent extraction failed", headers=used.headers()) from e
     response.headers.update(used.headers())
     return intent
@@ -105,6 +125,7 @@ def verify_photo(request: PhotoVerifyRequest, response: Response,
     except Exception as e:  # moderation / LLM timeout, rate limit, invalid output...
         # Never log the image; the target name is enough to follow it
         log.warning("Photo verification failed for %s '%s': %s", request.target_type, request.name, e)
+        sentry_sdk.capture_exception(e)
         raise HTTPException(status_code=502, detail="Photo verification failed", headers=used.headers()) from e
     response.headers.update(used.headers())
     return verdict

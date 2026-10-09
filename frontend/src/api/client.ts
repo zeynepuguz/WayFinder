@@ -1,3 +1,5 @@
+import { SecureStorage } from '@aparajita/capacitor-secure-storage'
+import { Capacitor } from '@capacitor/core'
 import { currentLang, tr } from '../lib/i18n'
 import type { ApiError, AuthResponse, User } from './types'
 
@@ -35,18 +37,68 @@ function write(key: string, value: string | null) {
   }
 }
 
+// Android / iOS app: the refresh token lives in the system's encrypted store (Keystore / Keychain), the access token
+// only in memory, so neither sits in the WebView's plain storage. Web: localStorage, shared by the tabs.
+const native = Capacitor.isNativePlatform()
+let memoryAccess: string | null = null
+let memoryRefresh: string | null = null
+// Secure store writes run one after another, so a quick sign-in + sign-out cannot end in the wrong order
+let secureWrites: Promise<void> = Promise.resolve()
+
+function persistRefresh(token: string | null) {
+  secureWrites = secureWrites.then(async () => {
+    try {
+      if (token) await SecureStorage.setItem(REFRESH_KEY, token)
+      else await SecureStorage.removeItem(REFRESH_KEY)
+    } catch {
+      // the session just will not survive a restart
+    }
+  })
+}
+
 /**
  * The short access token (15 min) for API calls and the refresh token that renews it. The session lasts 7 days
  * after the last use: every renewal moves its end (backend SessionService).
  */
 export const tokenStore = {
-  get: () => read(TOKEN_KEY),
-  getRefresh: () => read(REFRESH_KEY),
+  get: () => (native ? memoryAccess : read(TOKEN_KEY)),
+  getRefresh: () => (native ? memoryRefresh : read(REFRESH_KEY)),
   // null signs out: both tokens go
   set(token: string | null, refreshToken?: string | null) {
-    write(TOKEN_KEY, token)
-    if (token === null) write(REFRESH_KEY, null)
-    else if (refreshToken !== undefined) write(REFRESH_KEY, refreshToken)
+    const refresh = token === null ? null : refreshToken
+    if (!native) {
+      write(TOKEN_KEY, token)
+      if (refresh !== undefined) write(REFRESH_KEY, refresh)
+      return
+    }
+    memoryAccess = token
+    if (refresh !== undefined && refresh !== memoryRefresh) {
+      memoryRefresh = refresh
+      persistRefresh(refresh)
+    }
+  },
+  /**
+   * App start (before the first render): the app reads its refresh token from the secure store; the access token is
+   * renewed with it on the first request. Tokens an older app version kept in localStorage are moved there.
+   */
+  async load() {
+    if (!native) return
+    // An app version without refresh tokens kept a day-long access token: still used until it runs out
+    memoryAccess = read(TOKEN_KEY)
+    const legacy = read(REFRESH_KEY)
+    if (legacy) {
+      memoryRefresh = legacy
+      persistRefresh(legacy)
+      await secureWrites
+    } else {
+      try {
+        memoryRefresh = await SecureStorage.getItem(REFRESH_KEY)
+      } catch {
+        memoryRefresh = null
+      }
+    }
+    write(TOKEN_KEY, null)
+    write(REFRESH_KEY, null)
   },
 }
 

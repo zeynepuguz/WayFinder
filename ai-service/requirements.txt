@@ -4,3 +4,4 @@ openai==3.19.2
 pydantic==2.13.5
 pydantic-settings==2.15.0
 
+sentry-sdk[fastapi]==2.71.0

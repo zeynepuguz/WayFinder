@@ -1,7 +1,7 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, AiUsageSummary, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
+  AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, OpenSession, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
@@ -35,6 +35,10 @@ export const api = {
   resetPassword: (email: string, code: string, newPassword: string) =>
     http.post<AuthResponse>('/auth/password/reset', { email, code, newPassword }),
   me: () => http.get<User>('/users/me'),
+  // Devices signed in to the account (profile: "Açık oturumlar")
+  sessions: () => http.get<OpenSession[]>('/users/me/sessions'),
+  endSession: (id: number) => http.delete<void>(`/users/me/sessions/${id}`),
+  endOtherSessions: () => http.post<{ ended: number }>('/users/me/sessions/end-others'),
   deleteAccount: () => http.delete<void>('/users/me'),
 
   plans: () => http.get<PlansResponse>('/billing/plans'),

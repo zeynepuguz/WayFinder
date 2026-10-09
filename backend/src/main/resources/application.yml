@@ -77,6 +77,23 @@ management:
     mail:
       enabled: false
 
+# Error reports (sentry.io). Empty SENTRY_DSN = off. No personal data: no IP, no request bodies, no user e-mail;
+# only the error, its stack trace and the request id to find it in our own logs
+sentry:
+  dsn: ${SENTRY_DSN:}
+  environment: ${SENTRY_ENVIRONMENT:development}
+  send-default-pii: false
+  max-request-body-size: none
+  in-app-includes: com.nomi.wayfinder
+  # The request id of RequestIdFilter, to find the same request in our logs
+  context-tags: requestId
+  # Performance tracing costs quota; errors are what we need
+  traces-sample-rate: 0
+  logging:
+    # log.error(...) becomes an event; info/warn lines go along as breadcrumbs
+    minimum-event-level: error
+    minimum-breadcrumb-level: info
+
 nomi:
   timezone: Europe/Istanbul
   security:

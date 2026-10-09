@@ -12,7 +12,12 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -110,11 +115,21 @@ public class SecurityConfig {
         return new SecretKeySpec(bytes, "HmacSHA256");
     }
 
+    // Besides the signature and expiry: an access token of an ended session (signed out, ended from the profile,
+    // new password) is refused at once
     @Bean
-    public JwtDecoder jwtDecoder(SecretKey jwtSecretKey) {
-        return NimbusJwtDecoder.withSecretKey(jwtSecretKey)
+    public JwtDecoder jwtDecoder(SecretKey jwtSecretKey, SessionService sessions) {
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(jwtSecretKey)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        OAuth2TokenValidator<Jwt> sessionOpen = jwt -> {
+            Object sid = jwt.getClaim(JwtService.SESSION_CLAIM);
+            return sid instanceof Number id && sessions.isEnded(id.longValue())
+                    ? OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Session ended", null))
+                    : OAuth2TokenValidatorResult.success();
+        };
+        decoder.setJwtValidator(JwtValidators.createDefaultWithValidators(sessionOpen));
+        return decoder;
     }
 
     @Bean

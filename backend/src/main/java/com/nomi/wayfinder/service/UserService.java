@@ -16,6 +16,7 @@ import com.nomi.wayfinder.security.EmailCodeService.Purpose;
 import com.nomi.wayfinder.security.JwtService;
 import com.nomi.wayfinder.security.LoginAttemptLimiter;
 import com.nomi.wayfinder.security.SessionService;
+import com.nomi.wayfinder.security.SessionService.Client;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -49,6 +51,9 @@ public class UserService {
     static final String INVALID_CODE = "Invalid or expired code";
     // Resend only works this long after step one (password / sign-up form) passed
     static final Duration RESEND_WINDOW = Duration.ofMinutes(30);
+    // "8 Ekim 2026 18:47" (Istanbul time) in the new device e-mail
+    private static final DateTimeFormatter SIGN_IN_TIME =
+            DateTimeFormatter.ofPattern("d MMMM yyyy HH:mm", Locale.forLanguageTag("tr"));
 
     public UserService(
             UserRepository userRepository,
@@ -106,8 +111,8 @@ public class UserService {
 
     // noRollbackFor: a wrong guess must still be counted
     @Transactional(noRollbackFor = BusinessException.class)
-    public AuthResponse verifySignUp(VerifyCodeRequest request, String userAgent) {
-        return verify(request, Purpose.SIGN_UP, userAgent);
+    public AuthResponse verifySignUp(VerifyCodeRequest request, Client client) {
+        return verify(request, Purpose.SIGN_UP, client);
     }
 
     /**
@@ -162,8 +167,8 @@ public class UserService {
     }
 
     @Transactional(noRollbackFor = BusinessException.class)
-    public AuthResponse verifySignIn(VerifyCodeRequest request, String userAgent) {
-        return verify(request, Purpose.SIGN_IN, userAgent);
+    public AuthResponse verifySignIn(VerifyCodeRequest request, Client client) {
+        return verify(request, Purpose.SIGN_IN, client);
     }
 
     /**
@@ -177,7 +182,7 @@ public class UserService {
                 .ifPresent(user -> sendCode(user, request.purpose()));
     }
 
-    private AuthResponse verify(VerifyCodeRequest request, Purpose purpose, String userAgent) {
+    private AuthResponse verify(VerifyCodeRequest request, Purpose purpose, Client client) {
         User user = userRepository.findByEmailIgnoreCase(normalize(request.email()))
                 .orElseThrow(() -> new BusinessException(HttpStatus.BAD_REQUEST, INVALID_CODE));
         // A not yet verified account signs in with its sign-up code
@@ -187,7 +192,7 @@ public class UserService {
         }
         user.markEmailVerified(clock.instant());
         userRepository.save(user);
-        return signIn(promoteOwner(user), userAgent);
+        return signIn(promoteOwner(user), client);
     }
 
     private void sendCode(User user, Purpose purpose) {
@@ -279,13 +284,20 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
     }
 
-    // Signs the user in on this device: a new session (7 days while used), JWT + profile
-    public AuthResponse signIn(User user, String userAgent) {
-        return toAuthResponse(user, sessions.start(user.getId(), userAgent));
+    // Signs the user in on this device: a new session (7 days while used), JWT + profile. A device the account has
+    // not used lately gets a "new device" e-mail (not the first sign-in after sign-up)
+    public AuthResponse signIn(User user, Client client) {
+        boolean newDevice = sessions.isNewDevice(user.getId(), client.device());
+        SessionService.Issued session = sessions.start(user.getId(), client);
+        if (newDevice) {
+            String when = SIGN_IN_TIME.format(clock.instant().atZone(clock.getZone()));
+            mailService.sendNewDeviceAlert(user.getEmail(), client.device(), client.ip(), when);
+        }
+        return toAuthResponse(user, session);
     }
 
     private AuthResponse toAuthResponse(User user, SessionService.Issued session) {
-        JwtService.IssuedToken token = jwtService.issue(user);
+        JwtService.IssuedToken token = jwtService.issue(user, session.sessionId());
         return new AuthResponse(token.value(), "Bearer", token.expiresAt(), session.refreshToken(),
                 session.expiresAt(), toUserResponse(user));
     }

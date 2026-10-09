@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # Shared secret with the Spring backend (X-API-Key header). Empty = no check (local dev only).
     ai_service_api_key: str = ""
 
+    # Error reports (sentry.io), its own project next to the backend's. Empty = off
+    ai_sentry_dsn: str = ""
+    sentry_environment: str = "development"
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -29,6 +29,7 @@ import static org.mockito.Mockito.*;
 class PasswordResetServiceTest {
 
     private static final Instant NOW = Instant.parse("2026-09-27T09:00:00Z");
+    private static final SessionService.Client CLIENT = new SessionService.Client("test", "127.0.0.1");
 
     // Readable fake instead of BCrypt
     private static final PasswordEncoder ENCODER = new PasswordEncoder() {
@@ -95,13 +96,13 @@ class PasswordResetServiceTest {
         assertThat(code).matches("\\d{6}");
         assertThat(codes.getFirst().getCodeHash()).isNotEqualTo(code);
 
-        service(NOW.plusSeconds(60)).resetPassword("zeynep@example.com", code, "new-password", "test");
+        service(NOW.plusSeconds(60)).resetPassword("zeynep@example.com", code, "new-password", CLIENT);
 
         assertThat(user.getPasswordHash()).isEqualTo("hash:new-password");
-        verify(userService).signIn(user, "test");
+        verify(userService).signIn(user, CLIENT);
         // Whoever knew the old password is signed out everywhere
         verify(sessions).endAll(7L);
-        assertThatThrownBy(() -> service(NOW.plusSeconds(90)).resetPassword("zeynep@example.com", code, "again-123", "test"))
+        assertThatThrownBy(() -> service(NOW.plusSeconds(90)).resetPassword("zeynep@example.com", code, "again-123", CLIENT))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -118,7 +119,7 @@ class PasswordResetServiceTest {
         String code = requestAndCaptureCode(NOW);
 
         assertThatThrownBy(() -> service(NOW.plus(Duration.ofMinutes(16)))
-                .resetPassword("zeynep@example.com", code, "new-password", "test"))
+                .resetPassword("zeynep@example.com", code, "new-password", CLIENT))
                 .isInstanceOf(BusinessException.class);
         assertThat(user.getPasswordHash()).isEqualTo("hash:old-password");
     }
@@ -129,11 +130,11 @@ class PasswordResetServiceTest {
         String wrong = code.equals("000000") ? "111111" : "000000";
 
         for (int i = 0; i < PasswordResetService.MAX_ATTEMPTS; i++) {
-            assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", wrong, "new-password", "test"))
+            assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", wrong, "new-password", CLIENT))
                     .isInstanceOf(BusinessException.class);
         }
 
-        assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", code, "new-password", "test"))
+        assertThatThrownBy(() -> service(NOW).resetPassword("zeynep@example.com", code, "new-password", CLIENT))
                 .isInstanceOf(BusinessException.class);
         assertThat(user.getPasswordHash()).isEqualTo("hash:old-password");
     }
@@ -149,7 +150,7 @@ class PasswordResetServiceTest {
         assertThat(codes).hasSize(1);
 
         if (!codes.getFirst().getCodeHash().equals("hash:" + first)) {
-            assertThatThrownBy(() -> service(NOW.plusSeconds(70)).resetPassword("zeynep@example.com", first, "new-password", "test"))
+            assertThatThrownBy(() -> service(NOW.plusSeconds(70)).resetPassword("zeynep@example.com", first, "new-password", CLIENT))
                     .isInstanceOf(BusinessException.class);
         }
     }

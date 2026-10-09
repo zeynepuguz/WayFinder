@@ -16,6 +16,8 @@ import java.util.List;
 @Service
 public class JwtService {
 
+    public static final String SESSION_CLAIM = "sid";
+
     private final JwtEncoder jwtEncoder;
     private final long expirationMinutes;
 
@@ -24,7 +26,8 @@ public class JwtService {
         this.expirationMinutes = properties.security().jwtExpirationMinutes();
     }
 
-    public IssuedToken issue(User user) {
+    /** An access token of the user's session (claim "sid": refused at once when the session ends). */
+    public IssuedToken issue(User user, long sessionId) {
         Instant now = Instant.now();
         Instant expiresAt = now.plus(expirationMinutes, ChronoUnit.MINUTES);
 
@@ -35,6 +38,7 @@ public class JwtService {
                 .issuedAt(now)
                 .expiresAt(expiresAt)
                 .claim("roles", List.of(user.getRole().name()))
+                .claim(SESSION_CLAIM, sessionId)
                 .build();
 
         JwsHeader header = JwsHeader.with(MacAlgorithm.HS256).build();

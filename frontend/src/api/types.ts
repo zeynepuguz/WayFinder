@@ -85,6 +85,17 @@ export interface RegisterRequest {
 
 export type CodePurpose = 'SIGN_UP' | 'SIGN_IN'
 
+// A device signed in to the account; current = this one
+export interface OpenSession {
+  id: number
+  // "Chrome · Windows", "Nomi · Android"; null when the browser did not tell
+  device: string | null
+  ipAddress: string | null
+  createdAt: string
+  lastUsedAt: string
+  current: boolean
+}
+
 // Step one of sign-up / sign-in passed: a code went to the (partly hidden) address
 export interface CodeSent {
   email: string

@@ -61,6 +61,14 @@ kaydetme için giriş + aktif paket gerekir (backend 402 döner, uygulama paywal
 - Yerelde store olmadan denemek için `BILLING_DEV_MODE=true` (production'da asla).
 - `FREE_ACCESS_EMAILS`: virgülle ayrılmış e-postalar hiç ödeme yapmadan süresiz erişir (ör. uygulama sahibi). Sadece `.env`de tutulur.
 
+### Hata takibi (Sentry)
+
+sentry.io'da üç proje (Spring Boot, Python/FastAPI, React) açılır; DSN'ler `.env` (`SENTRY_DSN`, `AI_SENTRY_DSN`) ve
+`frontend/.env.production` (`VITE_SENTRY_DSN`) içine yazılır. Boşken hiçbir şey gönderilmez; React tarafında Sentry kodu
+pakete hiç girmez. Gönderilenler: yakalanmayan hatalar, backend'de `log.error` satırları, AI servisinde OpenAI hataları.
+Kişisel veri gönderilmez: IP, kullanıcı, istek gövdesi, sohbet metni, fotoğraf, sorgu parametreleri yok; e-postalar
+maskelenir.
+
 ### OpenAI maliyet koruması
 
 - Asistan mesajı başına tek bir küçük OpenAI çağrısı yapılır (yalnızca niyet çıkarımı; rota, mekan ve hava
