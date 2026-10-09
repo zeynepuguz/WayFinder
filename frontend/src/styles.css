@@ -1014,8 +1014,9 @@ details > .reasons { margin-top: 8px; }
 .input input { width: 100%; }
 
 @media (prefers-color-scheme: dark) {
-  /* Dim light map tiles so the map does not glare in dark mode */
-  .leaflet-tile-pane { filter: brightness(0.78) contrast(1.08) saturate(0.85); }
+  /* Dim raster fallback tiles so they do not glare; the vector map has its own dark style */
+  .leaflet-tile-pane > .leaflet-layer { filter: brightness(0.78) contrast(1.08) saturate(0.85); }
+  .leaflet-container .leaflet-control-attribution { background: rgb(11 15 23 / 72%); color: var(--ink-3); }
 }
 
 /* Crawlable HTML written by scripts/prerender.mjs; visible only until the app mounts */

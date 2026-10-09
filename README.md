@@ -218,7 +218,7 @@ Play Store'a çıkmadan önce yapılacaklar:
    izni ver, JSON anahtarının yolunu `GOOGLE_PLAY_SERVICE_ACCOUNT_FILE`'a yaz.
 5. Gizlilik politikası ve kullanım koşulları uygulamanın içindedir (`LegalPage.tsx`); Play Console'a
    `https://<DOMAIN>/gizlilik` adresini yaz.
-6. Harita için ticari kullanıma uygun bir karo sağlayıcısı (MapTiler, Stadia vb.) ve `VITE_MAP_TILE_URL`.
+6. Harita: OpenFreeMap vektör haritası (ücretsiz, ticari kullanım serbest, anahtar yok) varsayılan olarak açık; ayrıca ayar gerekmez. Başka bir MapLibre stiline geçmek için `VITE_MAP_STYLE_URL` / `VITE_MAP_STYLE_URL_DARK`.
 7. İmza anahtarı (upload key) oluştur, Android Studio'dan imzalı **AAB** üret, dahili test kanalına yükle.
 
 ## Testler

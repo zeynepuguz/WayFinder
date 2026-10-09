@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { ChevronDown, ChevronUp, LocateFixed, MapPin, Sparkles, X, ZoomIn } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AttributionControl, Circle, MapContainer, Marker, TileLayer } from 'react-leaflet'
+import { AttributionControl, Circle, MapContainer, Marker } from 'react-leaflet'
 import { Link } from 'react-router'
 import { api } from '../api'
 import type { City, District, NearbyPlace, Place, PlaceCategory, Recommendation } from '../api/types'
@@ -11,7 +11,7 @@ import { CATEGORY_LABELS, formatCost, formatDistance, haversineMeters } from '..
 import { CATEGORY_PIN, inBox, isInTurkey, latestRequest, MAX_MAP_PINS, MIN_PLACES_ZOOM, placesQueryBox } from '../lib/geo'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
-import { TILE_ATTRIBUTION, TILE_URL } from './mapTiles'
+import { BaseMap } from './BaseMap'
 import { OpenBadge, VerifiedBadge } from './PlaceViews'
 import { Skeleton, Spinner } from './ui'
 import { CategoryTile } from './visuals'
@@ -232,7 +232,7 @@ export function LiveMap({ category, tag = null, focusArea = null, focusCity = nu
     <div className="live-map" ref={containerRef}>
       <MapContainer ref={setMap} center={[origin.latitude, origin.longitude]} zoom={15} zoomControl={false}
                     attributionControl={false} style={{ height: '100%' }}>
-        <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
+        <BaseMap />
         {/* Top right: the bottom panel must never cover the OpenStreetMap attribution */}
         <AttributionControl position="topright" />
         {userPos && live.accuracy != null && live.accuracy < MAX_ACCURACY_CIRCLE && (

@@ -1,9 +1,9 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { useEffect } from 'react'
-import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet'
+import { MapContainer, Marker, Polyline, Popup, useMap } from 'react-leaflet'
 import { useT } from '../lib/i18n'
-import { TILE_ATTRIBUTION, TILE_URL } from './mapTiles'
+import { BaseMap } from './BaseMap'
 
 interface MapPoint {
   latitude: number
@@ -61,10 +61,7 @@ export function RouteMap({ points, start, height = 260, hero }: Props) {
   return (
     <div className={`map ${hero ? 'map-hero' : ''}`} style={{ height }}>
       <MapContainer center={center} zoom={15} scrollWheelZoom={false} zoomControl={false} style={{ height: '100%' }}>
-        <TileLayer
-          attribution={TILE_ATTRIBUTION}
-          url={TILE_URL}
-        />
+        <BaseMap />
         {start && <Marker position={[start.latitude, start.longitude]} icon={startIcon}><Popup>{t('Başlangıç', 'Start')}</Popup></Marker>}
         {all.length > 1 && <Polyline positions={all} pathOptions={{ color: '#ff5a36', weight: 4, opacity: 0.85, dashArray: '2 8', lineCap: 'round' }} />}
         {points.map((p, i) => (
