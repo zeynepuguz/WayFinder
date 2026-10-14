@@ -27,7 +27,7 @@ public final class PhotoDtos {
             int width,
             int height,
             Instant createdAt,
-            // First name only ("Zeynep"), or "Nomi kullanıcısı" / "Nomi user"
+            // The uploader's username ("@zeynep7"), or "Nomi kullanıcısı" / "Nomi user"
             String uploader,
             @JsonInclude(JsonInclude.Include.NON_NULL) Long placeId,
             @JsonInclude(JsonInclude.Include.NON_NULL) String placeName

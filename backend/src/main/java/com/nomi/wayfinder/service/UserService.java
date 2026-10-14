@@ -44,6 +44,7 @@ public class UserService {
     private final SessionService sessions;
     private final LoginAttemptLimiter loginAttempts;
     private final MailService mailService;
+    private final Usernames usernames;
     private final Clock clock;
     // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they sign up or sign in with a proven e-mail
     private final Set<String> ownerEmails;
@@ -66,9 +67,11 @@ public class UserService {
             SessionService sessions,
             LoginAttemptLimiter loginAttempts,
             MailService mailService,
+            Usernames usernames,
             Clock clock,
             NomiProperties properties
     ) {
+        this.usernames = usernames;
         this.emailCodes = emailCodes;
         this.sessions = sessions;
         this.loginAttempts = loginAttempts;
@@ -97,14 +100,20 @@ public class UserService {
         if (user != null && user.isEmailVerified()) {
             throw new BusinessException(HttpStatus.CONFLICT, "Email is already registered");
         }
+        // Checked first, so a taken name does not leave a half-made account behind
+        String username = request.username() == null || request.username().isBlank() ? null
+                : usernames.require(request.username(), user == null ? null : user.getId());
         if (user == null) {
             user = createUser(email, request.password(), request.firstName().trim(), request.lastName().trim(),
                     UserRole.USER, null);
         } else {
             user.setName(request.firstName().trim(), request.lastName().trim());
             user.setPasswordHash(passwordEncoder.encode(request.password()));
-            userRepository.save(user);
         }
+        if (username != null) {
+            user.setUsername(username);
+        }
+        userRepository.save(user);
         sendCode(user, Purpose.SIGN_UP);
         return codeSent(email);
     }
@@ -131,6 +140,7 @@ public class UserService {
         user.setEmail(normalizedEmail);
         user.setPasswordHash(passwordEncoder.encode(password));
         user.setName(firstName, lastName);
+        user.setUsername(usernames.suggest(firstName));
         user.setRole(role);
         if (verifiedAt != null) {
             user.markEmailVerified(verifiedAt);
@@ -252,6 +262,14 @@ public class UserService {
         return toUserResponse(getUser(userId));
     }
 
+    /** PUT /users/me/username: a new public name (400 against the rules, 409 when someone has it). */
+    @Transactional
+    public UserResponse changeUsername(Long userId, String username) {
+        User user = getUser(userId);
+        user.setUsername(usernames.require(username, userId));
+        return toUserResponse(userRepository.save(user));
+    }
+
     @Transactional
     public PreferencesResponse updatePreferences(Long userId, PreferencesRequest request) {
         UserPreferences preferences = getPreferences(userId);
@@ -313,6 +331,7 @@ public class UserService {
                 user.getDisplayName(),
                 user.getFirstName(),
                 user.getLastName(),
+                user.getUsername(),
                 user.getRole(),
                 toPreferencesResponse(getPreferences(user.getId())),
                 billingService.status(user.getId())

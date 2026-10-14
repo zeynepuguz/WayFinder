@@ -76,23 +76,45 @@ describe('AuthPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('15 dakika sonra')
   })
 
-  it('signs up with name and surname, then the code', async () => {
+  it('signs up with name, surname and username, then the code', async () => {
     register.mockResolvedValue(sent)
     verifyCode.mockResolvedValue(undefined)
     renderAt('/login?mode=register')
 
     await userEvent.type(screen.getByLabelText('Ad'), 'Zeynep')
     await userEvent.type(screen.getByLabelText('Soyad'), 'Uğuz')
+    await userEvent.type(screen.getByLabelText('Kullanıcı adı'), 'Zeynep_Gezer')
     await userEvent.type(screen.getByLabelText('E-posta'), 'z@b.dev')
     await userEvent.type(screen.getByLabelText('Şifre'), 'sifre1234')
     await userEvent.click(screen.getByRole('button', { name: 'Hesap oluştur' }))
 
-    expect(register).toHaveBeenCalledWith({ firstName: 'Zeynep', lastName: 'Uğuz', email: 'z@b.dev', password: 'sifre1234' })
+    // sent in lowercase, as the server keeps it
+    expect(register).toHaveBeenCalledWith({ firstName: 'Zeynep', lastName: 'Uğuz', email: 'z@b.dev', password: 'sifre1234', username: 'zeynep_gezer' })
     await userEvent.type(await screen.findByLabelText('Doğrulama kodu'), '654321')
     await userEvent.click(screen.getByRole('button', { name: 'Doğrula' }))
 
     expect(verifyCode).toHaveBeenCalledWith('SIGN_UP', 'z@b.dev', '654321')
     expect(await screen.findByRole('heading', { name: 'Home' })).toBeInTheDocument()
+  })
+
+  it('checks the username rules before sending, and says when it is taken', async () => {
+    register.mockRejectedValue(new ApiRequestError({ status: 409, message: 'Username is taken', errors: {} }))
+    renderAt('/login?mode=register')
+
+    await userEvent.type(screen.getByLabelText('Ad'), 'Zeynep')
+    await userEvent.type(screen.getByLabelText('Soyad'), 'Uğuz')
+    await userEvent.type(screen.getByLabelText('Kullanıcı adı'), '7zeynep')
+    await userEvent.type(screen.getByLabelText('E-posta'), 'z@b.dev')
+    await userEvent.type(screen.getByLabelText('Şifre'), 'sifre1234')
+    await userEvent.click(screen.getByRole('button', { name: 'Hesap oluştur' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('bir harfle başlamalı')
+    expect(register).not.toHaveBeenCalled()
+
+    await userEvent.clear(screen.getByLabelText('Kullanıcı adı'))
+    await userEvent.type(screen.getByLabelText('Kullanıcı adı'), 'zeynep')
+    await userEvent.click(screen.getByRole('button', { name: 'Hesap oluştur' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Bu kullanıcı adı alınmış')
   })
 
   it('explains a wrong code and keeps the code screen', async () => {

@@ -1,4 +1,4 @@
-import { Eye, EyeOff, Hash, KeyRound, Mail, User } from 'lucide-react'
+import { AtSign, Eye, EyeOff, Hash, KeyRound, Mail, User } from 'lucide-react'
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -9,6 +9,7 @@ import { BrandMark } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { LEGAL_PATHS } from '../lib/legal'
 import { safeNext } from '../lib/nav'
+import { normalizeUsername, USERNAME_TAKEN, usernameProblem } from '../lib/username'
 import { tr, useT } from '../lib/i18n'
 
 type Mode = 'login' | 'register'
@@ -25,6 +26,7 @@ export function AuthPage() {
   const [mode, setMode] = useState<Mode>(params.get('mode') === 'register' ? 'register' : 'login')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -35,12 +37,18 @@ export function AuthPage() {
 
   async function submitForm(event: FormEvent) {
     event.preventDefault()
+    // The username rules are checked here; whether it is free, by the server
+    const problem = mode === 'register' ? usernameProblem(username) : null
+    if (problem) {
+      setError(problem)
+      return
+    }
     setBusy(true)
     setError(null)
     try {
       setSent(mode === 'login'
         ? await login(email, password)
-        : await register({ firstName, lastName, email, password }))
+        : await register({ firstName, lastName, email, password, username: normalizeUsername(username) }))
       setCode('')
     } catch (e) {
       setError(errorText(e, mode))
@@ -132,6 +140,18 @@ export function AuthPage() {
                        autoComplete="family-name" placeholder={t('Soyadın', 'Last name')} style={{ minWidth: 0 }} />
               </span>
             </label>
+          </div>
+        )}
+        {mode === 'register' && (
+          // Not wrapped in <label>: the hint below must not become part of the input's name
+          <div className="field">
+            <label className="field-label" htmlFor="username">{t('Kullanıcı adı', 'Username')}</label>
+            <span className="input">
+              <AtSign size={18} />
+              <input id="username" value={username} onChange={e => setUsername(e.target.value)} required maxLength={20}
+                     autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder={t('ornek: zeynep_gezer', 'e.g. zeynep_travels')} />
+            </span>
+            <span className="t-caption">{t('Eklediğin fotoğrafların altında görünür. Harf, rakam, _ ve . kullanabilirsin.', 'Shown under the photos you add. Letters, digits, _ and . are allowed.')}</span>
           </div>
         )}
         <label className="field">
@@ -237,6 +257,8 @@ function errorText(e: unknown, mode: Mode): string {
     if (e.status === 429) return mode === 'login'
       ? tr('Çok fazla hatalı deneme yapıldı. 15 dakika sonra tekrar dene.', 'Too many wrong attempts. Try again in 15 minutes.')
       : tr('Çok fazla deneme yaptın. Bir dakika sonra tekrar dene.', 'Too many attempts. Try again in a minute.')
+    if (e.status === 409 && /username/i.test(e.message)) return USERNAME_TAKEN()
+    if (e.status === 400 && /username/i.test(e.message)) return tr('Bu kullanıcı adı kullanılamaz.', 'This username can’t be used.')
     if (e.status === 409) return tr('Bu e-posta ile zaten bir hesap var. Giriş yapabilirsin.', 'An account with this email already exists. You can log in.')
     if (e.errors.firstName || e.errors.lastName) return tr('Adını ve soyadını harflerle yaz.', 'Write your first and last name with letters.')
     if (e.errors.password) return tr('Şifre en az 8 karakter olmalı.', 'Password must be at least 8 characters.')

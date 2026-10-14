@@ -1,13 +1,15 @@
 import {
-  ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
+  AtSign, ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
   MonitorSmartphone, SlidersHorizontal, SunMoon, Trash2,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useState, type FormEvent } from 'react'
+import { api } from '../api'
+import { ApiRequestError } from '../api/client'
 import { Link, useNavigate } from 'react-router'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 import { OpenSessions } from '../components/OpenSessions'
 import { FeedbackForm, PreferencesForm } from '../components/ProfileForms'
-import { BackButton, ConfirmSheet, Segmented, Sheet, useToast } from '../components/ui'
+import { Alert, BackButton, ConfirmSheet, Segmented, Sheet, Spinner, useToast } from '../components/ui'
 import { MyPhotos } from '../components/UserPhotos'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
@@ -15,6 +17,7 @@ import { errorMessage, formatDateTime } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { LEGAL_PATHS, SUPPORT_EMAIL } from '../lib/legal'
 import { setThemePref, themePref, type ThemePref } from '../lib/theme'
+import { normalizeUsername, USERNAME_TAKEN, usernameProblem } from '../lib/username'
 
 export function ProfilePage() {
   const { user, hasAccess, logout, deleteAccount } = useAuth()
@@ -27,6 +30,7 @@ export function ProfilePage() {
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
+  const [usernameOpen, setUsernameOpen] = useState(false)
 
   if (!user) {
     return (
@@ -72,6 +76,7 @@ export function ProfilePage() {
         <span className="profile-avatar">{initials}</span>
         <div className="grow">
           <h1 className="t-title">{user.displayName}</h1>
+          {user.username && <p className="profile-username">@{user.username}</p>}
           <p className="t-caption">{user.email}</p>
         </div>
       </div>
@@ -110,6 +115,12 @@ export function ProfilePage() {
             <ChevronRight size={18} className="muted" />
           </Link>
         )}
+        <button className="list-item" onClick={() => setUsernameOpen(true)}>
+          <span className="list-item-icon"><AtSign size={18} /></span>
+          <span className="grow">{t('Kullanıcı adı', 'Username')}</span>
+          <span className="t-caption">@{user.username}</span>
+          <ChevronRight size={18} className="muted" />
+        </button>
         <button className="list-item" onClick={() => setPrefsOpen(true)}>
           <span className="list-item-icon"><SlidersHorizontal size={18} /></span>
           <span className="grow">{t('Tercihlerim', 'My preferences')}</span>
@@ -164,6 +175,10 @@ export function ProfilePage() {
 
       <Sheet open={sessionsOpen} onClose={() => setSessionsOpen(false)} label={t('Açık oturumlar', 'Signed-in devices')}>
         {sessionsOpen && <OpenSessions />}
+      </Sheet>
+
+      <Sheet open={usernameOpen} onClose={() => setUsernameOpen(false)} label={t('Kullanıcı adı', 'Username')}>
+        {usernameOpen && <UsernameForm current={user.username} onSaved={() => { setUsernameOpen(false); toast(t('Kullanıcı adın değişti', 'Your username has changed')) }} />}
       </Sheet>
 
       <Sheet open={prefsOpen} onClose={() => setPrefsOpen(false)} label={t('Tercihlerim', 'My preferences')}>
@@ -225,5 +240,51 @@ function ThemeRow() {
         ]} />
       </div>
     </div>
+  )
+}
+
+// A new public username; the rules are checked here, whether it is free by the server
+function UsernameForm({ current, onSaved }: { current: string; onSaved: () => void }) {
+  const t = useT()
+  const { refreshUser } = useAuth()
+  const [value, setValue] = useState(current)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    const problem = usernameProblem(value)
+    if (problem) {
+      setError(problem)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      await api.changeUsername(normalizeUsername(value))
+      await refreshUser()
+      onSaved()
+    } catch (e) {
+      setError(e instanceof ApiRequestError && e.status === 409 ? USERNAME_TAKEN()
+        : errorMessage(e, t('Kullanıcı adı değiştirilemedi', 'Couldn’t change the username')))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="stack" onSubmit={e => void save(e)}>
+      <p className="t-caption">{t('Eklediğin fotoğrafların altında bu ad görünür; gerçek adın görünmez.', 'This name is shown under the photos you add; your real name is never shown.')}</p>
+      <span className="input">
+        <AtSign size={18} />
+        <input value={value} onChange={e => setValue(e.target.value)} maxLength={20} autoFocus autoCapitalize="none" spellCheck={false}
+               aria-label={t('Kullanıcı adı', 'Username')} />
+      </span>
+      <span className="t-caption">{t('3-20 karakter: harf, rakam, _ ve .', '3-20 characters: letters, digits, _ and .')}</span>
+      {error && <Alert tone="danger"><span>{error}</span></Alert>}
+      <button type="submit" className="btn btn-primary btn-block" disabled={busy || normalizeUsername(value) === current}>
+        {busy ? <Spinner /> : t('Kaydet', 'Save')}
+      </button>
+    </form>
   )
 }

@@ -161,7 +161,7 @@ public class UserPhotoRepository {
     // ---------- collages ----------
 
     public record PublicPhoto(long id, String fileKey, int width, int height, Instant createdAt,
-                              String displayName, Long placeId, String placeName) {
+                              String username, Long placeId, String placeName) {
     }
 
     private static final RowMapper<PublicPhoto> PUBLIC = (rs, i) -> new PublicPhoto(
@@ -170,13 +170,13 @@ public class UserPhotoRepository {
             rs.getInt("width"),
             rs.getInt("height"),
             rs.getTimestamp("created_at").toInstant(),
-            rs.getString("display_name"),
+            rs.getString("username"),
             rs.getObject("place_id", Long.class),
             rs.getString("place_name"));
 
     public List<PublicPhoto> approvedOfPlace(long placeId, int limit) {
         return jdbc.query("""
-                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.display_name,
+                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username,
                        up.place_id, NULL AS place_name
                 FROM user_photos up JOIN users u ON u.id = up.user_id
                 WHERE up.place_id = ? AND up.status = 'APPROVED' AND up.file_key IS NOT NULL
@@ -187,7 +187,7 @@ public class UserPhotoRepository {
     // The district's own photos and those of the places inside it, newest first
     public List<PublicPhoto> approvedOfDistrict(long districtId, int limit) {
         return jdbc.query("""
-                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.display_name,
+                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username,
                        up.place_id, p.name AS place_name
                 FROM user_photos up
                 JOIN users u ON u.id = up.user_id

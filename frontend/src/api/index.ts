@@ -46,6 +46,7 @@ export const api = {
     http.post<AccessStatus>('/billing/google-play/verify', { productId, purchaseToken }),
   devPurchase: (plan: AccessPlan) => http.post<AccessStatus>('/billing/dev/purchase', { plan }),
   updatePreferences: (preferences: Preferences) => http.put<Preferences>('/users/me/preferences', preferences),
+  changeUsername: (username: string) => http.put<User>('/users/me/username', { username }),
 
   home: (lat: number, lon: number) => http.get<HomeResponse>('/home', { lat, lon }),
 

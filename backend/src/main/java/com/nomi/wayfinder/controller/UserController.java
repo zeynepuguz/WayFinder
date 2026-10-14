@@ -2,6 +2,7 @@ package com.nomi.wayfinder.controller;
 
 import com.nomi.wayfinder.dto.AuthDtos.PreferencesRequest;
 import com.nomi.wayfinder.dto.AuthDtos.PreferencesResponse;
+import com.nomi.wayfinder.dto.AuthDtos.UsernameRequest;
 import com.nomi.wayfinder.dto.AuthDtos.UserResponse;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.security.CurrentUser;
@@ -60,6 +61,12 @@ public class UserController {
     @PostMapping("/sessions/end-others")
     public Map<String, Integer> endOtherSessions(@AuthenticationPrincipal Jwt jwt) {
         return Map.of("ended", sessions.endOthers(CurrentUser.id(jwt), sessionId(jwt)));
+    }
+
+    // A new public username (shown under the user's photos)
+    @PutMapping("/username")
+    public UserResponse changeUsername(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UsernameRequest request) {
+        return userService.changeUsername(CurrentUser.id(jwt), request.username());
     }
 
     @PutMapping("/preferences")

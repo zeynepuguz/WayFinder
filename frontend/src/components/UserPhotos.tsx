@@ -21,8 +21,6 @@ function Portal({ children }: { children: ReactNode }) {
 const photoDate = (iso: string) =>
   new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
 
-// Only the first name is shown next to a photo
-const firstName = (uploader: string) => uploader.trim().split(/\s+/)[0] ?? ''
 
 /**
  * "Photos from our users" for a place (collage) or a district (compact strip):
@@ -122,6 +120,8 @@ function PhotoThumb({ photo, alt, onOpen, onError }: { photo: UserPhoto; alt: st
     <button type="button" className="photo-thumb" onClick={onOpen}>
       <img src={mediaUrl(photo.thumbUrl) ?? undefined} alt={alt} loading="lazy" decoding="async"
            width={photo.width || undefined} height={photo.height || undefined} onError={onError} />
+      {/* Who added it: the username ("@zeynep7"), never the real name */}
+      {photo.uploader && <span className="photo-by">{photo.uploader}</span>}
     </button>
   )
 }
@@ -218,7 +218,7 @@ function PhotoLightbox({ photos, index, onIndex, onClose, alt }: {
           </>
         )}
         <p className="lightbox-caption">
-          {[firstName(photo.uploader), photoDate(photo.createdAt)].filter(Boolean).join(' · ')}
+          {[photo.uploader, photoDate(photo.createdAt)].filter(Boolean).join(' · ')}
         </p>
       </div>
     </Portal>

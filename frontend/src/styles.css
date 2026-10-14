@@ -1255,3 +1255,8 @@ details > .reasons { margin-top: 8px; }
 .stop-swap { margin-left: auto; padding: 4px 0 4px 8px; border: 0; background: none; color: var(--brand-ink); font: inherit; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; }
 .stop-cost { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
 .stop-cost strong { color: var(--ink); font-size: 15px; }
+
+/* The uploader's username on a photo thumbnail */
+.photo-by { position: absolute; left: 6px; bottom: 6px; max-width: calc(100% - 12px); padding: 2px 7px; border-radius: 999px; background: rgb(0 0 0 / 55%); color: #fff; font-size: 11px; font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; pointer-events: none; }
+.photo-strip .photo-by { display: none; }
+.profile-username { font-size: 14px; font-weight: 700; color: var(--brand-ink); }

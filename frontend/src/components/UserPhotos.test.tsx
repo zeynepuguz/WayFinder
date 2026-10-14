@@ -21,7 +21,7 @@ vi.mock('../api', () => ({
 let auth: { user: object | null; hasAccess: boolean } = { user: null, hasAccess: false }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => auth }))
 
-const photo = (id: number, uploader = 'Ayşe Yılmaz'): UserPhoto => ({
+const photo = (id: number, uploader = '@ayse'): UserPhoto => ({
   id, url: `/media/photos/${id}.jpg`, thumbUrl: `/media/photos/${id}_t.jpg`, width: 800, height: 600,
   createdAt: '2026-09-01T10:00:00Z', uploader,
 })
@@ -71,7 +71,7 @@ beforeEach(() => {
 
 describe('UserPhotosSection', () => {
   it('shows the collage and opens / closes the lightbox', async () => {
-    photos.mockResolvedValue([photo(1), photo(2, 'Mehmet'), photo(3)])
+    photos.mockResolvedValue([photo(1), photo(2, '@mehmet_34'), photo(3)])
     renderSection()
 
     const thumbs = await screen.findAllByRole('img', { name: 'Moda Kahve — kullanıcı fotoğrafı' })
@@ -83,12 +83,12 @@ describe('UserPhotosSection', () => {
     await userEvent.click(thumbs[1])
     const box = screen.getByRole('dialog', { name: 'Fotoğraf' })
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/2.jpg')
-    expect(within(box).getByText(/^Mehmet · /)).toBeInTheDocument()
+    expect(within(box).getByText(/^@mehmet_34 · /)).toBeInTheDocument()
     expect(within(box).getByRole('button', { name: 'Kapat' })).toHaveFocus()
 
     await userEvent.keyboard('{ArrowRight}')
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/3.jpg')
-    expect(within(box).getByText(/^Ayşe · /)).toBeInTheDocument()
+    expect(within(box).getByText(/^@ayse · /)).toBeInTheDocument()
     await userEvent.click(within(box).getByRole('button', { name: 'Sonraki fotoğraf' }))
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/1.jpg')
 

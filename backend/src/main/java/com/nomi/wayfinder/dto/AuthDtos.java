@@ -23,8 +23,13 @@ public final class AuthDtos {
             @NotBlank @Size(max = 50) @Pattern(regexp = NAME_PATTERN, message = "must be a name") String firstName,
             @NotBlank @Size(max = 50) @Pattern(regexp = NAME_PATTERN, message = "must be a name") String lastName,
             @NotBlank @Email @Size(max = 254) String email,
-            @NotBlank @Size(min = 8, max = 100) String password
+            @NotBlank @Size(min = 8, max = 100) String password,
+            // Public name under the user's photos; older app versions send none and get one from the first name
+            @Size(max = 30) String username
     ) {
+    }
+
+    public record UsernameRequest(@NotBlank @Size(max = 30) String username) {
     }
 
     public record LoginRequest(
@@ -79,6 +84,7 @@ public final class AuthDtos {
             String displayName,
             String firstName,
             String lastName,
+            String username,
             UserRole role,
             PreferencesResponse preferences,
             BillingService.AccessStatus access

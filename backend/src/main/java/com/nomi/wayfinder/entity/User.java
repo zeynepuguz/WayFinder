@@ -26,6 +26,10 @@ public class User {
 
     private String lastName;
 
+    // Public name under the user's photos ("zeynep7"); unique, lowercase (service/Usernames)
+    @Column(nullable = false, unique = true, length = 20)
+    private String username;
+
     // Null until the sign-up code is entered: such an account cannot sign in
     private Instant emailVerifiedAt;
 
@@ -96,6 +100,14 @@ public class User {
         this.firstName = firstName;
         this.lastName = lastName;
         this.displayName = firstName + " " + lastName;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 
     public Instant getEmailVerifiedAt() {

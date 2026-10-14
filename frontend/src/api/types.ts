@@ -36,6 +36,8 @@ export interface User {
   displayName: string
   firstName: string | null
   lastName: string | null
+  // Public name under the user's photos ("zeynep7"); unique
+  username: string
   role: 'USER' | 'ADMIN'
   preferences: Preferences
   access: AccessStatus
@@ -81,6 +83,7 @@ export interface RegisterRequest {
   lastName: string
   email: string
   password: string
+  username: string
 }
 
 export type CodePurpose = 'SIGN_UP' | 'SIGN_IN'

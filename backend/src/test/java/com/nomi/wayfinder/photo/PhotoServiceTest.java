@@ -184,14 +184,14 @@ class PhotoServiceTest {
     }
 
     @Test
-    void collageShowsOnlyTheUploadersFirstName() {
+    void collageShowsTheUploadersUsername() {
         when(repository.approvedOfPlace(7, 10)).thenReturn(List.of(
-                new PublicPhoto(1, KEY, 1600, 1200, NOW, "Zeynep Uğuz", 7L, null),
+                new PublicPhoto(1, KEY, 1600, 1200, NOW, "zeynep7", 7L, null),
                 new PublicPhoto(2, KEY, 1200, 1600, NOW, "   ", 7L, null)));
 
         List<PhotoResponse> photos = service.placePhotos(7);
 
-        assertThat(photos).extracting(PhotoResponse::uploader).containsExactly("Zeynep", "Nomi kullanıcısı");
+        assertThat(photos).extracting(PhotoResponse::uploader).containsExactly("@zeynep7", "Nomi kullanıcısı");
         assertThat(photos.getFirst().url()).isEqualTo("/media/photos/" + KEY + ".jpg");
         assertThat(photos.getFirst().thumbUrl()).isEqualTo("/media/photos/" + KEY + "_t.jpg");
         // Place collages do not repeat the place
@@ -240,8 +240,8 @@ class PhotoServiceTest {
     }
 
     @Test
-    void uploaderNameIsTheFirstWordOnly() {
-        assertThat(PhotoService.uploaderName("Ayşe Nur Demir")).isEqualTo("Ayşe");
+    void uploaderNameIsTheUsernameNeverTheRealName() {
+        assertThat(PhotoService.uploaderName("aysenur")).isEqualTo("@aysenur");
         assertThat(PhotoService.uploaderName(null)).isEqualTo("Nomi kullanıcısı");
         LocaleContextHolder.setLocale(Locale.ENGLISH);
         assertThat(PhotoService.uploaderName("")).isEqualTo("Nomi user");

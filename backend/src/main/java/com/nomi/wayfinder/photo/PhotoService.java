@@ -149,17 +149,13 @@ public class PhotoService {
 
     private PhotoResponse toResponse(PublicPhoto photo) {
         return new PhotoResponse(photo.id(), storage.url(photo.fileKey()), storage.thumbUrl(photo.fileKey()),
-                photo.width(), photo.height(), photo.createdAt(), uploaderName(photo.displayName()),
+                photo.width(), photo.height(), photo.createdAt(), uploaderName(photo.username()),
                 photo.placeName() == null ? null : photo.placeId(), photo.placeName());
     }
 
-    // Only the first name is public ("Zeynep Uğuz" -> "Zeynep")
-    static String uploaderName(String displayName) {
-        String first = displayName == null ? "" : displayName.trim().split("\\s+")[0];
-        if (first.isEmpty()) {
-            return Texts.t("Nomi kullanıcısı", "Nomi user");
-        }
-        return first.length() > 30 ? first.substring(0, 30) : first;
+    // The uploader's public username ("@zeynep7"); never the real name
+    static String uploaderName(String username) {
+        return username == null || username.isBlank() ? Texts.t("Nomi kullanıcısı", "Nomi user") : "@" + username.trim();
     }
 
     // ---------- the user's own photos ----------
