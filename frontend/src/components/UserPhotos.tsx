@@ -12,6 +12,7 @@ import { checkPhotoFile, currentPosition, PHOTO_ACCEPT, uploadErrorMessage } fro
 import { useAsync } from '../lib/useAsync'
 import { HScroll } from './HScroll'
 import { Alert, ConfirmSheet, Sheet, Skeleton, Spinner, useToast } from './ui'
+import { Avatar, UserProfileSheet } from './UserProfileSheet'
 
 // Rendered on <body>: the place page's sheet is its own stacking context and would cover overlays
 function Portal({ children }: { children: ReactNode }) {
@@ -43,6 +44,8 @@ export function UserPhotosSection({ target, name, title, mapsUrl, variant = 'col
   const [failed, setFailed] = useState<Set<number>>(() => new Set())
   const [open, setOpen] = useState<number | null>(null)
   const [adding, setAdding] = useState(false)
+  // The uploader whose public profile is open (username without "@")
+  const [profile, setProfile] = useState<string | null>(null)
 
   const photos = (data ?? []).filter(p => !failed.has(p.id) && mediaUrl(p.thumbUrl) && mediaUrl(p.url)).slice(0, 10)
   const alt = () => `${name} — ${t('kullanıcı fotoğrafı', 'user photo')}`
@@ -108,8 +111,10 @@ export function UserPhotosSection({ target, name, title, mapsUrl, variant = 'col
       </a>
 
       {open != null && photos[open] && (
-        <PhotoLightbox photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} alt={alt} />
+        <PhotoLightbox photos={photos} index={open} onIndex={setOpen} onClose={() => setOpen(null)} alt={alt}
+                       onProfile={username => { setOpen(null); setProfile(username) }} />
       )}
+      <UserProfileSheet username={profile} onClose={() => setProfile(null)} />
       <AddPhotoSheet open={adding} onClose={() => setAdding(false)} target={target} />
     </section>
   )
@@ -121,7 +126,9 @@ function PhotoThumb({ photo, alt, onOpen, onError }: { photo: UserPhoto; alt: st
       <img src={mediaUrl(photo.thumbUrl) ?? undefined} alt={alt} loading="lazy" decoding="async"
            width={photo.width || undefined} height={photo.height || undefined} onError={onError} />
       {/* Who added it: the username ("@zeynep7"), never the real name */}
-      {photo.uploader && <span className="photo-by">{photo.uploader}</span>}
+      {photo.uploader && (
+        <span className="photo-by"><Avatar url={photo.uploaderAvatar} name={photo.uploader} size={16} />{photo.uploader}</span>
+      )}
     </button>
   )
 }
@@ -129,12 +136,14 @@ function PhotoThumb({ photo, alt, onOpen, onError }: { photo: UserPhoto; alt: st
 const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
 
 /** Full-screen viewer: arrows / swipe to move, Esc or the close button to leave; focus stays inside. */
-function PhotoLightbox({ photos, index, onIndex, onClose, alt }: {
+function PhotoLightbox({ photos, index, onIndex, onClose, alt, onProfile }: {
   photos: UserPhoto[]
   index: number
   onIndex: (index: number) => void
   onClose: () => void
   alt: (index: number) => string
+  // Opens the uploader's public profile
+  onProfile: (username: string) => void
 }) {
   const t = useT()
   const dialog = useRef<HTMLDivElement>(null)
@@ -218,7 +227,13 @@ function PhotoLightbox({ photos, index, onIndex, onClose, alt }: {
           </>
         )}
         <p className="lightbox-caption">
-          {[photo.uploader, photoDate(photo.createdAt)].filter(Boolean).join(' · ')}
+          {/* "@zeynep7": a username opens the uploader's profile ("Nomi kullanıcısı" has none) */}
+          {photo.uploader.startsWith('@') ? (
+            <button type="button" className="lightbox-uploader" onClick={() => onProfile(photo.uploader.slice(1))}>
+              <Avatar url={photo.uploaderAvatar} name={photo.uploader} size={24} />{photo.uploader}
+            </button>
+          ) : photo.uploader}
+          {' · '}{photoDate(photo.createdAt)}
         </p>
       </div>
     </Portal>

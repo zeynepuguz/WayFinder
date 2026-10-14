@@ -1,5 +1,5 @@
 import {
-  AtSign, ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
+  AtSign, Camera, ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
   MonitorSmartphone, SlidersHorizontal, SunMoon, Trash2,
 } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
@@ -11,6 +11,8 @@ import { OpenSessions } from '../components/OpenSessions'
 import { FeedbackForm, PreferencesForm } from '../components/ProfileForms'
 import { Alert, BackButton, ConfirmSheet, Segmented, Sheet, Spinner, useToast } from '../components/ui'
 import { MyPhotos } from '../components/UserPhotos'
+import { Avatar } from '../components/UserProfileSheet'
+import { checkPhotoFile, PHOTO_ACCEPT, uploadErrorMessage } from '../lib/photos'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
 import { errorMessage, formatDateTime } from '../lib/format'
@@ -31,6 +33,7 @@ export function ProfilePage() {
   const [feedbackOpen, setFeedbackOpen] = useState(false)
   const [sessionsOpen, setSessionsOpen] = useState(false)
   const [usernameOpen, setUsernameOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
 
   if (!user) {
     return (
@@ -73,7 +76,11 @@ export function ProfilePage() {
       <div className="topbar"><BackButton /><span className="topbar-title">{t('Profil', 'Profile')}</span><span style={{ width: 44 }} /></div>
 
       <div className="row" style={{ gap: 14 }}>
-        <span className="profile-avatar">{initials}</span>
+        <button type="button" className="profile-avatar-btn" onClick={() => setAvatarOpen(true)}
+                aria-label={user.avatarUrl ? t('Profil fotoğrafını değiştir', 'Change profile photo') : t('Profil fotoğrafı ekle', 'Add a profile photo')}>
+          {user.avatarUrl ? <Avatar url={user.avatarUrl} name={user.username} size={60} /> : <span className="profile-avatar">{initials}</span>}
+          <span className="cam"><Camera size={13} /></span>
+        </button>
         <div className="grow">
           <h1 className="t-title">{user.displayName}</h1>
           {user.username && <p className="profile-username">@{user.username}</p>}
@@ -175,6 +182,10 @@ export function ProfilePage() {
 
       <Sheet open={sessionsOpen} onClose={() => setSessionsOpen(false)} label={t('Açık oturumlar', 'Signed-in devices')}>
         {sessionsOpen && <OpenSessions />}
+      </Sheet>
+
+      <Sheet open={avatarOpen} onClose={() => setAvatarOpen(false)} label={t('Profil fotoğrafı', 'Profile photo')}>
+        {avatarOpen && <AvatarForm onDone={message => { setAvatarOpen(false); toast(message) }} />}
       </Sheet>
 
       <Sheet open={usernameOpen} onClose={() => setUsernameOpen(false)} label={t('Kullanıcı adı', 'Username')}>
@@ -286,5 +297,56 @@ function UsernameForm({ current, onSaved }: { current: string; onSaved: () => vo
         {busy ? <Spinner /> : t('Kaydet', 'Save')}
       </button>
     </form>
+  )
+}
+
+// Optional profile photo: other users see it with the username under the photos this user adds
+function AvatarForm({ onDone }: { onDone: (message: string) => void }) {
+  const t = useT()
+  const { user, refreshUser } = useAuth()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  if (!user) return null
+
+  async function run(action: () => Promise<unknown>, done: string) {
+    setBusy(true)
+    setError(null)
+    try {
+      await action()
+      await refreshUser()
+      onDone(done)
+    } catch (e) {
+      setError(uploadErrorMessage(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function choose(file: File | undefined) {
+    if (!file) return
+    const problem = checkPhotoFile(file)
+    if (problem) {
+      setError(problem)
+      return
+    }
+    void run(() => api.setAvatar(file), t('Profil fotoğrafın güncellendi', 'Your profile photo is updated'))
+  }
+
+  return (
+    <div className="stack" style={{ alignItems: 'center', textAlign: 'center' }}>
+      <Avatar url={user.avatarUrl} name={user.username} size={96} />
+      <p className="t-caption">{t('Eklediğin fotoğraflarda kullanıcı adınla birlikte görünür. Eklemek isteğe bağlı.', 'Shown with your username on the photos you add. Adding one is optional.')}</p>
+      {error && <Alert tone="danger"><span>{error}</span></Alert>}
+      <label className={`btn btn-primary btn-block ${busy ? 'disabled' : ''}`} aria-disabled={busy}>
+        {busy ? <Spinner /> : <><Camera size={18} /> {user.avatarUrl ? t('Başka fotoğraf seç', 'Choose another photo') : t('Fotoğraf seç', 'Choose a photo')}</>}
+        <input type="file" accept={PHOTO_ACCEPT} hidden disabled={busy} onChange={e => { choose(e.target.files?.[0]); e.target.value = '' }} />
+      </label>
+      {user.avatarUrl && (
+        <button type="button" className="btn btn-ghost btn-block" style={{ color: 'var(--danger)' }} disabled={busy}
+                onClick={() => void run(() => api.removeAvatar(), t('Profil fotoğrafın kaldırıldı', 'Your profile photo is removed'))}>
+          {t('Fotoğrafı kaldır', 'Remove photo')}
+        </button>
+      )}
+    </div>
   )
 }

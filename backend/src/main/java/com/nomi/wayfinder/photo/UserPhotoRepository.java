@@ -118,14 +118,20 @@ public class UserPhotoRepository {
         jdbc.update("DELETE FROM user_photos WHERE id = ?", id);
     }
 
+    // The user's photo files and profile photo
     public List<String> fileKeysOfUser(long userId) {
-        return jdbc.queryForList("SELECT file_key FROM user_photos WHERE user_id = ? AND file_key IS NOT NULL",
-                String.class, userId);
+        return jdbc.queryForList("""
+                SELECT file_key FROM user_photos WHERE user_id = ? AND file_key IS NOT NULL
+                UNION ALL SELECT avatar_key FROM users WHERE id = ? AND avatar_key IS NOT NULL
+                """, String.class, userId, userId);
     }
 
+    // Every stored file a row points to: photos and profile photos (the orphan sweep keeps these)
     public Set<String> allFileKeys() {
-        return new HashSet<>(jdbc.queryForList("SELECT file_key FROM user_photos WHERE file_key IS NOT NULL",
-                String.class));
+        return new HashSet<>(jdbc.queryForList("""
+                SELECT file_key FROM user_photos WHERE file_key IS NOT NULL
+                UNION SELECT avatar_key FROM users WHERE avatar_key IS NOT NULL
+                """, String.class));
     }
 
     // ---------- jobs ----------
@@ -161,7 +167,7 @@ public class UserPhotoRepository {
     // ---------- collages ----------
 
     public record PublicPhoto(long id, String fileKey, int width, int height, Instant createdAt,
-                              String username, Long placeId, String placeName) {
+                              String username, String avatarKey, Long placeId, String placeName) {
     }
 
     private static final RowMapper<PublicPhoto> PUBLIC = (rs, i) -> new PublicPhoto(
@@ -171,12 +177,13 @@ public class UserPhotoRepository {
             rs.getInt("height"),
             rs.getTimestamp("created_at").toInstant(),
             rs.getString("username"),
+            rs.getString("avatar_key"),
             rs.getObject("place_id", Long.class),
             rs.getString("place_name"));
 
     public List<PublicPhoto> approvedOfPlace(long placeId, int limit) {
         return jdbc.query("""
-                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username,
+                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username, u.avatar_key,
                        up.place_id, NULL AS place_name
                 FROM user_photos up JOIN users u ON u.id = up.user_id
                 WHERE up.place_id = ? AND up.status = 'APPROVED' AND up.file_key IS NOT NULL
@@ -187,7 +194,7 @@ public class UserPhotoRepository {
     // The district's own photos and those of the places inside it, newest first
     public List<PublicPhoto> approvedOfDistrict(long districtId, int limit) {
         return jdbc.query("""
-                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username,
+                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username, u.avatar_key,
                        up.place_id, p.name AS place_name
                 FROM user_photos up
                 JOIN users u ON u.id = up.user_id
@@ -196,6 +203,27 @@ public class UserPhotoRepository {
                   AND (up.district_id = ? OR p.district_id = ?)
                 ORDER BY up.created_at DESC, up.id DESC LIMIT ?
                 """, PUBLIC, districtId, districtId, limit);
+    }
+
+    // A user's published photos for their public profile, newest first (place name when it is a place photo)
+    public List<PublicPhoto> approvedOfUser(long userId, int limit) {
+        return jdbc.query("""
+                SELECT up.id, up.file_key, up.width, up.height, up.created_at, u.username, u.avatar_key,
+                       up.place_id, COALESCE(p.name, d.name) AS place_name
+                FROM user_photos up
+                JOIN users u ON u.id = up.user_id
+                LEFT JOIN places p ON p.id = up.place_id
+                LEFT JOIN districts d ON d.id = up.district_id
+                WHERE up.user_id = ? AND up.status = 'APPROVED' AND up.file_key IS NOT NULL
+                ORDER BY up.created_at DESC, up.id DESC LIMIT ?
+                """, PUBLIC, userId, limit);
+    }
+
+    public int countApprovedOfUser(long userId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT count(*) FROM user_photos WHERE user_id = ? AND status = 'APPROVED' AND file_key IS NOT NULL",
+                Integer.class, userId);
+        return count == null ? 0 : count;
     }
 
     // ---------- "my photos" ----------

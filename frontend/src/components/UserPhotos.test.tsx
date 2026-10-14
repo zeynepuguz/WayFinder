@@ -10,8 +10,10 @@ const photos = vi.fn()
 const uploadPhoto = vi.fn()
 const myPhotos = vi.fn()
 const deletePhoto = vi.fn()
+const publicProfile = vi.fn()
 vi.mock('../api', () => ({
   api: {
+    publicProfile: (...args: unknown[]) => publicProfile(...args),
     photos: (...args: unknown[]) => photos(...args),
     uploadPhoto: (...args: unknown[]) => uploadPhoto(...args),
     myPhotos: (...args: unknown[]) => myPhotos(...args),
@@ -70,6 +72,26 @@ beforeEach(() => {
 })
 
 describe('UserPhotosSection', () => {
+  it('shows who added a photo; the username opens their public profile', async () => {
+    photos.mockResolvedValue([{ ...photo(1, '@ayse'), uploaderAvatar: '/media/photos/av_t.jpg' }])
+    publicProfile.mockResolvedValue({
+      username: 'ayse', avatarUrl: '/media/photos/av.jpg', memberSince: '2026-10', photoCount: 4,
+      photos: [{ ...photo(7), placeId: 9, placeName: 'Moda Kahve' }],
+    })
+    renderSection()
+
+    const thumb = await screen.findByRole('button', { name: /@ayse/ })
+    expect(within(thumb).getByText('@ayse')).toBeInTheDocument()
+    await userEvent.click(thumb)
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Fotoğraf' })).getByRole('button', { name: '@ayse' }))
+
+    const profile = await screen.findByRole('dialog', { name: '@ayse' })
+    expect(publicProfile).toHaveBeenCalledWith('ayse')
+    expect(await within(profile).findByText('4 fotoğraf ekledi')).toBeInTheDocument()
+    expect(within(profile).getByText(/Ekim 2026’dan beri Nomi’de/)).toBeInTheDocument()
+    expect(within(profile).getByRole('link', { name: /Moda Kahve/ })).toHaveAttribute('href', '/places/9')
+  })
+
   it('shows the collage and opens / closes the lightbox', async () => {
     photos.mockResolvedValue([photo(1), photo(2, '@mehmet_34'), photo(3)])
     renderSection()
@@ -83,12 +105,12 @@ describe('UserPhotosSection', () => {
     await userEvent.click(thumbs[1])
     const box = screen.getByRole('dialog', { name: 'Fotoğraf' })
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/2.jpg')
-    expect(within(box).getByText(/^@mehmet_34 · /)).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: '@mehmet_34' })).toBeInTheDocument()
     expect(within(box).getByRole('button', { name: 'Kapat' })).toHaveFocus()
 
     await userEvent.keyboard('{ArrowRight}')
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/3.jpg')
-    expect(within(box).getByText(/^@ayse · /)).toBeInTheDocument()
+    expect(within(box).getByRole('button', { name: '@ayse' })).toBeInTheDocument()
     await userEvent.click(within(box).getByRole('button', { name: 'Sonraki fotoğraf' }))
     expect(within(box).getByRole('img')).toHaveAttribute('src', '/media/photos/1.jpg')
 

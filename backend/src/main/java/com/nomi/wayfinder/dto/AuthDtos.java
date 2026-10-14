@@ -85,6 +85,8 @@ public final class AuthDtos {
             String firstName,
             String lastName,
             String username,
+            // Profile photo, null when there is none
+            String avatarUrl,
             UserRole role,
             PreferencesResponse preferences,
             BillingService.AccessStatus access

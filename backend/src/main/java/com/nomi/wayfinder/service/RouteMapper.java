@@ -26,7 +26,7 @@ public class RouteMapper {
 
         return new RouteResponse(
                 route.getId(),
-                route.getTitle(),
+                RouteService.shownTitle(route.getTitle(), route.getDate()),
                 route.getDate(),
                 route.getStatus(),
                 route.isSaved(),
@@ -58,7 +58,7 @@ public class RouteMapper {
     public RouteSummary toSummary(Route route, boolean sharedWithMe) {
         return new RouteSummary(
                 route.getId(),
-                route.getTitle(),
+                RouteService.shownTitle(route.getTitle(), route.getDate()),
                 route.getDate(),
                 route.getStatus(),
                 route.isSaved(),

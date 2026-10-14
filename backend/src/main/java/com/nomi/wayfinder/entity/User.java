@@ -30,6 +30,9 @@ public class User {
     @Column(nullable = false, unique = true, length = 20)
     private String username;
 
+    // Optional profile photo (photo/PhotoStorage key); null = none
+    private String avatarKey;
+
     // Null until the sign-up code is entered: such an account cannot sign in
     private Instant emailVerifiedAt;
 
@@ -108,6 +111,14 @@ public class User {
 
     public void setUsername(String username) {
         this.username = username;
+    }
+
+    public String getAvatarKey() {
+        return avatarKey;
+    }
+
+    public void setAvatarKey(String avatarKey) {
+        this.avatarKey = avatarKey;
     }
 
     public Instant getEmailVerifiedAt() {

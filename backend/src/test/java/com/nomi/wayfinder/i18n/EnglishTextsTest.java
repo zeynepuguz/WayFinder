@@ -76,6 +76,19 @@ class EnglishTextsTest {
     }
 
     @Test
+    void aTitleNomiGaveIsShownInTheReadersLanguageATypedOneStays() {
+        LocalDate date = LocalDate.of(2026, 9, 27);
+        LocaleContextHolder.setLocale(Locale.ENGLISH);
+        assertThat(RouteService.shownTitle("27 Eylül Pazar Rotası", date)).isEqualTo("Sunday, 27 September route");
+        assertThat(RouteService.shownTitle("Kadıköy kahve turu", date)).isEqualTo("Kadıköy kahve turu");
+        // Another day's title is the user's own words
+        assertThat(RouteService.shownTitle("28 Eylül Pazartesi Rotası", date)).isEqualTo("28 Eylül Pazartesi Rotası");
+
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("tr"));
+        assertThat(RouteService.shownTitle("Sunday, 27 September route", date)).isEqualTo("27 Eylül Pazar Rotası");
+    }
+
+    @Test
     void planReplyInEnglishKeepsTheStopLineFormat() {
         LocaleContextHolder.setLocale(Locale.ENGLISH);
 

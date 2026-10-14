@@ -3,6 +3,7 @@ package com.nomi.wayfinder.photo;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.Instant;
+import java.util.List;
 
 public final class PhotoDtos {
 
@@ -29,9 +30,21 @@ public final class PhotoDtos {
             Instant createdAt,
             // The uploader's username ("@zeynep7"), or "Nomi kullanıcısı" / "Nomi user"
             String uploader,
+            // The uploader's profile photo (small), null when they have none
+            String uploaderAvatar,
             @JsonInclude(JsonInclude.Include.NON_NULL) Long placeId,
             @JsonInclude(JsonInclude.Include.NON_NULL) String placeName
     ) {
+    }
+
+    /**
+     * What other users see of someone: the username, profile photo and the photos they added (no real name,
+     * no e-mail).
+     *
+     * @param memberSince "2026-10" (year and month they joined)
+     */
+    public record PublicProfile(String username, String avatarUrl, String memberSince, int photoCount,
+                                List<PhotoResponse> photos) {
     }
 
     /** One of the user's own uploads, whatever its status. url / thumbUrl are null once a rejected photo's files are gone. */

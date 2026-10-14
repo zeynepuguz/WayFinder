@@ -708,6 +708,18 @@ public class RouteService {
                 : dayName(date) + " Rotası";
     }
 
+    /**
+     * The title to show in the user's language: a title Nomi gave the route ("27 Eylül Pazar Rotası", saved in the
+     * language of the day it was made) is written again in this request's language; a title the user typed stays.
+     */
+    public static String shownTitle(String title, LocalDate date) {
+        if (title == null || date == null) {
+            return title;
+        }
+        boolean nomis = title.equals(date.format(TITLE_DATE) + " Rotası") || title.equals(date.format(TITLE_DATE_EN) + " route");
+        return nomis ? defaultTitle(date) : title;
+    }
+
     // "27 Eylül Pazar" / "Sunday, 27 September"
     public static String dayName(LocalDate date) {
         return Texts.english() ? date.format(TITLE_DATE_EN) : date.format(TITLE_DATE);

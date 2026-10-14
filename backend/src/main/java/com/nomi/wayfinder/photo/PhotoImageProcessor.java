@@ -111,6 +111,34 @@ public class PhotoImageProcessor {
         }
     }
 
+    static final int AVATAR_SIDE = 512;
+    static final int AVATAR_THUMB_SIDE = 160;
+    static final int AVATAR_MIN_SIDE = 96;
+
+    /**
+     * A profile photo: upright, the centre square, 512 px (and a 160 px copy for lists), as a fresh JPEG without
+     * any of the original metadata.
+     */
+    public ProcessedPhoto processAvatar(byte[] bytes) {
+        Format format = sniff(bytes);
+        if (format != Format.JPEG && format != Format.PNG && format != Format.WEBP) {
+            throw new PhotoRejectedException(RejectReason.UNSUPPORTED);
+        }
+        PhotoMetadata metadata = readMetadata(bytes);
+        permits.acquireUninterruptibly();
+        try {
+            BufferedImage image = orient(decode(bytes, AVATAR_SIDE * 2, AVATAR_MIN_SIDE), metadata.orientation());
+            int side = Math.min(image.getWidth(), image.getHeight());
+            BufferedImage square = image.getSubimage((image.getWidth() - side) / 2, (image.getHeight() - side) / 2,
+                    side, side);
+            BufferedImage large = scale(square, AVATAR_SIDE);
+            return new ProcessedPhoto(encode(large, QUALITY), large.getWidth(), large.getHeight(),
+                    encode(scale(large, AVATAR_THUMB_SIDE), THUMB_QUALITY), PhotoMetadata.NONE);
+        } finally {
+            permits.release();
+        }
+    }
+
     // The small copy sent to the AI service (low detail is enough and costs less)
     public byte[] downscaleForAi(byte[] storedJpeg) {
         permits.acquireUninterruptibly();

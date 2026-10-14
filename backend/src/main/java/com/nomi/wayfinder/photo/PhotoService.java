@@ -147,10 +147,10 @@ public class PhotoService {
         return repository.approvedOfDistrict(districtId, COLLAGE_SIZE).stream().map(this::toResponse).toList();
     }
 
-    private PhotoResponse toResponse(PublicPhoto photo) {
+    PhotoResponse toResponse(PublicPhoto photo) {
         return new PhotoResponse(photo.id(), storage.url(photo.fileKey()), storage.thumbUrl(photo.fileKey()),
                 photo.width(), photo.height(), photo.createdAt(), uploaderName(photo.username()),
-                photo.placeName() == null ? null : photo.placeId(), photo.placeName());
+                storage.thumbUrl(photo.avatarKey()), photo.placeName() == null ? null : photo.placeId(), photo.placeName());
     }
 
     // The uploader's public username ("@zeynep7"); never the real name

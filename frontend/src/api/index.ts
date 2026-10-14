@@ -3,7 +3,7 @@ import type {
   AccessPlan, AccessStatus, AiUsageSummary, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
   AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, OpenSession, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, PlaceRating, RatingReason, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
-  Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
+  Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User, PublicProfile,
 } from './types'
 
 // Multipart body of a photo upload: the original file (EXIF intact) plus the device position when known
@@ -132,6 +132,14 @@ export const api = {
     http.post<PhotoUploadResult>(photosPath(target), photoForm(file, position)),
   myPhotos: () => http.get<MyPhoto[]>('/me/photos'),
   deletePhoto: (id: number) => http.delete<void>(`/photos/${id}`),
+  setAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return http.put<{ avatarUrl: string }>('/users/me/avatar', form)
+  },
+  removeAvatar: () => http.delete<void>('/users/me/avatar'),
+  publicProfile: (username: string) => http.get<PublicProfile>(`/users/${encodeURIComponent(username)}/profile`),
+  removeAvatarOf: (username: string) => http.delete<void>(`/admin/users/${encodeURIComponent(username)}/avatar`),
 
   // Without conversationId the backend starts a new chat; the reply carries its id
   sendMessage: (message: string, latitude: number, longitude: number, conversationId?: number | null) =>

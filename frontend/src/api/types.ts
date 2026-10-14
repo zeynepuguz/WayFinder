@@ -38,6 +38,8 @@ export interface User {
   lastName: string | null
   // Public name under the user's photos ("zeynep7"); unique
   username: string
+  // Profile photo, null when there is none
+  avatarUrl: string | null
   role: 'USER' | 'ADMIN'
   preferences: Preferences
   access: AccessStatus
@@ -547,7 +549,23 @@ export interface UserPhoto {
   width: number
   height: number
   createdAt: string
+  // "@zeynep7" (the username, never the real name), or "Nomi kullanıcısı"
   uploader: string
+  // The uploader's profile photo (small); null / absent when they have none
+  uploaderAvatar?: string | null
+  // District collages and public profiles: the place the photo is of
+  placeId?: number
+  placeName?: string
+}
+
+// What anyone sees of a user: username, profile photo, the photos they added (no real name or e-mail)
+export interface PublicProfile {
+  username: string
+  avatarUrl: string | null
+  // "2026-10"
+  memberSince: string
+  photoCount: number
+  photos: UserPhoto[]
 }
 
 export type PhotoStatus = 'PENDING' | 'APPROVED' | 'REJECTED'

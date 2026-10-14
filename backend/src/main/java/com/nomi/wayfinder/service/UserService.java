@@ -9,6 +9,7 @@ import com.nomi.wayfinder.entity.UserRole;
 import com.nomi.wayfinder.exception.BusinessException;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
 import com.nomi.wayfinder.photo.PhotoService;
+import com.nomi.wayfinder.photo.PhotoStorage;
 import com.nomi.wayfinder.repository.UserPreferencesRepository;
 import com.nomi.wayfinder.repository.UserRepository;
 import com.nomi.wayfinder.security.EmailCodeService;
@@ -45,6 +46,7 @@ public class UserService {
     private final LoginAttemptLimiter loginAttempts;
     private final MailService mailService;
     private final Usernames usernames;
+    private final PhotoStorage photoStorage;
     private final Clock clock;
     // The owner's accounts (OWNER_EMAILS in .env): ADMIN when they sign up or sign in with a proven e-mail
     private final Set<String> ownerEmails;
@@ -68,10 +70,12 @@ public class UserService {
             LoginAttemptLimiter loginAttempts,
             MailService mailService,
             Usernames usernames,
+            PhotoStorage photoStorage,
             Clock clock,
             NomiProperties properties
     ) {
         this.usernames = usernames;
+        this.photoStorage = photoStorage;
         this.emailCodes = emailCodes;
         this.sessions = sessions;
         this.loginAttempts = loginAttempts;
@@ -332,6 +336,7 @@ public class UserService {
                 user.getFirstName(),
                 user.getLastName(),
                 user.getUsername(),
+                photoStorage.url(user.getAvatarKey()),
                 user.getRole(),
                 toPreferencesResponse(getPreferences(user.getId())),
                 billingService.status(user.getId())

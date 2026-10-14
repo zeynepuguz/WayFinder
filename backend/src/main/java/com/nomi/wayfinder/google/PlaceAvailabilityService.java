@@ -26,12 +26,16 @@ import java.util.Optional;
  * closed places for years ("Seyir Cafe", "Akdağ Çayevi" are closed on Google but open in OSM / Overture), and a
  * search by name alone opens another place with the same name. So: the Google place of this name within
  * radius-meters of our pin decides; a permanently closed one is hidden from Nomi; no match says it may be closed;
- * an open one is opened in Google Maps by its own place id (never a namesake).
+ * an open one is opened in Google Maps by its own place id (never a namesake). Pins of open data can be off by
+ * a few hundred metres, so a miss near the pin is searched again by name, district and city ("Devran Kebap Merkez
+ * Adıyaman") and the same name counts within {@link #WIDE_RADIUS_METERS}.
  */
 @Service
 public class PlaceAvailabilityService {
 
     private static final Logger log = LoggerFactory.getLogger(PlaceAvailabilityService.class);
+    // The second search (name + district + city): the same name this far from our pin is still our place
+    static final int WIDE_RADIUS_METERS = 2000;
 
     public enum Status {
         // Google knows it here and it is open
@@ -87,6 +91,15 @@ public class PlaceAvailabilityService {
         }
         Optional<GooglePlace> match = bestMatch(place.getName(), place.getLatitude(), place.getLongitude(), found,
                 properties.radiusMeters());
+        // Not near our pin: by name, district and city, a little wider (one more call, also within the free share)
+        if (match.isEmpty() && budget.tryAcquire()) {
+            try {
+                match = bestMatch(place.getName(), place.getLatitude(), place.getLongitude(),
+                        client.search(searchQuery(place), place.getLatitude(), place.getLongitude()), WIDE_RADIUS_METERS);
+            } catch (RuntimeException e) {
+                log.warn("Google Places area check of place {} failed: {}", placeId, e.getMessage());
+            }
+        }
         if (match.isEmpty()) {
             return new Availability(Status.NOT_FOUND, nearPin, null);
         }
@@ -139,12 +152,21 @@ public class PlaceAvailabilityService {
     private static final List<String> GENERIC_WORDS = List.of("cafe", "kafe", "restoran", "restaurant", "lokanta",
             "kahve", "coffee", "market", "pastane", "pastanesi", "firin", "firini", "evi", "bahcesi", "camii", "cami");
 
-    // A Google Maps search for "<city> <name>" around our pin: the nearest of namesakes comes first
+    // "Devran Kebap Merkez Adıyaman": the name with its district and city, unless the name already says them
+    static String searchQuery(Place place) {
+        StringBuilder query = new StringBuilder(place.getName());
+        String folded = OsmPlaceMapper.fold(place.getName());
+        for (String area : new String[]{place.getDistrictName(), place.getCityName()}) {
+            if (area != null && !area.isBlank() && !folded.contains(OsmPlaceMapper.fold(area))) {
+                query.append(' ').append(area);
+            }
+        }
+        return query.toString();
+    }
+
+    // A Google Maps search for the name, district and city around our pin: the nearest of namesakes comes first
     static String searchAroundPin(Place place) {
-        String city = place.getCityName();
-        boolean named = city == null || OsmPlaceMapper.fold(place.getName()).contains(OsmPlaceMapper.fold(city));
-        String query = named ? place.getName() : city + " " + place.getName();
-        return "https://www.google.com/maps/search/" + encode(query) + "/@"
+        return "https://www.google.com/maps/search/" + encode(searchQuery(place)) + "/@"
                 + String.format(Locale.ROOT, "%.6f,%.6f,17z", place.getLatitude(), place.getLongitude());
     }
 

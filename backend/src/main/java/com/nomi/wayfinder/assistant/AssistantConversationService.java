@@ -61,7 +61,7 @@ public class AssistantConversationService {
                 .filter(Objects::nonNull)
                 .distinct()
                 .forEach(routeId -> routeService.findRouteEntity(userId, routeId)
-                        .ifPresent(r -> routeTitles.put(routeId, r.getTitle())));
+                        .ifPresent(r -> routeTitles.put(routeId, RouteService.shownTitle(r.getTitle(), r.getDate()))));
 
         return conversations.stream()
                 .map(c -> summary(c, routeTitles.get(c.getRouteId()), previews.get(c.getId())))

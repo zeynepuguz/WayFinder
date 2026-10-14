@@ -5,6 +5,9 @@ import com.nomi.wayfinder.dto.AuthDtos.PreferencesResponse;
 import com.nomi.wayfinder.dto.AuthDtos.UsernameRequest;
 import com.nomi.wayfinder.dto.AuthDtos.UserResponse;
 import com.nomi.wayfinder.exception.ResourceNotFoundException;
+import com.nomi.wayfinder.photo.AvatarService;
+import com.nomi.wayfinder.photo.PhotoRejectedException;
+import com.nomi.wayfinder.photo.RejectReason;
 import com.nomi.wayfinder.security.CurrentUser;
 import com.nomi.wayfinder.security.JwtService;
 import com.nomi.wayfinder.security.SessionService;
@@ -12,6 +15,8 @@ import com.nomi.wayfinder.security.SessionService.SessionView;
 import com.nomi.wayfinder.service.UserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -25,10 +30,12 @@ public class UserController {
 
     private final UserService userService;
     private final SessionService sessions;
+    private final AvatarService avatars;
 
-    public UserController(UserService userService, SessionService sessions) {
+    public UserController(UserService userService, SessionService sessions, AvatarService avatars) {
         this.userService = userService;
         this.sessions = sessions;
+        this.avatars = avatars;
     }
 
     @GetMapping
@@ -67,6 +74,22 @@ public class UserController {
     @PutMapping("/username")
     public UserResponse changeUsername(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody UsernameRequest request) {
         return userService.changeUsername(CurrentUser.id(jwt), request.username());
+    }
+
+    // Optional profile photo (JPEG / PNG / WebP): stored square, without metadata; shown with the username
+    @PutMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public Map<String, String> setAvatar(@AuthenticationPrincipal Jwt jwt, @RequestParam("file") MultipartFile file)
+            throws java.io.IOException {
+        if (file == null || file.isEmpty()) {
+            throw new PhotoRejectedException(RejectReason.UNSUPPORTED);
+        }
+        return Map.of("avatarUrl", avatars.set(CurrentUser.id(jwt), file.getBytes()));
+    }
+
+    @DeleteMapping("/avatar")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void removeAvatar(@AuthenticationPrincipal Jwt jwt) {
+        avatars.remove(CurrentUser.id(jwt));
     }
 
     @PutMapping("/preferences")

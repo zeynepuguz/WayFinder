@@ -186,8 +186,8 @@ class PhotoServiceTest {
     @Test
     void collageShowsTheUploadersUsername() {
         when(repository.approvedOfPlace(7, 10)).thenReturn(List.of(
-                new PublicPhoto(1, KEY, 1600, 1200, NOW, "zeynep7", 7L, null),
-                new PublicPhoto(2, KEY, 1200, 1600, NOW, "   ", 7L, null)));
+                new PublicPhoto(1, KEY, 1600, 1200, NOW, "zeynep7", null, 7L, null),
+                new PublicPhoto(2, KEY, 1200, 1600, NOW, "   ", null, 7L, null)));
 
         List<PhotoResponse> photos = service.placePhotos(7);
 

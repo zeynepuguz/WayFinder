@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/v1/places/**", "/api/v1/cities/**", "/api/v1/districts/**",
                                 "/api/v1/routes/popular", "/api/v1/routes/community", "/api/v1/weather/**",
                                 "/api/v1/recommendations/**", "/api/v1/home/**", "/api/v1/billing/plans").permitAll()
+                        // Public profiles: username, profile photo and the photos a user added
+                        .requestMatchers(HttpMethod.GET, "/api/v1/users/*/profile").permitAll()
                         // Published user photos (development; Caddy serves them in production)
                         .requestMatchers(HttpMethod.GET, "/media/photos/**").permitAll()
                         // Any logged-in user may add photos of a place (checked before they are published)

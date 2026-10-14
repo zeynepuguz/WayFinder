@@ -85,6 +85,41 @@ class PlaceAvailabilityTest {
     }
 
     @Test
+    void aMissNearThePinIsSearchedAgainByNameDistrictAndCity() {
+        Place devran = new Place();
+        ReflectionTestUtils.setField(devran, "id", 8L);
+        devran.setName("Devran Kebap");
+        devran.setCategory(PlaceCategory.RESTAURANT);
+        devran.setCoordinates(37.7640, 38.2760);
+        ReflectionTestUtils.setField(devran, "cityName", "Adıyaman");
+        ReflectionTestUtils.setField(devran, "districtName", "Merkez");
+        when(places.findById(8L)).thenReturn(Optional.of(devran));
+        // Google's pin is 1.1 km from ours: nothing within 300 m by name alone
+        GooglePlace google = new GooglePlace("ChIJdevran", "Devran Kebap Salonu", "OPERATIONAL", 37.7740, 38.2760);
+        when(client.search(eq("Devran Kebap"), anyDouble(), anyDouble())).thenReturn(List.of(google));
+        when(client.search(eq("Devran Kebap Merkez Adıyaman"), anyDouble(), anyDouble())).thenReturn(List.of(google));
+
+        Availability result = service.check(8L);
+
+        assertThat(result.status()).isEqualTo(Status.OPEN);
+        assertThat(result.mapsUrl()).contains("query_place_id=ChIJdevran");
+        verify(budget, times(2)).tryAcquire();
+    }
+
+    @Test
+    void theMapsSearchHasTheDistrictAndCity() {
+        Place place = new Place();
+        place.setName("Devran Kebap");
+        place.setCoordinates(37.764, 38.276);
+        ReflectionTestUtils.setField(place, "cityName", "Adıyaman");
+        ReflectionTestUtils.setField(place, "districtName", "Merkez");
+        assertThat(PlaceAvailabilityService.searchQuery(place)).isEqualTo("Devran Kebap Merkez Adıyaman");
+        // A name that already says the city does not repeat it
+        place.setName("Adıyaman Kebapçısı");
+        assertThat(PlaceAvailabilityService.searchQuery(place)).isEqualTo("Adıyaman Kebapçısı Merkez");
+    }
+
+    @Test
     void withoutAKeyNothingIsAskedAndTheSearchStaysAroundThePin() {
         when(client.enabled()).thenReturn(false);
 
