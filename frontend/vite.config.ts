@@ -5,6 +5,8 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
+    // Android builds (scripts/android.mjs) rewrite android/ while the dev server runs: never watch it
+    watch: { ignored: ['**/android/**'] },
     // The browser calls /api on the same origin; Vite forwards it to Spring Boot (no CORS in dev)
     proxy: {
       '/api': 'http://localhost:8080',

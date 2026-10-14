@@ -126,22 +126,23 @@ backend loguna yazılır.
   ilgi alanlarının en az yarısı ortak). Bulunursa mekanları sabitlenip o gün için yeniden planlanır (kapalı / yağmurda
   uygun olmayan mekan değişir); mekanların en az %60'ı korunamazsa ya da bütçe aşılırsa rota sıfırdan planlanır.
 - Rotayı kaydetmek (kalp) de beğeni sayılır; 👎 kaydetmenin önüne geçer.
-- Keşfet: yan yana iki kutucuk, "Popüler rotalar" (`GET /routes/community`) ve "Favori mekanlar"
-  (`GET /places/favorites`), biri açıkken diğeri kapalı; şehir
-  listesinde "Tüm Türkiye" = Türkiye geneli, şehir = o şehir, ilçe = sadece o ilçe. Favori rota yoksa ünlü yerler
-  (Wikipedia) rotalarına bir butonla bakılır. Rota başlatmak
-  paket ister.
+- Keşfet: yan yana iki kutucuk, biri açıkken diğeri kapalı. "Popüler rotalar" (`GET /routes/community`): kaydedilen
+  ve beğenilen rotalar. "Favori mekanlar" (`GET /places/favorites`): yalnızca yıldız puanına göre, en yüksekten
+  (Bayes ortalaması; mekan kaydetmek kişiye özeldir, sayılmaz). Şehir listesinde "Tüm Türkiye" = Türkiye geneli,
+  şehir = o şehir, ilçe = sadece o ilçe. Favori rota yoksa ünlü yerler (Wikipedia) rotalarına bir butonla bakılır.
+  Rota başlatmak paket ister.
 
 ## Kullanıcı puanları ve favoriler
 
 - Giriş yapmış herkes yeme içme mekanlarına (kahvaltı, restoran, kafe, tatlı) 1-5 yıldız verir: `PUT /places/{id}/rating`
   (kişi başı mekana tek puan, günde en çok 40 puan; paket gerekmez). Toplamlar mekan satırında tutulur
-  (`user_rating_sum/count`, `favorite_count` = mekanı kaydeden kullanıcı sayısı), her gece yeniden sayılır.
+  (`user_rating_sum/count`; `favorite_count` = mekanı kaydeden kullanıcı sayısı, sadece sayılır, sıralamalarda
+  kullanılmaz), her gece yeniden sayılır.
 - Puan Bayes ortalamasıdır (`planning/CommunityScore`): her mekan 5 "ortalama" oyla başlar; tek bir 5 yıldız 3,8'i
   ancak 4,0 yapar, 30 kişi 4,8 yapar. Kartlarda kullanıcı puanı 3 oydan sonra gösterilir.
-- Etkisi: şehir / ilçe listelerinde bölgenin favorileri en başta; "Bölgenin favorisi" rozeti (5 oy ve ortalama ≥ 4,3
-  ya da 5 kayıt); rota planlayıcı iyi puanlı ve çok kaydedilen mekanları, en çok da kullanıcının kendi kaydettiklerini
-  öne alır (hava, ilgi alanı ve mesafe yine belirleyicidir).
+- Etkisi: şehir / ilçe listelerinde en yüksek puanlılar en başta; "Bölgenin favorisi" rozeti (5 oy ve ortalama
+  ≥ 4,3); rota planlayıcı iyi puanlı mekanları ve kullanıcının **kendi** kaydettiklerini öne alır (başkalarının
+  kaydettikleri sayılmaz; hava, ilgi alanı ve mesafe yine belirleyicidir).
 
 ## Mekan verisi
 
@@ -230,6 +231,7 @@ Rehberlerde yalnızca veritabanındaki bilgiler (açıklama, adres, doğrulanmı
 ```bash
 cd frontend
 node scripts/android.mjs dev       # emülatör: API http://10.0.2.2:8080
+node scripts/android.mjs phone     # USB'deki gerçek telefon: adb reverse ile bu bilgisayarın 8080'i; kurar ve açar
 node scripts/android.mjs release   # store: .env.production'daki HTTPS API
 npx cap open android               # Android Studio'da aç, çalıştır / imzalı AAB üret
 ```
