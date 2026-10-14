@@ -6,7 +6,7 @@ import type { City, District, Place, PlaceCategory } from '../api/types'
 import { HScroll } from '../components/HScroll'
 import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
-import { Favorites } from '../components/Favorites'
+import { FavoritePlaces, FavoriteRoutes } from '../components/Favorites'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CitySheet, DistrictSheet } from '../components/AreaSheets'
 import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
@@ -72,10 +72,13 @@ export function ExplorePage() {
   const city: City | null = cities.find(c => c.slug === citySlug) ?? null
   const cityName = city?.name ?? null
   const [cityOpen, setCityOpen] = useState(false)
-  // "Popüler" ticked (?rotalar=1): favourite routes and places instead of the place list (list view only)
+  // Two boxes next to each other, one at a time, instead of the place list (list view only):
+  // "Popüler rotalar" (?rotalar=1, routes users saved / liked) and "Favori mekanlar" (?favoriler=1)
   const popular = view === 'list' && params.get('rotalar') === '1'
-  // Popüler can look at all Türkiye (?sehir=turkiye); the place list always has a city
-  const allTurkey = popular && params.get('sehir') === TURKEY
+  const favorites = view === 'list' && !popular && params.get('favoriler') === '1'
+  const community = popular || favorites
+  // Both can look at all Türkiye (?sehir=turkiye); the place list always has a city
+  const allTurkey = community && params.get('sehir') === TURKEY
 
   // District (ilçe) in the URL (?ilce=kadikoy): shareable and kept on back navigation
   const districts = useDistricts(citySlug)
@@ -148,7 +151,8 @@ export function ExplorePage() {
   const setWorshipKind = (kind: string | null) => updateParams({ tur: kind })
   // The map and the popular routes exclude each other: each route card has its own map
   const setView = (v: View) => updateParams(v === 'map' ? { view: 'map', rotalar: null } : { view: null })
-  const togglePopular = () => updateParams({ rotalar: popular ? null : '1', view: null })
+  const togglePopular = () => updateParams({ rotalar: popular ? null : '1', favoriler: null, view: null })
+  const toggleFavorites = () => updateParams({ favoriler: favorites ? null : '1', rotalar: null, view: null })
   const chooseCity = (c: City) => {
     setCityOpen(false)
     cityState.setCity(c.slug)
@@ -169,7 +173,7 @@ export function ExplorePage() {
 
   useEffect(() => {
     // The map loads its own places for the visible area; popular routes load their own data
-    if (view === 'map' || popular) return
+    if (view === 'map' || community) return
     // The city list waits until the city is known (saved choice or detection)
     if (mode === 'all' && !citySlug) return
     // Restored from the cache: the first run keeps it
@@ -180,7 +184,7 @@ export function ExplorePage() {
     const timer = setTimeout(() => void load(0), query ? 300 : 0)
     return () => clearTimeout(timer)
     // Reload from the first page whenever a filter changes (search is debounced)
-  }, [view, popular, mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
+  }, [view, community, mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
 
   async function load(nextPage: number) {
     // Only the newest request may change the list: a slow answer for old filters must not overwrite it
@@ -234,8 +238,12 @@ export function ExplorePage() {
   const cityLabel = allTurkey ? t('Tüm Türkiye', 'All Türkiye') : cityName ?? t('Şehir', 'City')
   // Second tab: the chosen district, else the whole city
   const areaLabel = districtName ?? cityLabel
+  // Popüler rotalar / Favori mekanlar: all Türkiye, the city, or only the district
+  const scope = allTurkey
+    ? { city: null, district: null, areaName: t('Türkiye', 'Türkiye') }
+    : { city: citySlug, district: districtSlug, areaName: areaLabel }
 
-  // [City ▾] [District ▾] [☐ Popular routes]
+  // [City ▾] [District ▾] [☐ Popüler rotalar] [☐ Favori mekanlar]
   const controls = (
     <div className="explore-controls">
       <button type="button" className="chip city-pill" onClick={() => setCityOpen(true)}
@@ -248,7 +256,10 @@ export function ExplorePage() {
         <MapIcon size={15} /> <span>{pillLabel}</span> <ChevronDown size={15} />
       </button>
       <button type="button" className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
-        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler', 'Popular')}
+        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler rotalar', 'Popular routes')}
+      </button>
+      <button type="button" className={`chip ${favorites ? 'active' : ''}`} onClick={toggleFavorites} aria-pressed={favorites}>
+        {favorites ? <SquareCheck size={15} /> : <Square size={15} />} {t('Favori mekanlar', 'Favourite places')}
       </button>
     </div>
   )
@@ -299,11 +310,10 @@ export function ExplorePage() {
           {worshipChips}
           <LiveMap category={category} tag={worshipKind} focusArea={district} focusCity={city} />
         </>
-      ) : popular ? (
-        // Category chips, search and filters are about places: not shown for the favourites
-        allTurkey ? <Favorites city={null} district={null} areaName={t('Türkiye', 'Türkiye')} />
-          : citySlug ? <Favorites city={citySlug} district={districtSlug} areaName={areaLabel} />
-            : <ListSkeleton rows={3} height={180} />
+      ) : community ? (
+        // Category chips, search and filters are about the place list: not shown for these two boxes
+        !allTurkey && !citySlug ? <ListSkeleton rows={3} height={180} />
+          : popular ? <FavoriteRoutes {...scope} /> : <FavoritePlaces {...scope} />
       ) : (
         <>
           <div className="row">
@@ -360,7 +370,7 @@ export function ExplorePage() {
       )}
 
       <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={allTurkey ? null : citySlug} state={cityState}
-                 onChoose={chooseCity} allTurkey={popular ? { selected: allTurkey, onChoose: chooseAllTurkey } : undefined} />
+                 onChoose={chooseCity} allTurkey={community ? { selected: allTurkey, onChoose: chooseAllTurkey } : undefined} />
 
       <DistrictSheet open={districtOpen} onClose={() => setDistrictOpen(false)} selected={districtSlug}
                      districts={districts} onChoose={chooseDistrict} />

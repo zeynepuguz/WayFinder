@@ -126,7 +126,8 @@ backend loguna yazılır.
   ilgi alanlarının en az yarısı ortak). Bulunursa mekanları sabitlenip o gün için yeniden planlanır (kapalı / yağmurda
   uygun olmayan mekan değişir); mekanların en az %60'ı korunamazsa ya da bütçe aşılırsa rota sıfırdan planlanır.
 - Rotayı kaydetmek (kalp) de beğeni sayılır; 👎 kaydetmenin önüne geçer.
-- Keşfet > Popüler: favori rotalar (`GET /routes/community`) ve favori mekanlar (`GET /places/favorites`); şehir
+- Keşfet: yan yana iki kutucuk, "Popüler rotalar" (`GET /routes/community`) ve "Favori mekanlar"
+  (`GET /places/favorites`), biri açıkken diğeri kapalı; şehir
   listesinde "Tüm Türkiye" = Türkiye geneli, şehir = o şehir, ilçe = sadece o ilçe. Favori rota yoksa ünlü yerler
   (Wikipedia) rotalarına bir butonla bakılır. Rota başlatmak
   paket ister.

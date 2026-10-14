@@ -213,33 +213,46 @@ describe('ExplorePage cities', () => {
   })
 })
 
-describe('ExplorePage favourites (Popüler)', () => {
-  it('shows the city’s favourite routes and places instead of the place list', async () => {
+describe('ExplorePage popular routes and favourite places', () => {
+  it('“Popüler rotalar” shows the city’s favourite routes instead of the place list', async () => {
     communityRoutes.mockResolvedValue([route('c-1a-2b', 'Kocatepe ve 2 durak daha')])
-    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { district: 'Çankaya' })])
     renderPage('/explore?sehir=ankara&category=CAFE')
-    await userEvent.click(await screen.findByRole('button', { name: /Popüler/ }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Popüler rotalar' }))
 
     expect(search).toContain('rotalar=1')
-    expect(screen.getByRole('button', { name: /Popüler/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Popüler rotalar' })).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('Kocatepe ve 2 durak daha')).toBeInTheDocument()
-    expect(await screen.findByText('Kızılay Kahve')).toBeInTheDocument()
     expect(communityRoutes).toHaveBeenCalledWith('ankara', undefined)
-    expect(favoritePlaces).toHaveBeenCalledWith('ankara', undefined)
-    // The famous-sights routes are not the favourites
+    // Places are the other box; the famous-sights routes are not the favourites
+    expect(favoritePlaces).not.toHaveBeenCalled()
     expect(popularRoutes).not.toHaveBeenCalled()
     // categories and the place tabs are about places
     expect(screen.queryByRole('button', { name: 'Tümü' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Yakınımda' })).not.toBeInTheDocument()
   })
 
+  it('“Favori mekanlar” is its own box, and only one box is open at a time', async () => {
+    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { district: 'Çankaya' })])
+    renderPage('/explore?sehir=ankara&rotalar=1')
+    await userEvent.click(await screen.findByRole('button', { name: 'Favori mekanlar' }))
+
+    expect(search).toContain('favoriler=1')
+    expect(search).not.toContain('rotalar=1')
+    expect(screen.getByRole('button', { name: 'Favori mekanlar' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Popüler rotalar' })).toHaveAttribute('aria-pressed', 'false')
+    expect(await screen.findByText('Kızılay Kahve')).toBeInTheDocument()
+    expect(screen.getByText('Ankara: favori mekanlar')).toBeInTheDocument()
+    expect(favoritePlaces).toHaveBeenCalledWith('ankara', undefined)
+  })
+
   it('only the district’s favourites when a district is chosen', async () => {
     renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
     await waitFor(() => expect(communityRoutes).toHaveBeenCalledWith('istanbul', 'kadikoy'))
-    expect(favoritePlaces).toHaveBeenCalledWith('istanbul', 'kadikoy')
+    renderPage('/explore?sehir=istanbul&ilce=kadikoy&favoriler=1')
+    await waitFor(() => expect(favoritePlaces).toHaveBeenCalledWith('istanbul', 'kadikoy'))
   })
 
-  it('all Türkiye from the city list, without a district', async () => {
+  it('all Türkiye from the city list, without a district, in both boxes', async () => {
     renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
     await userEvent.click(await screen.findByRole('button', { name: /Şehir seç/ }))
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Şehir seç' })).getByRole('button', { name: 'Tüm Türkiye' }))
@@ -247,9 +260,13 @@ describe('ExplorePage favourites (Popüler)', () => {
     expect(search).toContain('sehir=turkiye')
     expect(search).not.toContain('ilce=')
     await waitFor(() => expect(communityRoutes).toHaveBeenLastCalledWith(undefined, undefined))
-    expect(favoritePlaces).toHaveBeenLastCalledWith(undefined, undefined)
     expect(screen.getByRole('button', { name: /İlçe seç/ })).toBeDisabled()
-    expect(screen.getByText('Türkiye: favori rotalar')).toBeInTheDocument()
+    expect(screen.getByText('Türkiye: popüler rotalar')).toBeInTheDocument()
+
+    // The other box keeps all Türkiye
+    await userEvent.click(screen.getByRole('button', { name: 'Favori mekanlar' }))
+    await waitFor(() => expect(favoritePlaces).toHaveBeenLastCalledWith(undefined, undefined))
+    expect(screen.getByText('Türkiye: favori mekanlar')).toBeInTheDocument()
   })
 
   it('offers the famous-sights routes while the area has no favourite routes', async () => {
@@ -299,6 +316,10 @@ describe('ExplorePage favourites (Popüler)', () => {
   it('says so when the area has no favourites yet', async () => {
     renderPage('/explore?sehir=izmir&rotalar=1')
     expect(await screen.findByText('Henüz favori rota yok')).toBeInTheDocument()
+  })
+
+  it('says so when the area has no favourite places yet', async () => {
+    renderPage('/explore?sehir=izmir&favoriler=1')
     expect(await screen.findByText('Henüz favori mekan yok')).toBeInTheDocument()
   })
 })
