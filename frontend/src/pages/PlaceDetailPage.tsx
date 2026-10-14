@@ -1,4 +1,4 @@
-import { Clock, ExternalLink, Globe, Heart, Info, MapPin, Navigation, Phone, Timer, Umbrella, Wallet } from 'lucide-react'
+import { Clock, ExternalLink, Globe, Bookmark, Info, MapPin, Navigation, Phone, Timer, Umbrella, Wallet } from 'lucide-react'
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
@@ -58,7 +58,7 @@ export function PlaceDetailPage() {
           <BackButton glass />
           <button className="icon-btn icon-btn-glass" aria-pressed={isSaved} aria-label={isSaved ? t('Kaydedilenlerden çıkar', 'Remove from saved') : t('Kaydet', 'Save')}
                   onClick={() => gate() && void saved.toggle(place)}>
-            <Heart size={20} fill={isSaved ? '#ff5a36' : 'none'} color={isSaved ? '#ff5a36' : 'currentColor'} />
+            <Bookmark size={20} fill={isSaved ? 'currentColor' : 'none'} />
           </button>
         </div>
       </div>

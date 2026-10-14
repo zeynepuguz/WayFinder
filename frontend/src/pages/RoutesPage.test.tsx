@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import type { City, District, RouteSummary } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
+import { todayIso } from '../lib/format'
 import { RoutesPage } from './RoutesPage'
 
 const city = (slug: string, name: string, placeCount = 1000): City => ({
@@ -172,5 +173,20 @@ describe('Route list', () => {
     routes.mockResolvedValue([summary])
     renderPage()
     expect(await screen.findByText(/Başlangıç: Kadıköy merkezi/)).toBeInTheDocument()
+  })
+
+  it('shows today’s unfinished route on top in its own “Bugün” card', async () => {
+    const base = { saved: false, stopCount: 4, totalEstimatedCost: 800, createdAt: '2026-09-28T10:00:00Z' }
+    routes.mockResolvedValue([
+      { ...base, id: 3, title: 'Gelecek hafta', date: '2999-01-01', status: 'DRAFT' },
+      { ...base, id: 4, title: 'Bugünkü tur', date: todayIso(), status: 'ACTIVE' },
+    ] satisfies RouteSummary[])
+    renderPage()
+
+    const today = await screen.findByRole('region', { name: 'Bugün' })
+    expect(within(today).getByText('Bugünkü tur')).toBeInTheDocument()
+    expect(within(today).getByText(/Devam et/)).toBeInTheDocument()
+    expect(within(today).queryByText('Gelecek hafta')).not.toBeInTheDocument()
+    expect(screen.getByText('Gelecek hafta')).toBeInTheDocument()
   })
 })

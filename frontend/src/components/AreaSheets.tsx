@@ -42,7 +42,7 @@ export function DistrictSheet({ open, onClose, selected, districts, onChoose }: 
             <button type="button" className="list-item" aria-pressed={selected == null} onClick={() => onChoose(null)}>
               <span className="list-item-icon"><MapPin size={18} /></span>
               <span className="grow" style={{ fontWeight: 700 }}>{t('Tüm ilçeler', 'All districts')}</span>
-              {selected == null && <Check size={18} color="var(--brand)" />}
+              {selected == null && <Check size={18} color="var(--brand-ink)" />}
             </button>
           )}
           {districts.loading && !districts.data && (
@@ -54,7 +54,7 @@ export function DistrictSheet({ open, onClose, selected, districts, onChoose }: 
             <button type="button" key={d.slug} className="list-item" aria-pressed={selected === d.slug} onClick={() => onChoose(d)}>
               <span className="grow" style={{ fontWeight: 650 }}>{d.name}</span>
               <span className="t-caption">{count(d.placeCount)}</span>
-              {selected === d.slug && <Check size={18} color="var(--brand)" />}
+              {selected === d.slug && <Check size={18} color="var(--brand-ink)" />}
             </button>
           ))}
           {districts.data && search.trim() && list.length === 0 && (
@@ -105,7 +105,7 @@ export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey 
           {allTurkey && !search.trim() && (
             <button type="button" className="list-item" aria-pressed={allTurkey.selected} onClick={allTurkey.onChoose}>
               <span className="grow" style={{ fontWeight: 650 }}>{t('Tüm Türkiye', 'All Türkiye')}</span>
-              {allTurkey.selected && <Check size={18} color="var(--brand)" />}
+              {allTurkey.selected && <Check size={18} color="var(--brand-ink)" />}
             </button>
           )}
           {list.map(c => {
@@ -117,7 +117,7 @@ export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey 
                 {soon
                   ? <span className="badge">{t('yakında', 'coming soon')}</span>
                   : <span className="t-caption">{count(c.placeCount)}</span>}
-                {selected === c.slug && <Check size={18} color="var(--brand)" />}
+                {selected === c.slug && <Check size={18} color="var(--brand-ink)" />}
               </button>
             )
           })}

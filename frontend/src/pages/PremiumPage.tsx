@@ -1,4 +1,4 @@
-import { CloudRain, Crown, MessageCircle, Route, ShieldCheck, Sparkles, X } from 'lucide-react'
+import { CloudRain, Crown, MessageCircle, Route, ShieldCheck, MessageSquare, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -12,7 +12,7 @@ import { locale, useLang, useT, type Translate } from '../lib/i18n'
 import { safeNext } from '../lib/nav'
 
 const perks = (t: Translate) => [
-  { icon: Sparkles, text: t('Sınırsız AI asistan: “2 kişiyiz, 700 TL’miz var…” de, gerisini Nomi planlasın', 'Unlimited AI assistant: say “We’re 2 people with 700 TL…” and Nomi plans the rest') },
+  { icon: MessageSquare, text: t('Sınırsız AI asistan: “2 kişiyiz, 700 TL’miz var…” de, gerisini Nomi planlasın', 'Unlimited AI assistant: say “We’re 2 people with 700 TL…” and Nomi plans the rest') },
   { icon: Route, text: t('Bütçene, zamanına ve yürüme isteğine göre günlük rotalar', 'Day routes that fit your budget, time and how much you like to walk') },
   { icon: CloudRain, text: t('Hava, yorgunluk ve değişikliklere göre anlık yeniden planlama', 'Instant re-planning for weather, tiredness and change of plans') },
   { icon: MessageCircle, text: t('Rotalarını ve mekanları kaydet, istediğin zaman aç', 'Save your routes and places, open them anytime') },
@@ -106,8 +106,8 @@ export function PremiumPage() {
         </div>
         <span className="crown"><Crown size={30} /></span>
         <div className="stack-sm">
-          <h1 className="t-display" style={{ color: '#fff' }}>Nomi Premium</h1>
-          <p style={{ color: 'rgb(255 255 255 / 75%)' }}>{t('Şehirde gününü planlayan kişisel asistanın. Ödediğin süre kadar kullan; abonelik yok, sürpriz ödeme yok.', 'Your personal assistant that plans your day in the city. Use it for as long as you pay; no subscription, no surprise charges.')}</p>
+          <h1 className="t-display">Nomi Premium</h1>
+          <p className="ink-2">{t('Şehirde gününü planlayan kişisel asistanın. Ödediğin süre kadar kullan; abonelik yok, sürpriz ödeme yok.', 'Your personal assistant that plans your day in the city. Use it for as long as you pay; no subscription, no surprise charges.')}</p>
         </div>
         <ul className="perks">
           {perks(t).map(({ icon: Icon, text }) => (

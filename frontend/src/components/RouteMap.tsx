@@ -63,7 +63,7 @@ export function RouteMap({ points, start, height = 260, hero }: Props) {
       <MapContainer center={center} zoom={15} scrollWheelZoom={false} zoomControl={false} style={{ height: '100%' }}>
         <BaseMap />
         {start && <Marker position={[start.latitude, start.longitude]} icon={startIcon}><Popup>{t('Başlangıç', 'Start')}</Popup></Marker>}
-        {all.length > 1 && <Polyline positions={all} pathOptions={{ color: '#ff5a36', weight: 4, opacity: 0.85, dashArray: '2 8', lineCap: 'round' }} />}
+        {all.length > 1 && <Polyline positions={all} pathOptions={{ color: '#ff8a00', weight: 4, opacity: 0.85, dashArray: '2 8', lineCap: 'round' }} />}
         {points.map((p, i) => (
           <Marker key={`${i}-${p.title}`} position={[p.latitude, p.longitude]} icon={pinIcon(p.label, p.muted)}>
             <Popup>{p.title}</Popup>

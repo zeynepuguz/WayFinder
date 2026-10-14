@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { ChevronDown, ChevronUp, LocateFixed, MapPin, Sparkles, X, ZoomIn } from 'lucide-react'
+import { ChevronDown, ChevronUp, LocateFixed, MapPin, Navigation, X, ZoomIn } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AttributionControl, Circle, MapContainer, Marker } from 'react-leaflet'
 import { Link } from 'react-router'
@@ -302,7 +302,7 @@ export function LiveMap({ category, tag = null, focusArea = null, focusCity = nu
 
         <section className={`card map-panel ${panelOpen ? 'open' : ''}`} aria-label={t('Şu an senin için', 'Right now for you')}>
           <button className="map-panel-head" onClick={() => setPanelOpen(o => !o)} aria-expanded={panelOpen}>
-            <Sparkles size={16} color="var(--brand)" />
+            <Navigation size={16} color="var(--brand-ink)" />
             <span className="grow">{t('Şu an senin için', 'Right now for you')}</span>
             {panelOpen ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
           </button>

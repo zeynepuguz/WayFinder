@@ -1,19 +1,20 @@
 import {
   ChevronRight, CircleHelp, Crown, FileText, Info, Languages, LogIn, LogOut, MessageSquare, RotateCcw, ShieldCheck,
-  MonitorSmartphone, SlidersHorizontal, Trash2,
+  MonitorSmartphone, SlidersHorizontal, SunMoon, Trash2,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 import { OpenSessions } from '../components/OpenSessions'
 import { FeedbackForm, PreferencesForm } from '../components/ProfileForms'
-import { BackButton, ConfirmSheet, Sheet, useToast } from '../components/ui'
+import { BackButton, ConfirmSheet, Segmented, Sheet, useToast } from '../components/ui'
 import { MyPhotos } from '../components/UserPhotos'
 import { useAuth } from '../context/AuthContext'
 import { isNativeApp, restorePurchases } from '../lib/billing'
 import { errorMessage, formatDateTime } from '../lib/format'
 import { locale, useT } from '../lib/i18n'
 import { LEGAL_PATHS, SUPPORT_EMAIL } from '../lib/legal'
+import { setThemePref, themePref, type ThemePref } from '../lib/theme'
 
 export function ProfilePage() {
   const { user, hasAccess, logout, deleteAccount } = useAuth()
@@ -40,6 +41,7 @@ export function ProfilePage() {
         </div>
         <div className="list-group">
           <LanguageRow />
+          <ThemeRow />
         </div>
         <LegalLinks />
       </main>
@@ -67,7 +69,7 @@ export function ProfilePage() {
       <div className="topbar"><BackButton /><span className="topbar-title">{t('Profil', 'Profile')}</span><span style={{ width: 44 }} /></div>
 
       <div className="row" style={{ gap: 14 }}>
-        <span className="bot-avatar" style={{ width: 60, height: 60, borderRadius: 20, fontSize: 22, fontWeight: 800 }}>{initials}</span>
+        <span className="profile-avatar">{initials}</span>
         <div className="grow">
           <h1 className="t-title">{user.displayName}</h1>
           <p className="t-caption">{user.email}</p>
@@ -119,6 +121,7 @@ export function ProfilePage() {
           <ChevronRight size={18} className="muted" />
         </button>
         <LanguageRow />
+        <ThemeRow />
         {/* Suggestions are stored with the sender, so only signed-in users see this row */}
         <button className="list-item" onClick={() => setFeedbackOpen(true)}>
           <span className="list-item-icon"><MessageSquare size={18} /></span>
@@ -202,6 +205,25 @@ function LegalLinks() {
         <span className="list-item-icon"><FileText size={18} /></span><span className="grow">{t('Kullanım Koşulları', 'Terms of Use')}</span>
         <ChevronRight size={18} className="muted" />
       </Link>
+    </div>
+  )
+}
+
+// Light or dark look: the phone's setting by default (lib/theme)
+function ThemeRow() {
+  const t = useT()
+  const [pref, setPref] = useState<ThemePref>(themePref)
+  return (
+    <div className="list-item">
+      <span className="list-item-icon"><SunMoon size={18} /></span>
+      <span className="grow">{t('Tema', 'Theme')}</span>
+      <div className="theme-switch">
+        <Segmented<ThemePref> value={pref} onChange={p => { setPref(p); setThemePref(p) }} options={[
+          { value: 'system', label: t('Sistem', 'System') },
+          { value: 'light', label: t('Açık', 'Light') },
+          { value: 'dark', label: t('Koyu', 'Dark') },
+        ]} />
+      </div>
     </div>
   )
 }

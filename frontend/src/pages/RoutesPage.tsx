@@ -7,7 +7,7 @@ import { NewRouteForm } from '../components/NewRouteForm'
 import { RouteCard } from '../components/RouteCard'
 import { Alert, EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { errorMessage, isPastRoute } from '../lib/format'
+import { errorMessage, isPastRoute, todayIso } from '../lib/format'
 import { inviteCode } from '../lib/group'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
@@ -35,7 +35,9 @@ function RouteList() {
   const { data, error, loading, reload } = useAsync(() => api.routes(tab === 'saved'), [tab], { cacheKey: `routes:${tab}` })
 
   const openCreate = () => gate('/routes') && setCreating(true)
-  const current = data?.filter(route => !isPastRoute(route)) ?? []
+  // Today's unfinished route gets the big card on top ("Bugün"); the rest are listed below it
+  const today = data?.find(route => route.date === todayIso() && route.status !== 'COMPLETED' && !isPastRoute(route)) ?? null
+  const current = data?.filter(route => !isPastRoute(route) && route !== today) ?? []
   const past = data?.filter(route => isPastRoute(route)) ?? []
 
   return (
@@ -57,9 +59,15 @@ function RouteList() {
         <EmptyState
           icon={MapIcon}
           title={tab === 'saved' ? t('Kaydedilen rota yok', 'No saved routes') : t('Henüz rotan yok', 'No routes yet')}
-          text={tab === 'saved' ? t('Bir rotanın detayında kalbe dokunarak kaydedebilirsin.', 'Tap the heart on a route to save it.') : t('Birkaç tercihle ilk rotanı oluştur ya da asistana ne istediğini yaz.', 'Create your first route with a few choices, or tell the assistant what you’d like.')}
+          text={tab === 'saved' ? t('Bir rotanın detayında kaydet simgesine dokunarak kaydedebilirsin.', 'Tap the save icon on a route to save it.') : t('Birkaç tercihle ilk rotanı oluştur ya da asistana ne istediğini yaz.', 'Create your first route with a few choices, or tell the assistant what you’d like.')}
           action={tab === 'all' && <button type="button" className="btn btn-primary" onClick={openCreate}><Plus size={18} /> {t('Rota oluştur', 'Create route')}</button>}
         />
+      )}
+      {today && (
+        <section className="section" aria-label={t('Bugün', 'Today')}>
+          <span className="t-overline today-label">{t('Bugün', 'Today')}</span>
+          <RouteCard route={today} featured />
+        </section>
       )}
       {current.length > 0 && (
         <div className="stack">

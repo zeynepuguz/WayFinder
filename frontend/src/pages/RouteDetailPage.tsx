@@ -1,6 +1,6 @@
 import {
-  BatteryLow, Check, MapPin, Sparkles, ChevronDown, CloudRain, Footprints, Heart, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
-  Clock, Ellipsis, History, SkipForward, ThumbsDown, ThumbsUp, X,
+  BatteryLow, Check, MapPin, Lightbulb, ChevronDown, CloudRain, Footprints, Bookmark, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
+  Clock, Ellipsis, History, MapPinned, SkipForward, ThumbsDown, ThumbsUp, X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
@@ -145,7 +145,7 @@ export function RouteDetailPage() {
           {owner && <button className="icon-btn icon-btn-glass" disabled={busy} aria-pressed={route.saved}
                   aria-label={route.saved ? t('Kaydedilenlerden çıkar', 'Remove from saved') : t('Rotayı kaydet', 'Save route')}
                   onClick={() => act(() => api.updateRoute(routeId, { saved: !route.saved }))}>
-            <Heart size={20} fill={route.saved ? '#ff5a36' : 'none'} color={route.saved ? '#ff5a36' : 'currentColor'} />
+            <Bookmark size={20} fill={route.saved ? 'currentColor' : 'none'} />
           </button>}
         </div>
       </div>
@@ -159,7 +159,7 @@ export function RouteDetailPage() {
           )}
           {interests.length > 0 && (
             <div className="route-interests" aria-label={t('İlgi alanların', 'Your interests')}>
-              <Sparkles size={14} className="muted" style={{ alignSelf: 'center' }} />
+              <Lightbulb size={14} className="muted" style={{ alignSelf: 'center' }} />
               {interests.map(key => <span key={key} className="badge badge-brand">{TAG_LABELS[key] ?? key}</span>)}
             </div>
           )}
@@ -169,7 +169,10 @@ export function RouteDetailPage() {
           <div className="stat"><Wallet size={16} className="muted" /><strong>{routeTotalCost(route)}</strong>
             <span>{route.budget != null ? t(`bütçe ₺${route.budget.toLocaleString(locale())}`, `budget ₺${route.budget.toLocaleString(locale())}`) : t('tahmini', 'estimated')}</span></div>
           <div className="stat"><Footprints size={16} className="muted" /><strong>~{route.totalWalkingMinutes} {t('dk', 'min')}</strong><span>{t('yürüme', 'walking')}</span></div>
-          <div className="stat"><Clock size={16} className="muted" /><strong>{route.stops.length}</strong><span>{t('durak', route.stops.length === 1 ? 'stop' : 'stops')}</span></div>
+          <div className="stat"><MapPinned size={16} className="muted" /><strong>{route.stops.length}</strong><span>{t('durak', route.stops.length === 1 ? 'stop' : 'stops')}</span></div>
+          {route.stops.length > 0 && (
+            <div className="stat"><Clock size={16} className="muted" /><strong>{dayLength(route.stops, t)}</strong><span>{t('toplam süre', 'in total')}</span></div>
+          )}
         </div>
 
         {changes.length > 0 && (
@@ -229,7 +232,8 @@ export function RouteDetailPage() {
                         editable={!finished && stop.status === 'PLANNED'} busy={busy}
                         votes={shared && !past ? stop.votes : null} onVote={value => void vote(stop, value)}
                         onVisited={() => setStopStatus(stop, 'VISITED')}
-                        onMore={() => setMenuStop(stop)} />
+                        onMore={() => setMenuStop(stop)}
+                        onSwap={() => { setWish(''); setSwapStop(stop) }} />
             ))}
           </ol>
         </section>
@@ -295,7 +299,16 @@ export function RouteDetailPage() {
   )
 }
 
-function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisited, onMore }: {
+// "~5 sa", "~45 dk": from the first stop's start to the last stop's end
+function dayLength(stops: RouteStop[], t: Translate): string {
+  const minutes = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5))
+  const total = minutes(stops[stops.length - 1].plannedEnd) - minutes(stops[0].plannedStart)
+  if (total < 60) return t(`~${Math.max(total, 0)} dk`, `~${Math.max(total, 0)} min`)
+  const hours = Math.round(total / 30) / 2
+  return t(`~${hours.toLocaleString('tr')} sa`, `~${hours} h`)
+}
+
+function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisited, onMore, onSwap }: {
   stop: RouteStop
   index: number
   isNext: boolean
@@ -306,6 +319,7 @@ function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisite
   onVote: (value: -1 | 1) => void
   onVisited: () => void
   onMore: () => void
+  onSwap: () => void
 }) {
   const t = useT()
   const Icon = STOP_ICON[stop.type]
@@ -322,17 +336,24 @@ function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisite
         <div className="stop-num">{stop.status === 'VISITED' ? <Check size={18} /> : index + 1}</div>
         <div className="card stop-card" style={isNext ? { borderColor: 'var(--brand)', boxShadow: '0 0 0 3px var(--brand-50)' } : undefined}>
           <div className="row-between">
-            <span className="stop-time"><Icon size={14} /> {formatTime(stop.plannedStart)} – {formatTime(stop.plannedEnd)} · {stop.typeLabel.toLocaleUpperCase(locale())}</span>
+            <span className="stop-time">
+              <span className="time-chip">{formatTime(stop.plannedStart)}</span>
+              <Icon size={14} /> {stop.typeLabel}{stop.place.neighborhood ? ` · ${stop.place.neighborhood}` : ''}
+            </span>
             {isNext && <span className="badge badge-brand">{t('Sıradaki', 'Next')}</span>}
             {stop.status === 'VISITED' && <span className="badge badge-success">{t('Gidildi', 'Visited')}</span>}
             {stop.status === 'SKIPPED' && <span className="badge">{t('Atlandı', 'Skipped')}</span>}
+            {editable && !isNext && <button className="stop-swap" disabled={busy} onClick={onSwap}>{t('Değiştir', 'Change')}</button>}
           </div>
           <Link to={`/places/${stop.place.id}`} className="stop-title">{stop.place.name}</Link>
           <div className="meta">
             {shownRating(stop.place) != null && <span>★ {shownRating(stop.place)!.toFixed(1)}</span>}
-            <span>{formatCost(stop.place.estimatedCost)}</span>
-            {stop.place.neighborhood && <span>{stop.place.neighborhood}</span>}
+            <span>{formatTime(stop.plannedStart)} – {formatTime(stop.plannedEnd)}</span>
             {stop.place.indoor && <span>{t('Kapalı alan', 'Indoor')}</span>}
+          </div>
+          <div className="stop-cost">
+            <span>{t('Tahmini harcama', 'Estimated spend')}</span>
+            <strong>{formatCost(stop.place.estimatedCost)}</strong>
           </div>
           <details>
             <summary>{t('Neden burası?', 'Why here?')} <ChevronDown size={14} /></summary>

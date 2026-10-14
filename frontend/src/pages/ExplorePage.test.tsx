@@ -214,6 +214,24 @@ describe('ExplorePage cities', () => {
 })
 
 describe('ExplorePage popular routes and favourite places', () => {
+  it('shows the top two of both boxes side by side above the places; a box title opens it', async () => {
+    communityRoutes.mockResolvedValue([route('c-1', 'Kocatepe turu'), route('c-2', 'Ulus turu'), route('c-3', 'Üçüncü tur')])
+    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { userRating: 4.6, userRatingCount: 12 })])
+    renderPage('/explore?sehir=ankara')
+
+    expect(await screen.findByText('Kocatepe turu')).toBeInTheDocument()
+    expect(screen.getByText('Ulus turu')).toBeInTheDocument()
+    expect(screen.queryByText('Üçüncü tur')).not.toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /Kızılay Kahve/ })).toHaveAttribute('href', '/places/5')
+    expect(screen.getByText(/12 oy/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Favori mekanlar' }))
+    expect(search).toContain('favoriler=1')
+    // back to the place list
+    await userEvent.click(screen.getByRole('button', { name: /Mekanlar/ }))
+    expect(search).not.toContain('favoriler=1')
+  })
+
   it('“Popüler rotalar” shows the city’s favourite routes instead of the place list', async () => {
     communityRoutes.mockResolvedValue([route('c-1a-2b', 'Kocatepe ve 2 durak daha')])
     renderPage('/explore?sehir=ankara&category=CAFE')
@@ -223,8 +241,8 @@ describe('ExplorePage popular routes and favourite places', () => {
     expect(screen.getByRole('button', { name: 'Popüler rotalar' })).toHaveAttribute('aria-pressed', 'true')
     expect(await screen.findByText('Kocatepe ve 2 durak daha')).toBeInTheDocument()
     expect(communityRoutes).toHaveBeenCalledWith('ankara', undefined)
-    // Places are the other box; the famous-sights routes are not the favourites
-    expect(favoritePlaces).not.toHaveBeenCalled()
+    // Places are the other box (not shown); the famous-sights routes are not the favourites
+    expect(screen.queryByText('Ankara: favori mekanlar')).not.toBeInTheDocument()
     expect(popularRoutes).not.toHaveBeenCalled()
     // categories and the place tabs are about places
     expect(screen.queryByRole('button', { name: 'Tümü' })).not.toBeInTheDocument()

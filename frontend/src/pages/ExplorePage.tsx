@@ -1,4 +1,4 @@
-import { ChevronDown, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Square, SquareCheck, Umbrella } from 'lucide-react'
+import { ChevronDown, ChevronLeft, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Umbrella } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -6,7 +6,7 @@ import type { City, District, Place, PlaceCategory } from '../api/types'
 import { HScroll } from '../components/HScroll'
 import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
-import { FavoritePlaces, FavoriteRoutes } from '../components/Favorites'
+import { CommunityPreview, FavoritePlaces, FavoriteRoutes } from '../components/Favorites'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CitySheet, DistrictSheet } from '../components/AreaSheets'
 import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
@@ -243,7 +243,7 @@ export function ExplorePage() {
     ? { city: null, district: null, areaName: t('Türkiye', 'Türkiye') }
     : { city: citySlug, district: districtSlug, areaName: areaLabel }
 
-  // [City ▾] [District ▾] [☐ Popüler rotalar] [☐ Favori mekanlar]
+  // [City ▾] [District ▾]
   const controls = (
     <div className="explore-controls">
       <button type="button" className="chip city-pill" onClick={() => setCityOpen(true)}
@@ -255,11 +255,20 @@ export function ExplorePage() {
               aria-haspopup="dialog" aria-label={`${t('İlçe seç', 'Choose district')}: ${pillLabel}`}>
         <MapIcon size={15} /> <span>{pillLabel}</span> <ChevronDown size={15} />
       </button>
+    </div>
+  )
+
+  // An open box: back to the places, or the other box
+  const boxTabs = (
+    <div className="row wrap" style={{ gap: 8 }}>
+      <button type="button" className="chip" onClick={() => updateParams({ rotalar: null, favoriler: null })}>
+        <ChevronLeft size={15} /> {t('Mekanlar', 'Places')}
+      </button>
       <button type="button" className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
-        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler rotalar', 'Popular routes')}
+        {t('Popüler rotalar', 'Popular routes')}
       </button>
       <button type="button" className={`chip ${favorites ? 'active' : ''}`} onClick={toggleFavorites} aria-pressed={favorites}>
-        {favorites ? <SquareCheck size={15} /> : <Square size={15} />} {t('Favori mekanlar', 'Favourite places')}
+        {t('Favori mekanlar', 'Favourite places')}
       </button>
     </div>
   )
@@ -312,8 +321,11 @@ export function ExplorePage() {
         </>
       ) : community ? (
         // Category chips, search and filters are about the place list: not shown for these two boxes
-        !allTurkey && !citySlug ? <ListSkeleton rows={3} height={180} />
-          : popular ? <FavoriteRoutes {...scope} /> : <FavoritePlaces {...scope} />
+        <>
+          {boxTabs}
+          {!allTurkey && !citySlug ? <ListSkeleton rows={3} height={180} />
+            : popular ? <FavoriteRoutes {...scope} /> : <FavoritePlaces {...scope} />}
+        </>
       ) : (
         <>
           <div className="row">
@@ -332,6 +344,9 @@ export function ExplorePage() {
 
           {categoryChips}
           {worshipChips}
+
+          {/* What Nomi users love here: the top two of each box, side by side */}
+          {citySlug && <CommunityPreview city={scope.city} district={scope.district} onOpenRoutes={togglePopular} onOpenPlaces={toggleFavorites} />}
 
           <Segmented value={mode} onChange={setMode}
                      options={[

@@ -1,4 +1,4 @@
-import { BadgeCheck, Camera, ExternalLink, Heart, MapPin } from 'lucide-react'
+import { Award, BadgeCheck, Bookmark, Camera, ExternalLink, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import type { Place, PlaceImage, Recommendation } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
@@ -24,7 +24,7 @@ function SaveButton({ place, glass }: { place: Place; glass?: boolean }) {
         if (gate()) void saved.toggle(place)
       }}
     >
-      <Heart size={19} fill={isSaved ? 'currentColor' : 'none'} />
+      <Bookmark size={19} fill={isSaved ? 'currentColor' : 'none'} />
     </button>
   )
 }
@@ -44,7 +44,7 @@ export function VerifiedBadge() {
 // One of the area's favourites: well rated by enough Nomi users, or saved by many
 export function FavoriteBadge() {
   const t = useT()
-  return <span className="badge badge-premium"><Heart size={12} /> {t('Bölgenin favorisi', 'Local favourite')}</span>
+  return <span className="badge badge-stamp"><Award size={12} /> {t('Bölgenin favorisi', 'Local favourite')}</span>
 }
 
 // Compact row for lists
@@ -58,12 +58,12 @@ export function PlaceRow({ place, showDistrict, showVotes }: { place: Place; sho
       <Link to={`/places/${place.id}`} className="place-row card-press">
         <CategoryTile category={place.category} image={place.image} alt={place.name} />
         <div className="place-row-body">
+          <span className="t-overline place-kind">{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
           <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
           <div className="meta">
             {showVotes && place.userRating != null
               ? <span><Rating value={place.userRating} /> {t(`· ${votes} oy`, `· ${votes} ${votes === 1 ? 'vote' : 'votes'}`)}</span>
               : <Rating value={shownRating(place)} />}
-            <span>{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
             {place.distanceMeters != null && <span><MapPin size={12} />{formatDistance(place.distanceMeters)}</span>}
           </div>
           <div className="row wrap" style={{ gap: 6 }}>

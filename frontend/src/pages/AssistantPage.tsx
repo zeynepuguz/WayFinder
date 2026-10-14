@@ -1,4 +1,4 @@
-import { ArrowUp, ChevronRight, Crown, MessagesSquare, Sparkles, SquarePen } from 'lucide-react'
+import { ArrowUp, ChevronRight, Crown, MessagesSquare, MessageCircle, SquarePen } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { api } from '../api'
@@ -57,7 +57,7 @@ export function AssistantPage() {
   if (!user) {
     return (
       <main className="screen">
-        <Locked icon={Sparkles} title={t('Kişisel şehir asistanın', 'Your personal city assistant')}
+        <Locked icon={MessageCircle} title={t('Kişisel şehir asistanın', 'Your personal city assistant')}
                 text={t('Bütçeni, kaç kişi olduğunuzu ve ne istediğini yaz; Nomi gerçek mekan, saat ve mesafe bilgileriyle gününü planlasın.',
                         'Tell Nomi your budget, how many of you there are and what you’d like to do; it plans your day with real places, opening hours and distances.')} />
       </main>
@@ -202,7 +202,7 @@ function Chat({ canSend }: { canSend: boolean }) {
   return (
     <main className="screen chat-screen">
       <header className="chat-header">
-        <span className="bot-avatar"><Sparkles size={20} /></span>
+        <span className="bot-avatar"><img src="/icon-192.png" alt="" /></span>
         <div className="grow" style={{ minWidth: 0 }}>
           <h1 className="t-headline">{t('Nomi Asistan', 'Nomi Assistant')}</h1>
           <p className="t-caption" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -227,7 +227,7 @@ function Chat({ canSend }: { canSend: boolean }) {
               {starters().map(s => (
                 <button key={s} className="list-item card" style={{ borderRadius: 14, minHeight: 48 }}
                         onClick={() => void send(s)} disabled={!canSend}>
-                  <Sparkles size={16} color="var(--brand)" />
+                  <MessageCircle size={16} color="var(--brand-ink)" />
                   <span className="grow" style={{ fontSize: 14, fontWeight: 600 }}>{s}</span>
                   <ChevronRight size={16} className="muted" />
                 </button>
@@ -241,7 +241,7 @@ function Chat({ canSend }: { canSend: boolean }) {
         ) : (
           <div key={m.key} className="stack-sm">
             <div className="msg msg-bot">
-              <span className="bot-avatar"><Sparkles size={15} /></span>
+              <span className="bot-avatar"><img src="/icon-192.png" alt="" /></span>
               <div className="bubble bubble-bot">{m.route ? withoutStopLines(m.content) : m.content}</div>
             </div>
             {(m.route || m.routeId || (m.recommendations && m.recommendations.length > 0)
@@ -267,7 +267,7 @@ function Chat({ canSend }: { canSend: boolean }) {
 
         {sending && (
           <div className="msg msg-bot">
-            <span className="bot-avatar"><Sparkles size={15} /></span>
+            <span className="bot-avatar"><img src="/icon-192.png" alt="" /></span>
             <div className="bubble bubble-bot typing" aria-label={t('Nomi yazıyor', 'Nomi is typing')}><span /><span /><span /></div>
           </div>
         )}

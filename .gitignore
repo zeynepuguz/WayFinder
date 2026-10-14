@@ -40,3 +40,6 @@ deploy/secrets/
 
 # TypeScript incremental build cache
 *.tsbuildinfo
+
+# Stitch design export (reference only; holds AI-generated mock photos)
+stitch_nomi_travel_design_system/

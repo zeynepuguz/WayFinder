@@ -158,7 +158,7 @@ export function AuthPage() {
         </div>
 
         {mode === 'login' && (
-          <Link className="t-caption" style={{ alignSelf: 'flex-end', marginTop: -4, fontWeight: 600, color: 'var(--brand-strong)' }}
+          <Link className="t-caption" style={{ alignSelf: 'flex-end', marginTop: -4, fontWeight: 600, color: 'var(--brand-ink)' }}
                 to={`/forgot-password?next=${encodeURIComponent(next)}${email ? `&email=${encodeURIComponent(email)}` : ''}`}>
             {t('Şifremi unuttum', 'Forgot password?')}
           </Link>
