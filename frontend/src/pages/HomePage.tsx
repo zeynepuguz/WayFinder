@@ -58,6 +58,7 @@ export function HomePage() {
   const { data, error, loading, reload } = useAsync(
     () => api.home(location.latitude, location.longitude),
     [location.latitude, location.longitude, user?.id],
+    { cacheKey: `home:${user?.id ?? 0}:${location.latitude}:${location.longitude}` },
   )
 
   const hour = new Date().getHours()

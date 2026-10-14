@@ -1,6 +1,6 @@
 import { AlertTriangle, CheckCircle2, ChevronLeft, Info, LoaderCircle, Minus, Plus, X, type LucideIcon } from 'lucide-react'
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router'
+import { useLocation, useNavigate } from 'react-router'
 import { useT } from '../lib/i18n'
 
 export function Skeleton({ height = 16, width = '100%', radius }: { height?: number; width?: number | string; radius?: number }) {
@@ -65,12 +65,15 @@ export function EmptyState({ icon: Icon, title, text, action }: {
   )
 }
 
+// Back to the screen the user came from, as they left it. "to" is only where to go when there is none (the app was
+// opened right on this page, e.g. from a shared link): location.key "default" = the first entry of this visit
 export function BackButton({ to, glass }: { to?: string; glass?: boolean }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const t = useT()
   return (
     <button type="button" className={`icon-btn ${glass ? 'icon-btn-glass' : ''}`} aria-label={t('Geri', 'Back')}
-            onClick={() => (to ? navigate(to) : window.history.length > 1 ? navigate(-1) : navigate('/'))}>
+            onClick={() => (location.key !== 'default' ? navigate(-1) : navigate(to ?? '/', { replace: true }))}>
       <ChevronLeft size={22} />
     </button>
   )

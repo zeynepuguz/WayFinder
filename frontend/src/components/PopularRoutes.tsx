@@ -29,7 +29,8 @@ const STOP_TILE: Record<StopType, PlaceCategory> = {
  */
 export function PopularRoutes({ city, district }: { city: string; district: string | null }) {
   const t = useT()
-  const { data, error, loading, reload } = useAsync(() => api.popularRoutes(city, district ?? undefined), [city, district])
+  const { data, error, loading, reload } = useAsync(() => api.popularRoutes(city, district ?? undefined), [city, district],
+    { cacheKey: `popular-routes:${city}:${district}` })
   const [open, setOpen] = useState<string | null>(null)
   useEffect(() => setOpen(null), [city, district])
 

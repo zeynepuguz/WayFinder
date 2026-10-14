@@ -14,6 +14,7 @@ import { useAuth } from '../context/AuthContext'
 import { useUserLocation } from '../context/LocationContext'
 import { errorMessage } from '../lib/format'
 import { tr, useT } from '../lib/i18n'
+import { forgetLastChat, lastChat, rememberChat } from '../lib/lastChat'
 
 interface Message {
   key: string
@@ -94,6 +95,16 @@ function Chat({ canSend }: { canSend: boolean }) {
 
   useEffect(loadConversations, [loadConversations])
 
+  // The Asistan tab (/assistant alone) continues the chat the user had open; ?new=1 and a prompt start a new one
+  useEffect(() => {
+    if (conversationId != null) {
+      rememberChat(conversationId)
+      return
+    }
+    const last = lastChat()
+    if (last != null && !params.has('new') && !params.get('q')) setParams({ c: String(last) }, { replace: true })
+  }, [conversationId])
+
   useEffect(() => {
     setError(null)
     if (conversationId == null) {
@@ -112,7 +123,14 @@ function Chat({ canSend }: { canSend: boolean }) {
         if (!cancelled) setMessages(history.map(m => ({ key: `h${m.id}`, role: m.role, content: m.content, routeId: m.routeId })))
       })
       .catch(e => {
-        if (!cancelled) setError(errorMessage(e, t('Sohbet yüklenemedi', 'Could not load the chat')))
+        if (cancelled) return
+        // The remembered chat is gone (deleted, or another account's): start an empty one instead of an error
+        if (e instanceof ApiRequestError && e.status === 404) {
+          forgetLastChat()
+          navigate('/assistant?new=1', { replace: true })
+          return
+        }
+        setError(errorMessage(e, t('Sohbet yüklenemedi', 'Could not load the chat')))
       })
       .finally(() => {
         if (!cancelled) setLoadingChat(false)
@@ -172,7 +190,9 @@ function Chat({ canSend }: { canSend: boolean }) {
 
   function open(id: number | null) {
     setListOpen(false)
-    navigate(id == null ? '/assistant' : `/assistant?c=${id}`)
+    // "Yeni sohbet": an empty chat on purpose (the tab alone would continue the last one)
+    if (id == null) forgetLastChat()
+    navigate(id == null ? '/assistant?new=1' : `/assistant?c=${id}`)
   }
 
   const current = conversations.find(c => c.id === conversationId)

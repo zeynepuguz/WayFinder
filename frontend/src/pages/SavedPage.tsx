@@ -29,7 +29,7 @@ function SavedLists() {
   const t = useT()
   const [tab, setTab] = useState<'places' | 'routes'>('places')
   const saved = useSavedPlaces()
-  const routes = useAsync(() => api.routes(true), [])
+  const routes = useAsync(() => api.routes(true), [], { cacheKey: 'routes:saved' })
 
   return (
     <main className="screen">

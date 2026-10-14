@@ -42,7 +42,7 @@ export function RouteDetailPage() {
   // Interests chosen in the new-route form (shown when the server's route does not list them)
   const requested = (useLocation().state as { interests?: string[] } | null)?.interests
 
-  const { data: route, setData: setRoute, error, loading, reload } = useAsync(() => api.route(routeId), [routeId])
+  const { data: route, setData: setRoute, error, loading, reload } = useAsync(() => api.route(routeId), [routeId], { cacheKey: `route:${routeId}` })
   const [busy, setBusy] = useState(false)
   const [changes, setChanges] = useState<string[]>([])
   const [actionError, setActionError] = useState<string | null>(null)

@@ -3,6 +3,8 @@ import { api } from '../api'
 import { setRenewedHandler, setUnauthorizedHandler, tokenStore } from '../api/client'
 import type { AccessStatus, AuthResponse, CodePurpose, CodeSent, RegisterRequest, User } from '../api/types'
 import { setAccessChangedHandler } from '../lib/billing'
+import { forgetLastChat } from '../lib/lastChat'
+import { clearAsyncCache } from '../lib/useAsync'
 
 interface AuthState {
   user: User | null
@@ -32,6 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // The session ended (expired, signed out elsewhere): forget the tokens here
   const forget = useCallback(() => {
     tokenStore.set(null)
+    // Screens kept for the way back (routes, places) belong to this user
+    clearAsyncCache()
+    forgetLastChat()
     setUser(null)
   }, [])
 

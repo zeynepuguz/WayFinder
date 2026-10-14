@@ -32,7 +32,7 @@ function RouteList() {
   const [tab, setTab] = useState<'all' | 'saved'>('all')
   const [creating, setCreating] = useState(false)
   const [joining, setJoining] = useState(false)
-  const { data, error, loading, reload } = useAsync(() => api.routes(tab === 'saved'), [tab])
+  const { data, error, loading, reload } = useAsync(() => api.routes(tab === 'saved'), [tab], { cacheKey: `routes:${tab}` })
 
   const openCreate = () => gate('/routes') && setCreating(true)
   const current = data?.filter(route => !isPastRoute(route)) ?? []

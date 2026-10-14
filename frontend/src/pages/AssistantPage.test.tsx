@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import type { AssistantReply, ChatMessage, ConversationSummary, Recommendation, Route as RouteT } from '../api/types'
+import { forgetLastChat, rememberChat } from '../lib/lastChat'
 import { place } from '../test/fixtures'
 import { AssistantPage, resetAutoSend } from './AssistantPage'
 
@@ -67,6 +68,8 @@ beforeAll(() => { Element.prototype.scrollIntoView = vi.fn() })
 beforeEach(() => {
   vi.clearAllMocks()
   resetAutoSend()
+  // Each test starts without a remembered chat (lib/lastChat)
+  forgetLastChat()
   conversations.mockResolvedValue([])
   conversationMessages.mockResolvedValue([])
 })
@@ -112,6 +115,25 @@ describe('AssistantPage conversations', () => {
   it('a plain /assistant is an empty new chat with the starter prompts, not an older chat', async () => {
     conversations.mockResolvedValue([chat(1, 'Dünkü sohbet', 5)])
     renderAt('/assistant')
+
+    expect(await screen.findByText('Merhaba! Bugün nasıl bir gün istersin?')).toBeInTheDocument()
+    expect(conversationMessages).not.toHaveBeenCalled()
+  })
+
+  it('the Asistan tab continues the chat the user had open', async () => {
+    rememberChat(1)
+    conversations.mockResolvedValue([chat(1, 'İstanbul günü', null)])
+    conversationMessages.mockResolvedValue([message(11, 'USER', 'İstanbul için bir rota öner'),
+      message(12, 'ASSISTANT', 'İstanbul içinde rotaya nereden başlayalım?')])
+    renderAt('/assistant')
+
+    expect(await screen.findByText('İstanbul içinde rotaya nereden başlayalım?')).toBeInTheDocument()
+    expect(conversationMessages).toHaveBeenCalledWith(1)
+  })
+
+  it('“Yeni sohbet” starts an empty chat even with one remembered', async () => {
+    rememberChat(1)
+    renderAt('/assistant?new=1')
 
     expect(await screen.findByText('Merhaba! Bugün nasıl bir gün istersin?')).toBeInTheDocument()
     expect(conversationMessages).not.toHaveBeenCalled()
@@ -188,7 +210,7 @@ describe('AssistantPage conversations', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sil' }))
 
     await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith(1))
-    // the open chat was deleted: back to a new, empty chat
-    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^\/assistant$/))
+    // the open chat was deleted: back to a new, empty chat (never "continued" again by the Asistan tab)
+    await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^\/assistant\?new=1$/))
   })
 })

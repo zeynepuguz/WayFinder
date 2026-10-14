@@ -19,7 +19,7 @@ export function PlaceDetailPage() {
   const saved = useSavedPlaces()
   const gate = useGate()
   const t = useT()
-  const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id])
+  const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id], { cacheKey: `place:${id}` })
   // Is it still there (Google Places)? Never blocks the page: without an answer the search around our pin is used
   const { data: availability } = useAsync(() => api.placeAvailability(Number(id)).catch(() => null), [id])
   const photo = usePlacePhoto(place?.image)

@@ -49,7 +49,16 @@ run('npx cap sync android', target === 'release' ? {} : { CAP_DEV_HTTP: '1' })
 if (target === 'phone') {
   // The phone's localhost:8080 is this computer's backend, over the cable (no Wi-Fi or firewall setup)
   run(`${adb()} reverse tcp:8080 tcp:8080`)
-  run(process.platform === 'win32' ? 'gradlew.bat installDebug' : './gradlew installDebug', {}, 'android')
+  const gradlew = process.platform === 'win32' ? 'gradlew.bat' : './gradlew'
+  try {
+    run(`${gradlew} installDebug`, {}, 'android')
+  } catch {
+    // The first build after changes often fails in a stale Gradle / Kotlin daemon ("Could not isolate
+    // parameters ..."); a fresh daemon builds it
+    console.log('\nInstall failed once, restarting Gradle and trying again...')
+    run(`${gradlew} --stop`, {}, 'android')
+    run(`${gradlew} installDebug`, {}, 'android')
+  }
   run(`${adb()} shell am start -n com.nomi.app/.MainActivity`)
   console.log('\nNomi is open on the phone. After reconnecting the cable run again: adb reverse tcp:8080 tcp:8080')
 } else {

@@ -10,6 +10,7 @@ import { SavedPlacesProvider } from './context/SavedPlacesContext'
 import { isNativeApp } from './lib/billing'
 import { LanguageProvider } from './lib/i18n'
 import { setupNativeShell } from './lib/native'
+import { useScrollMemory } from './lib/scrollMemory'
 import { AssistantPage } from './pages/AssistantPage'
 import { AuthPage } from './pages/AuthPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
@@ -43,14 +44,20 @@ function ShellEffects() {
   const location = useLocation()
   const path = useRef(location.pathname)
   path.current = location.pathname
+  const key = useRef(location.key)
+  key.current = location.key
 
+  // Back: the screen the user came from, as they left it; home when the app was opened right on this page
   useEffect(() => {
     void setupNativeShell(() => {
       if (path.current === '/') return false
-      navigate(-1)
+      if (key.current === 'default') navigate('/', { replace: true })
+      else navigate(-1)
       return true
     })
   }, [navigate])
+
+  useScrollMemory()
 
   useEffect(() => {
     const onPaymentRequired = () => {
