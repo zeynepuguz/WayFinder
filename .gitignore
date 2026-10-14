@@ -37,3 +37,6 @@ deploy/secrets/
 
 # User photos (backend dev storage)
 **/data/photos/
+
+# TypeScript incremental build cache
+*.tsbuildinfo

@@ -4,6 +4,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type { PlaceCategory, PlaceImage, StopType } from '../api/types'
+import logoWordmark from '../assets/logo-wordmark.png'
 import { httpUrl } from '../lib/format'
 
 export const CATEGORY_ICON: Record<PlaceCategory, LucideIcon> = {
@@ -78,16 +79,11 @@ export function Rating({ value }: { value: number | null }) {
   )
 }
 
+// The Nomi wordmark (built from assets/logo-source.png by scripts/logo.mjs); white in dark mode (styles.css)
 export function BrandMark() {
   return (
     <span className="brand-mark">
-      <span className="brand-logo" aria-hidden>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4"
-             strokeLinecap="round" strokeLinejoin="round">
-          <path d="M12 2 15 9 22 12 15 15 12 22 9 15 2 12 9 9Z" />
-        </svg>
-      </span>
-      Nomi
+      <img className="brand-wordmark" src={logoWordmark} alt="Nomi" width={81} height={40} />
     </span>
   )
 }
