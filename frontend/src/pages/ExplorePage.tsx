@@ -6,7 +6,7 @@ import type { City, District, Place, PlaceCategory } from '../api/types'
 import { HScroll } from '../components/HScroll'
 import { LiveMap } from '../components/LiveMap'
 import { PlaceRow } from '../components/PlaceViews'
-import { PopularRoutes } from '../components/PopularRoutes'
+import { Favorites } from '../components/Favorites'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CitySheet, DistrictSheet } from '../components/AreaSheets'
 import { EmptyState, ErrorState, ListSkeleton, Segmented, Sheet } from '../components/ui'
@@ -19,6 +19,8 @@ import { useT, type Translate } from '../lib/i18n'
 
 type Mode = 'nearby' | 'all'
 type View = 'list' | 'map'
+// ?sehir= value of the Türkiye-wide favourites (Popüler)
+const TURKEY = 'turkiye'
 const priceOptions = (t: Translate) => [
   { value: '', label: t('Hepsi', 'All') },
   { value: '0', label: t('Ücretsiz', 'Free') },
@@ -70,8 +72,10 @@ export function ExplorePage() {
   const city: City | null = cities.find(c => c.slug === citySlug) ?? null
   const cityName = city?.name ?? null
   const [cityOpen, setCityOpen] = useState(false)
-  // "Popular routes" ticked (?rotalar=1): ready-made routes instead of the place list (list view only)
+  // "Popüler" ticked (?rotalar=1): favourite routes and places instead of the place list (list view only)
   const popular = view === 'list' && params.get('rotalar') === '1'
+  // Popüler can look at all Türkiye (?sehir=turkiye); the place list always has a city
+  const allTurkey = popular && params.get('sehir') === TURKEY
 
   // District (ilçe) in the URL (?ilce=kadikoy): shareable and kept on back navigation
   const districts = useDistricts(citySlug)
@@ -152,6 +156,10 @@ export function ExplorePage() {
     updateParams({ sehir: c.slug, ilce: null })
     setMode('all')
   }
+  const chooseAllTurkey = () => {
+    setCityOpen(false)
+    updateParams({ sehir: TURKEY, ilce: null })
+  }
   const chooseDistrict = (d: District | null) => {
     setDistrictOpen(false)
     updateParams({ ilce: d?.slug ?? null })
@@ -223,7 +231,7 @@ export function ExplorePage() {
   // Name once the list is loaded; a neutral word meanwhile (never the raw slug)
   const districtName = district?.name ?? (districtSlug ? t('İlçe', 'District') : null)
   const pillLabel = districtName ?? t('Tüm ilçeler', 'All districts')
-  const cityLabel = cityName ?? t('Şehir', 'City')
+  const cityLabel = allTurkey ? t('Tüm Türkiye', 'All Türkiye') : cityName ?? t('Şehir', 'City')
   // Second tab: the chosen district, else the whole city
   const areaLabel = districtName ?? cityLabel
 
@@ -235,12 +243,12 @@ export function ExplorePage() {
         <MapPin size={15} /> <span>{cityLabel}</span> <ChevronDown size={15} />
       </button>
       <button type="button" className={`chip district-pill ${districtSlug ? 'active' : ''}`} onClick={() => setDistrictOpen(true)}
-              disabled={!citySlug}
+              disabled={!citySlug || allTurkey}
               aria-haspopup="dialog" aria-label={`${t('İlçe seç', 'Choose district')}: ${pillLabel}`}>
         <MapIcon size={15} /> <span>{pillLabel}</span> <ChevronDown size={15} />
       </button>
       <button type="button" className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>
-        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler rotalar', 'Popular routes')}
+        {popular ? <SquareCheck size={15} /> : <Square size={15} />} {t('Popüler', 'Popular')}
       </button>
     </div>
   )
@@ -292,8 +300,10 @@ export function ExplorePage() {
           <LiveMap category={category} tag={worshipKind} focusArea={district} focusCity={city} />
         </>
       ) : popular ? (
-        // Category chips, search and filters are about places: not shown for the routes
-        citySlug ? <PopularRoutes city={citySlug} district={districtSlug} /> : <ListSkeleton rows={3} height={180} />
+        // Category chips, search and filters are about places: not shown for the favourites
+        allTurkey ? <Favorites city={null} district={null} areaName={t('Türkiye', 'Türkiye')} />
+          : citySlug ? <Favorites city={citySlug} district={districtSlug} areaName={areaLabel} />
+            : <ListSkeleton rows={3} height={180} />
       ) : (
         <>
           <div className="row">
@@ -349,7 +359,8 @@ export function ExplorePage() {
         </>
       )}
 
-      <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={citySlug} state={cityState} onChoose={chooseCity} />
+      <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={allTurkey ? null : citySlug} state={cityState}
+                 onChoose={chooseCity} allTurkey={popular ? { selected: allTurkey, onChoose: chooseAllTurkey } : undefined} />
 
       <DistrictSheet open={districtOpen} onClose={() => setDistrictOpen(false)} selected={districtSlug}
                      districts={districts} onChoose={chooseDistrict} />

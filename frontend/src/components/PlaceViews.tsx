@@ -2,7 +2,7 @@ import { BadgeCheck, Camera, ExternalLink, Heart, MapPin } from 'lucide-react'
 import { Link } from 'react-router'
 import type { Place, PlaceImage, Recommendation } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, formatCost, formatDistance, httpUrl } from '../lib/format'
+import { CATEGORY_LABELS, formatCost, formatDistance, httpUrl, shownRating } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useGate } from './gate'
 import { CategoryTile, Rating } from './visuals'
@@ -41,6 +41,12 @@ export function VerifiedBadge() {
   return <span className="badge badge-success"><BadgeCheck size={12} /> {t('Doğrulandı', 'Verified')}</span>
 }
 
+// One of the area's favourites: well rated by enough Nomi users, or saved by many
+export function FavoriteBadge() {
+  const t = useT()
+  return <span className="badge badge-premium"><Heart size={12} /> {t('Bölgenin favorisi', 'Local favourite')}</span>
+}
+
 // Compact row for lists
 // showDistrict: city-wide lists add the district ("Kafe · Üsküdar") so same-named places can be told apart
 export function PlaceRow({ place, showDistrict }: { place: Place; showDistrict?: boolean }) {
@@ -52,11 +58,12 @@ export function PlaceRow({ place, showDistrict }: { place: Place; showDistrict?:
         <div className="place-row-body">
           <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
           <div className="meta">
-            <Rating value={place.rating} />
+            <Rating value={shownRating(place)} />
             <span>{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
             {place.distanceMeters != null && <span><MapPin size={12} />{formatDistance(place.distanceMeters)}</span>}
           </div>
-          <div className="row" style={{ gap: 6 }}>
+          <div className="row wrap" style={{ gap: 6 }}>
+            {place.favorite && <FavoriteBadge />}
             <OpenBadge openNow={place.openNow} />
             <span className="badge">{formatCost(place.estimatedCost)}</span>
             {place.indoor && <span className="badge badge-sea">{t('Kapalı alan', 'Indoor')}</span>}
@@ -77,7 +84,7 @@ export function PlaceCard({ place, reason }: { place: Place; reason?: string }) 
         <div className="place-card-body">
           <span className="place-name">{place.name}</span>
           <div className="meta">
-            <Rating value={place.rating} />
+            <Rating value={shownRating(place)} />
             <span>{formatCost(place.estimatedCost)}</span>
             {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
           </div>

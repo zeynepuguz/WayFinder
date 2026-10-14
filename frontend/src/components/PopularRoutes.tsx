@@ -23,8 +23,9 @@ const STOP_TILE: Record<StopType, PlaceCategory> = {
 }
 
 /**
- * The most popular sights of a city (or one of its districts) that lie close together, in walking order, with
- * meals and coffee in between; one card open at a time.
+ * Routes through the best-known sights of a city (or one of its districts; Wikipedia popularity) that lie close
+ * together, in walking order, with meals and coffee in between; one card open at a time. Keşfet shows them only when
+ * the area has no favourite routes yet (components/Favorites).
  */
 export function PopularRoutes({ city, district }: { city: string; district: string | null }) {
   const t = useT()
@@ -43,20 +44,20 @@ export function PopularRoutes({ city, district }: { city: string; district: stri
   return (
     <div className="stack">
       {data.map(route => (
-        <PopularRouteCard key={route.key} route={route} city={city} district={district}
-                          expanded={open === route.key}
-                          onToggle={() => setOpen(current => (current === route.key ? null : route.key))} />
+        <PopularRouteCard key={route.key} route={route} expanded={open === route.key}
+                          onToggle={() => setOpen(current => (current === route.key ? null : route.key))}
+                          create={() => api.startPopularRoute({ city, district: district ?? undefined, key: route.key, date: route.date })} />
       ))}
     </div>
   )
 }
 
-function PopularRouteCard({ route, city, district, expanded, onToggle }: {
+export function PopularRouteCard({ route, expanded, onToggle, create }: {
   route: PopularRoute
-  city: string
-  district: string | null
   expanded: boolean
   onToggle: () => void
+  // Saves the route for the user (popular or community route)
+  create: () => Promise<{ id: number }>
 }) {
   const t = useT()
   const gate = useGate()
@@ -72,7 +73,7 @@ function PopularRouteCard({ route, city, district, expanded, onToggle }: {
     setBusy(true)
     setError(null)
     try {
-      const created = await api.startPopularRoute({ city, district: district ?? undefined, key: route.key, date: route.date })
+      const created = await create()
       navigate(`/routes/${created.id}`)
     } catch (e) {
       setError(errorMessage(e, t('Rota oluşturulamadı', 'Could not create the route')))

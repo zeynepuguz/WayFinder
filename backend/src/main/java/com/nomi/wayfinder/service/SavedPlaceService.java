@@ -16,12 +16,16 @@ public class SavedPlaceService {
     private final SavedPlaceRepository savedPlaceRepository;
     private final PlaceRepository placeRepository;
     private final PlaceMapper placeMapper;
+    // Keeps the place's favorite_count (how many users saved it) in step
+    private final PlaceCommunityService community;
 
     public SavedPlaceService(
             SavedPlaceRepository savedPlaceRepository,
             PlaceRepository placeRepository,
-            PlaceMapper placeMapper
+            PlaceMapper placeMapper,
+            PlaceCommunityService community
     ) {
+        this.community = community;
         this.savedPlaceRepository = savedPlaceRepository;
         this.placeRepository = placeRepository;
         this.placeMapper = placeMapper;
@@ -41,12 +45,16 @@ public class SavedPlaceService {
         }
         SavedPlace.Key key = new SavedPlace.Key(userId, placeId);
         if (!savedPlaceRepository.existsById(key)) {
-            savedPlaceRepository.save(new SavedPlace(userId, placeId));
+            // Flushed: the count below is plain SQL and must see the new row
+            savedPlaceRepository.saveAndFlush(new SavedPlace(userId, placeId));
         }
+        community.refreshSaves(placeId);
     }
 
     @Transactional
     public void remove(Long userId, Long placeId) {
         savedPlaceRepository.deleteById(new SavedPlace.Key(userId, placeId));
+        savedPlaceRepository.flush();
+        community.refreshSaves(placeId);
     }
 }

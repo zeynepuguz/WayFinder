@@ -158,6 +158,26 @@ public class Place {
     @Formula("(CASE WHEN image_url IS NULL THEN 1 ELSE 0 END)")
     private int imageRank;
 
+    // Nomi users' star ratings and how many users saved the place; written only by PlaceCommunityService
+    @Column(insertable = false, updatable = false)
+    private int userRatingSum;
+
+    @Column(insertable = false, updatable = false)
+    private int userRatingCount;
+
+    @Column(insertable = false, updatable = false)
+    private int favoriteCount;
+
+    // What enough users said about it when rating (planning/RatingReason): "budget", "view", "family", "pricey" ...
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(columnDefinition = "text[]", insertable = false, updatable = false)
+    private List<String> communityTags = new ArrayList<>();
+
+    // Sort key "the area's favourites first": planning/CommunityScore.rating in SQL, plus a little for saves
+    @Formula("((COALESCE(rating, 3.8) * 5 + user_rating_sum) / (5.0 + user_rating_count)"
+            + " + LEAST(favorite_count, 20) * 0.02)")
+    private double communityScore;
+
     @Column(nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -291,8 +311,17 @@ public class Place {
         return nearSea;
     }
 
+    // Imported tags and what Nomi's users agree on count alike
     public boolean hasTag(String tag) {
-        return tag != null && tags.contains(tag);
+        return tag != null && (tags.contains(tag) || hasCommunityTag(tag));
+    }
+
+    public boolean hasCommunityTag(String tag) {
+        return communityTags != null && communityTags.contains(tag);
+    }
+
+    public List<String> getCommunityTags() {
+        return communityTags == null ? List.of() : communityTags;
     }
 
     public Long getId() {
@@ -441,6 +470,22 @@ public class Place {
 
     public Double getPopularity() {
         return popularity;
+    }
+
+    public int getUserRatingSum() {
+        return userRatingSum;
+    }
+
+    public int getUserRatingCount() {
+        return userRatingCount;
+    }
+
+    public int getFavoriteCount() {
+        return favoriteCount;
+    }
+
+    public double getCommunityScore() {
+        return communityScore;
     }
 
     public Long getDistrictId() {

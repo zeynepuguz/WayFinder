@@ -1,7 +1,7 @@
 import { http } from './client'
 import type {
   AccessPlan, AccessStatus, AiUsageSummary, PlansResponse, DevicePosition, MyPhoto, PhotoTarget, PhotoUploadResult, UserPhoto,
-  AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, OpenSession, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
+  AssistantReply, AuthResponse, ChatMessage, CodePurpose, CodeSent, OpenSession, RegisterRequest, City, ConversationSummary, District, HomeResponse, MapBox, NearbyPlace, Page, Place, PlaceAvailability, PlaceRating, RatingReason, ReportReason, ReviewAction, ReviewCounts, ReviewedPlace, AppFeedback, PlaceCategory,
   PopularRoute, Preferences,
   Recommendation, ReplanRequest, ReplanResponse, Route, RoutePlanRequest, RouteSummary, StopStatus, StopType, User,
 } from './types'
@@ -68,6 +68,12 @@ export const api = {
   districts: (city: string) => http.get<District[]>('/districts', { city }),
   place: (id: number) => http.get<Place>(`/places/${id}`),
   placeAvailability: (id: number) => http.get<PlaceAvailability>(`/places/${id}/availability`),
+  // Stars by Nomi's users (food and drink places); rating again replaces the earlier stars
+  placeRating: (id: number) => http.get<PlaceRating>(`/places/${id}/rating`),
+  ratePlace: (id: number, stars: number) => http.put<PlaceRating>(`/places/${id}/rating`, { stars }),
+  removePlaceRating: (id: number) => http.delete<PlaceRating>(`/places/${id}/rating`),
+  // Why the user gave their stars (after rating); [] clears the answers
+  setRatingReasons: (id: number, reasons: RatingReason[]) => http.put<PlaceRating>(`/places/${id}/rating/reasons`, { reasons }),
   reportPlace: (id: number, reason: ReportReason) => http.post<void>(`/places/${id}/reports`, { reason }),
   sendFeedback: (message: string) => http.post<void>('/feedback', { message }),
   // The owner's admin area
@@ -96,6 +102,17 @@ export const api = {
   // key: PopularRoute.key of the list shown for this city / district and day (date: null = today)
   startPopularRoute: (request: { city: string; district?: string; key: string; date?: string }) =>
     http.post<Route>('/routes/popular/start', request),
+  // Routes Nomi users saved or liked (public; same cards as the popular routes): no city = all Türkiye, a city, or one
+  // of its districts. Starting one needs a pass
+  communityRoutes: (city?: string, district?: string) => http.get<PopularRoute[]>('/routes/community', { city, district }),
+  startCommunityRoute: (request: { city?: string; district?: string; key: string; date?: string }) =>
+    http.post<Route>('/routes/community/start', request),
+  // Places Nomi users saved or rated well, same scopes as above
+  favoritePlaces: (city?: string, district?: string) => http.get<Place[]>('/places/favorites', { city, district, limit: 10 }),
+  // "Bu rotayı beğendin mi?" (the route's owner; liked = null when not answered)
+  routeFeedback: (routeId: number) => http.get<{ liked: boolean | null }>(`/routes/${routeId}/feedback`),
+  setRouteFeedback: (routeId: number, liked: boolean) => http.put<{ liked: boolean | null }>(`/routes/${routeId}/feedback`, { liked }),
+  removeRouteFeedback: (routeId: number) => http.delete<{ liked: boolean | null }>(`/routes/${routeId}/feedback`),
   replan: (routeId: number, request: ReplanRequest) => http.post<ReplanResponse>(`/routes/${routeId}/replan`, request),
   // Group plans: sharing is the owner's; joining, voting and leaving need no pass
   shareRoute: (routeId: number) => http.post<{ token: string }>(`/routes/${routeId}/share`),

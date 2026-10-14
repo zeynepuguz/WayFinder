@@ -7,13 +7,14 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import type { ReplanRequest, Route, RouteStop, StopStatus, StopType } from '../api/types'
 import { useGate } from '../components/gate'
+import { RouteFeedback } from '../components/RouteFeedback'
 import { RouteGroup } from '../components/RouteGroup'
 import { RouteMap } from '../components/RouteMap'
 import { TripBar } from '../components/TripBar'
 import { Alert, BackButton, ConfirmSheet, ErrorState, Sheet, Skeleton, Spinner, useToast } from '../components/ui'
 import { STOP_ICON, WEATHER_ICON } from '../components/visuals'
 import { useUserLocation } from '../context/LocationContext'
-import { errorMessage, formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeTotalCost, STOP_TYPE_LABELS, TAG_LABELS, todayIso } from '../lib/format'
+import { errorMessage, formatCost, formatDate, formatDistance, formatTime, INTEREST_LABELS, isPastRoute, routeTotalCost, shownRating, STOP_TYPE_LABELS, TAG_LABELS, todayIso } from '../lib/format'
 import { isGroupRoute } from '../lib/group'
 import { cancelReminders } from '../lib/trip'
 import { locale, useT, type Translate } from '../lib/i18n'
@@ -233,6 +234,8 @@ export function RouteDetailPage() {
           </ol>
         </section>
 
+        {owner && route.stops.length > 0 && <RouteFeedback routeId={route.id} />}
+
         <RouteGroup route={route} onChange={setRoute} />
 
         {owner && (
@@ -326,7 +329,7 @@ function StopItem({ stop, index, isNext, editable, busy, votes, onVote, onVisite
           </div>
           <Link to={`/places/${stop.place.id}`} className="stop-title">{stop.place.name}</Link>
           <div className="meta">
-            {stop.place.rating != null && <span>★ {stop.place.rating.toFixed(1)}</span>}
+            {shownRating(stop.place) != null && <span>★ {shownRating(stop.place)!.toFixed(1)}</span>}
             <span>{formatCost(stop.place.estimatedCost)}</span>
             {stop.place.neighborhood && <span>{stop.place.neighborhood}</span>}
             {stop.place.indoor && <span>{t('Kapalı alan', 'Indoor')}</span>}

@@ -67,12 +67,14 @@ export function DistrictSheet({ open, onClose, selected, districts, onChoose }: 
 }
 
 // Bottom sheet: search field and all 81 cities; cities without places yet are shown as "coming soon"
-export function CitySheet({ open, onClose, selected, state, onChoose }: {
+export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey }: {
   open: boolean
   onClose: () => void
   selected: string | null
   state: ReturnType<typeof useCity>
   onChoose: (city: City) => void
+  // "Tüm Türkiye" on top (Keşfet > Popüler); absent where a city is needed
+  allTurkey?: { selected: boolean; onChoose: () => void }
 }) {
   const t = useT()
   const [search, setSearch] = useState('')
@@ -99,6 +101,12 @@ export function CitySheet({ open, onClose, selected, state, onChoose }: {
             <div className="stack" style={{ padding: 12 }}>
               {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
             </div>
+          )}
+          {allTurkey && !search.trim() && (
+            <button type="button" className="list-item" aria-pressed={allTurkey.selected} onClick={allTurkey.onChoose}>
+              <span className="grow" style={{ fontWeight: 650 }}>{t('Tüm Türkiye', 'All Türkiye')}</span>
+              {allTurkey.selected && <Check size={18} color="var(--brand)" />}
+            </button>
           )}
           {list.map(c => {
             const soon = c.placeCount === 0

@@ -117,9 +117,11 @@ public class PlaceService {
             }
         }
 
-        // A city / district list shows its best-documented places first: verified, then with a photo
+        // A city / district list shows the area's favourites first (users' ratings and saves, Place.communityScore),
+        // then its best-documented places: verified, then with a photo
         Sort sort = byDistrict || byCity
-                ? Sort.by(Sort.Order.asc("verifiedRank"), Sort.Order.asc("imageRank"), Sort.Order.asc("name"))
+                ? Sort.by(Sort.Order.desc("communityScore"), Sort.Order.asc("verifiedRank"),
+                        Sort.Order.asc("imageRank"), Sort.Order.asc("name"))
                 : Sort.by(Sort.Order.desc("rating").nullsLast(), Sort.Order.asc("name"));
         Pageable pageable = PageRequest.of(page, size, sort);
 

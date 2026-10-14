@@ -36,7 +36,10 @@ public final class Interests {
             Map.entry("quick", "hızlı yemek"),
             Map.entry("bakery", "fırın"),
             Map.entry("tea", "çay"),
-            Map.entry("religious", "ibadethane")
+            Map.entry("religious", "ibadethane"),
+            // Said by Nomi users when rating (planning/RatingReason)
+            Map.entry("family", "çocuklarla rahat"),
+            Map.entry("quiet", "sakin")
     );
 
     private static final Map<String, String> LABELS_EN = Map.ofEntries(
@@ -63,7 +66,9 @@ public final class Interests {
             Map.entry("quick", "quick bites"),
             Map.entry("bakery", "bakery"),
             Map.entry("tea", "tea"),
-            Map.entry("religious", "place of worship")
+            Map.entry("religious", "place of worship"),
+            Map.entry("family", "good with children"),
+            Map.entry("quiet", "quiet")
     );
 
     private Interests() {

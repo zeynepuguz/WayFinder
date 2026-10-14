@@ -106,6 +106,14 @@ export function formatDistance(meters: number): string {
   return `${(meters / 1000).toLocaleString(locale(), { maximumFractionDigits: 1 })} km`
 }
 
+// The stars shown on a card: Nomi users' average once enough of them voted (a single 5 says little), else the
+// place's own checked rating; null = nothing to show. Same threshold as the backend (CommunityScore.SHOWN_FROM_VOTES)
+export const RATING_SHOWN_FROM_VOTES = 3
+
+export function shownRating(place: { rating: number | null; userRating?: number | null; userRatingCount?: number }): number | null {
+  return (place.userRatingCount ?? 0) >= RATING_SHOWN_FROM_VOTES && place.userRating != null ? place.userRating : place.rating
+}
+
 // null = price unknown (most OpenStreetMap places), 0 = free
 export function formatCost(cost: number | null | undefined): string {
   if (cost == null) return tr('Fiyat bilgisi yok', 'No price info')

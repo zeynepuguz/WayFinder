@@ -208,7 +208,35 @@ export interface Place {
   distanceMeters?: number
   // The owner marked it "may have closed": shown with a warning, never suggested
   suspect?: boolean
+  // Nomi users' stars: plain average (null without votes) and number of votes
+  userRating?: number | null
+  userRatingCount?: number
+  // How many users saved the place
+  favoriteCount?: number
+  // One of the area's favourites: well rated by enough users, or saved by many
+  favorite?: boolean
 }
+
+// GET / PUT / DELETE /places/{id}/rating
+export interface PlaceRating {
+  average: number | null
+  count: number
+  // The signed-in user's stars; null = not rated
+  mine: number | null
+  favoriteCount: number
+  // Only food and drink places are rated
+  rateable: boolean
+  // Why the signed-in user gave their stars
+  myReasons: RatingReason[]
+  // What most raters said (from 2 users on)
+  topReasons: { reason: RatingReason; count: number; positive: boolean }[]
+}
+
+// "Neden bu puanı verdin?" answers (backend planning/RatingReason)
+export type RatingReason =
+  | 'TASTY' | 'AFFORDABLE' | 'VIEW' | 'LOCAL_FLAVOURS' | 'GREAT_COFFEE' | 'GREAT_BREAKFAST' | 'GREAT_DESSERT'
+  | 'FAMILY_FRIENDLY' | 'QUIET' | 'FRIENDLY_STAFF' | 'CLEAN'
+  | 'NOT_TASTY' | 'EXPENSIVE' | 'CROWDED_NOISY' | 'SLOW_SERVICE' | 'NOT_CLEAN' | 'UNFRIENDLY_STAFF'
 
 // Wikimedia Commons photo; url is an 800px thumbnail hot-linked from upload.wikimedia.org
 export interface PlaceImage {

@@ -19,7 +19,11 @@ import java.util.Locale;
 @Component
 public class PlaceScorer {
 
-    static final double DEFAULT_RATING = 3.8;
+    static final double DEFAULT_RATING = CommunityScore.DEFAULT_RATING;
+    // A place the user saved: beats a small distance or rating advantage, not an interest match or bad weather
+    static final double OWN_FAVORITE_BONUS = 18;
+    // "Uygun fiyat" asked, and the place's raters mostly found it expensive (RatingReason.EXPENSIVE)
+    static final double PRICEY_FOR_BUDGET_PENALTY = 20;
     // With a budget, a place of unknown price is slightly less attractive than one known to fit
     static final double UNKNOWN_PRICE_PENALTY = 4;
     // Interest matches: the first counts a lot (it must beat a small distance advantage), a second one a bit more
@@ -41,8 +45,9 @@ public class PlaceScorer {
         List<String> reasons = new ArrayList<>();
         double score = 0;
 
-        // 1) Quality
-        double rating = place.getRating() == null ? DEFAULT_RATING : place.getRating();
+        // 1) Quality: the place's own rating pulled towards what Nomi's users gave it (CommunityScore: a few votes
+        // move it a little, many votes a lot). Without votes this is the rating itself, as before
+        double rating = CommunityScore.rating(place.getRating(), place.getUserRatingSum(), place.getUserRatingCount());
         score += rating * 20;
 
         // 2) Distance: closer is better, relative to how far the user is willing to walk.
@@ -50,8 +55,23 @@ public class PlaceScorer {
         double distancePenalty = (c.distanceMeters() / c.maxLegMeters()) * 25;
         reasons.add(distanceReason(c.distanceMeters(), c.walkingMinutes(), c.firstLeg()));
 
-        if (place.getRating() != null) {
+        if (place.getUserRatingCount() >= CommunityScore.SHOWN_FROM_VOTES) {
+            reasons.add(String.format(Locale.ROOT, Texts.t("Nomi kullanıcılarının puanı %.1f (%d oy)",
+                            "Rated %.1f by Nomi users (%d votes)"),
+                    CommunityScore.average(place.getUserRatingSum(), place.getUserRatingCount()),
+                    place.getUserRatingCount()));
+        } else if (place.getRating() != null) {
             reasons.add(String.format(Locale.ROOT, Texts.t("Puanı %.1f", "Rated %.1f"), place.getRating()));
+        }
+
+        // 1b) Favourites: the user's own saved places count a lot (they chose them), places many users saved a little
+        if (c.savedByUser()) {
+            score += OWN_FAVORITE_BONUS;
+            reasons.add(Texts.t("Kaydettiğin bir yer", "One of your saved places"));
+        }
+        score += CommunityScore.savesBonus(place.getFavoriteCount());
+        if (!c.savedByUser() && place.getFavoriteCount() >= CommunityScore.FAVORITE_FROM_SAVES) {
+            reasons.add(Texts.t("Bölgede çok kaydedilen bir yer", "Saved by many people around here"));
         }
 
         // 3) Weather at the time of the visit
@@ -97,8 +117,20 @@ public class PlaceScorer {
                 reasons.add(Texts.t("Deniz kenarında", "By the sea"));
             }
         }
+        // Interests matched only through what Nomi's users said when rating (RatingReason community tags)
+        List<String> saidByUsers = matches.stream()
+                .filter(i -> place.hasCommunityTag(i) && !InterestMatcher.matchesImported(place, i)).toList();
+        if (!saidByUsers.isEmpty()) {
+            reasons.add(Texts.t("Nomi kullanıcılarına göre: ", "Nomi users say: ")
+                    + String.join(", ", saidByUsers.stream().map(Interests::label).toList()));
+        }
+
         // "Uygun fiyat" without known prices: a café is the cheaper meal (never a guessed price)
         boolean budgetInterest = c.interests() != null && c.interests().contains("budget");
+        // ... and most of the people who rated it found it expensive
+        if (budgetInterest && place.hasCommunityTag("pricey")) {
+            score -= PRICEY_FOR_BUDGET_PENALTY;
+        }
         if (budgetInterest && matches.stream().noneMatch("budget"::equals) && c.slotType() != null
                 && (c.slotType() == StopType.LUNCH || c.slotType() == StopType.DINNER)
                 && place.getCategory() == PlaceCategory.CAFE && place.getEstimatedCost() == null) {
@@ -182,14 +214,23 @@ public class PlaceScorer {
             Double budgetAllowance,
             Boolean openStatus,
             // The stop being filled (null = a single recommendation): "uygun fiyat" meals may be cafés
-            StopType slotType
+            StopType slotType,
+            // The user saved this place ("Kaydedilenler")
+            boolean savedByUser
     ) {
 
         public Candidate(Place place, double distanceMeters, double maxLegMeters, int walkingMinutes, boolean firstLeg,
                          LocalTime arrival, WeatherContext weather, List<String> interests, Integer totalCost,
                          Double budgetAllowance, Boolean openStatus) {
             this(place, distanceMeters, maxLegMeters, walkingMinutes, firstLeg, arrival, weather, interests, totalCost,
-                    budgetAllowance, openStatus, null);
+                    budgetAllowance, openStatus, null, false);
+        }
+
+        public Candidate(Place place, double distanceMeters, double maxLegMeters, int walkingMinutes, boolean firstLeg,
+                         LocalTime arrival, WeatherContext weather, List<String> interests, Integer totalCost,
+                         Double budgetAllowance, Boolean openStatus, StopType slotType) {
+            this(place, distanceMeters, maxLegMeters, walkingMinutes, firstLeg, arrival, weather, interests, totalCost,
+                    budgetAllowance, openStatus, slotType, false);
         }
     }
 

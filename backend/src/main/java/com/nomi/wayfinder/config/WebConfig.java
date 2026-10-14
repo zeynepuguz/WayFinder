@@ -59,7 +59,9 @@ public class WebConfig implements WebMvcConfigurer {
 
         // Paid features
         registry.addInterceptor(accessInterceptor)
-                .addPathPatterns("/api/v1/routes", "/api/v1/routes/**", "/api/v1/assistant/**", "/api/v1/saved/**");
+                .addPathPatterns("/api/v1/routes", "/api/v1/routes/**", "/api/v1/assistant/**", "/api/v1/saved/**")
+                // Telling us how a route went stays possible after the pass ran out
+                .excludePathPatterns("/api/v1/routes/*/feedback");
     }
 
     /**

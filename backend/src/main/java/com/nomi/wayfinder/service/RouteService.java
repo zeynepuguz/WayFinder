@@ -40,6 +40,11 @@ public class RouteService {
     // null in unit tests: then only the owner sees a route
     private final RouteGroupService groups;
 
+    // null in unit tests: then nobody's saved places are preferred
+    private final PlaceCommunityService community;
+    // null in unit tests: then every route is planned from scratch
+    private final RouteTemplates templates;
+
     @Autowired
     public RouteService(
             RouteRepository routeRepository,
@@ -49,8 +54,12 @@ public class RouteService {
             Clock clock,
             RouteStartService startService,
             PlaceRepository placeRepository,
-            RouteGroupService groups
+            RouteGroupService groups,
+            PlaceCommunityService community,
+            RouteTemplates templates
     ) {
+        this.community = community;
+        this.templates = templates;
         this.routeRepository = routeRepository;
         this.planner = planner;
         this.userService = userService;
@@ -68,7 +77,19 @@ public class RouteService {
             RouteMapper routeMapper,
             Clock clock
     ) {
-        this(routeRepository, planner, userService, routeMapper, clock, null, null, null);
+        this(routeRepository, planner, userService, routeMapper, clock, null, null, null, null, null);
+    }
+
+    public RouteService(RouteRepository routeRepository, RoutePlanner planner, UserService userService,
+                        RouteMapper routeMapper, Clock clock, RouteStartService startService,
+                        PlaceRepository placeRepository, RouteGroupService groups) {
+        this(routeRepository, planner, userService, routeMapper, clock, startService, placeRepository, groups, null,
+                null);
+    }
+
+    // The user's saved places: the planner prefers them when they fit the stop
+    private Set<Long> savedPlaces(Long userId) {
+        return community == null || userId == null ? Set.of() : community.savedPlaceIds(userId);
     }
 
     // ================= PLAN =================
@@ -117,10 +138,29 @@ public class RouteService {
         RouteStartService.Start origin = startService != null ? startService.resolve(request)
                 : locationOnly(request);
 
-        PlanResult result = planner.plan(new PlanningRequest(
+        PlanningRequest planning = new PlanningRequest(
                 origin.latitude(), origin.longitude(), date, start, end,
-                partySize, budget, tolerance, interests, slots, Set.of(), assumeWet));
-        if (origin.kind() == StartKind.LOCATION) {
+                partySize, budget, tolerance, interests, slots, Set.of(), assumeWet).withSaved(savedPlaces(userId));
+        // A route other users liked for a day like this one, planned again for this day; else from scratch
+        Optional<RouteTemplates.Template> template = likedTemplate(userId, planning, partySize, budget);
+        PlanResult result = null;
+        if (template.isPresent()) {
+            PlanResult replayed = planner.plan(RouteTemplates.replay(template.get(), planning));
+            if (RouteTemplates.acceptable(template.get(), replayed, budget, partySize)) {
+                List<String> notes = new ArrayList<>(replayed.notes());
+                notes.addFirst(Texts.t("Bu rota, buraya yakın benzer bir gün planlayan ve rotasını beğenen Nomi "
+                        + "kullanıcılarının rotasına göre hazırlandı; bugünün hava ve açılış saatlerine göre yeniden "
+                        + "kontrol edildi.", "This route follows one that Nomi users planning a similar day nearby "
+                        + "liked, checked again for today's weather and opening hours."));
+                result = new PlanResult(replayed.stops(), notes, replayed.forecast(), replayed.weatherAdvice());
+            } else {
+                template = Optional.empty();
+            }
+        }
+        if (result == null) {
+            result = planner.plan(planning);
+        }
+        if (origin.kind() == StartKind.LOCATION && template.isEmpty()) {
             result = withSparseAreaNote(result, origin, slots);
         }
         if (theme != null) {
@@ -144,9 +184,22 @@ public class RouteService {
         route.setWalkingTolerance(tolerance);
         route.setInterests(interests);
         route.setAssumeWet(assumeWet);
+        template.ifPresent(t -> route.setBasedOnRouteId(t.route().getId()));
         applyResult(route, result, List.of());
 
         return routeRepository.save(route);
+    }
+
+    private Optional<RouteTemplates.Template> likedTemplate(Long userId, PlanningRequest planning, int partySize,
+                                                            Integer budget) {
+        if (templates == null || userId == null) {
+            return Optional.empty();
+        }
+        RouteSimilarity.Shape wanted = new RouteSimilarity.Shape(planning.startLatitude(), planning.startLongitude(),
+                planning.slots().stream().map(PlanningSlot::type).toList(), planning.interests(),
+                budget == null ? null : budget / Math.max(1, partySize), planning.walkingTolerance(),
+                planning.startTime());
+        return templates.find(userId, wanted);
     }
 
     // Radius and minimum of plannable places around a start position before we suggest choosing a city / district
@@ -493,7 +546,8 @@ public class RouteService {
         double[] origin = replanOrigin(route, done, request.latitude(), request.longitude());
         PlanResult result = planner.plan(new PlanningRequest(
                 origin[0], origin[1], route.getDate(), start, end,
-                route.getPartySize(), remainingBudget, tolerance, interests, slots, excluded, assumeWet));
+                route.getPartySize(), remainingBudget, tolerance, interests, slots, excluded, assumeWet)
+                .withSaved(savedPlaces(route.getUserId())));
 
         changes.addAll(describeChanges(remaining, result.stops()));
 

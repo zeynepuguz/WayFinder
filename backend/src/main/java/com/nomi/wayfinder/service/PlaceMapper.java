@@ -6,6 +6,7 @@ import com.nomi.wayfinder.dto.PlaceCreateRequest;
 import com.nomi.wayfinder.dto.PlaceImage;
 import com.nomi.wayfinder.dto.PlaceResponse;
 import com.nomi.wayfinder.entity.Place;
+import com.nomi.wayfinder.planning.CommunityScore;
 import com.nomi.wayfinder.entity.PlaceOpeningHours;
 import com.nomi.wayfinder.i18n.Texts;
 import org.springframework.stereotype.Component;
@@ -92,6 +93,11 @@ public class PlaceMapper {
         response.setWebsite(place.getWebsite());
         response.setLastVerifiedAt(place.getLastVerifiedAt());
         response.setImage(PlaceImage.of(place));
+        response.setUserRating(CommunityScore.average(place.getUserRatingSum(), place.getUserRatingCount()));
+        response.setUserRatingCount(place.getUserRatingCount());
+        response.setFavoriteCount(place.getFavoriteCount());
+        response.setFavorite(CommunityScore.isFavorite(place.getUserRatingSum(), place.getUserRatingCount(),
+                place.getFavoriteCount()));
         response.setSuspect(place.isSuspect());
 
         return response;

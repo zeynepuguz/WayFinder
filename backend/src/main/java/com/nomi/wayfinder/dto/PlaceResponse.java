@@ -37,6 +37,13 @@ public class PlaceResponse {
     private Instant lastVerifiedAt;
     // Wikimedia Commons photo with attribution; null = no image
     private PlaceImage image;
+    // Nomi users' stars: plain average (null without votes) and number of votes
+    private Double userRating;
+    private int userRatingCount;
+    // How many users saved the place
+    private int favoriteCount;
+    // One of the area's favourites: well rated by enough users, or saved by many
+    private boolean favorite;
 
     public Long getId() {
         return id;
@@ -228,6 +235,38 @@ public class PlaceResponse {
 
     public void setImage(PlaceImage image) {
         this.image = image;
+    }
+
+    public Double getUserRating() {
+        return userRating;
+    }
+
+    public void setUserRating(Double userRating) {
+        this.userRating = userRating;
+    }
+
+    public int getUserRatingCount() {
+        return userRatingCount;
+    }
+
+    public void setUserRatingCount(int userRatingCount) {
+        this.userRatingCount = userRatingCount;
+    }
+
+    public int getFavoriteCount() {
+        return favoriteCount;
+    }
+
+    public void setFavoriteCount(int favoriteCount) {
+        this.favoriteCount = favoriteCount;
+    }
+
+    public boolean isFavorite() {
+        return favorite;
+    }
+
+    public void setFavorite(boolean favorite) {
+        this.favorite = favorite;
     }
 
     // The owner marked it "may have closed": shown with a warning, never suggested

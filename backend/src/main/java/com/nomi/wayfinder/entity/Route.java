@@ -93,6 +93,9 @@ public class Route {
     @Column(length = 32, unique = true)
     private String shareToken;
 
+    // The liked route this one was built from (service/RouteTemplates); null = planned from scratch
+    private Long basedOnRouteId;
+
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("position")
     private List<RouteStop> stops = new ArrayList<>();
@@ -300,6 +303,14 @@ public class Route {
 
     public void setShareToken(String shareToken) {
         this.shareToken = shareToken;
+    }
+
+    public Long getBasedOnRouteId() {
+        return basedOnRouteId;
+    }
+
+    public void setBasedOnRouteId(Long basedOnRouteId) {
+        this.basedOnRouteId = basedOnRouteId;
     }
 
     public List<RouteStop> getStops() {

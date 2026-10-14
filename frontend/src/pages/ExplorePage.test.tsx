@@ -23,6 +23,9 @@ const searchPlaces = vi.fn()
 const nearbyPlaces = vi.fn()
 const popularRoutes = vi.fn()
 const startPopularRoute = vi.fn()
+const communityRoutes = vi.fn()
+const startCommunityRoute = vi.fn()
+const favoritePlaces = vi.fn()
 const photos = vi.fn()
 vi.mock('../api', () => ({
   api: {
@@ -31,6 +34,9 @@ vi.mock('../api', () => ({
     nearbyPlaces: (...args: unknown[]) => nearbyPlaces(...args),
     popularRoutes: (...args: unknown[]) => popularRoutes(...args),
     startPopularRoute: (...args: unknown[]) => startPopularRoute(...args),
+    communityRoutes: (...args: unknown[]) => communityRoutes(...args),
+    startCommunityRoute: (...args: unknown[]) => startCommunityRoute(...args),
+    favoritePlaces: (...args: unknown[]) => favoritePlaces(...args),
     photos: (...args: unknown[]) => photos(...args),
   },
 }))
@@ -73,6 +79,9 @@ beforeEach(() => {
   districts.mockReset().mockImplementation((slug: string) => Promise.resolve(slug === 'ankara' ? ANKARA_DISTRICTS : DISTRICTS))
   popularRoutes.mockReset().mockResolvedValue([])
   startPopularRoute.mockReset()
+  communityRoutes.mockReset().mockResolvedValue([])
+  startCommunityRoute.mockReset()
+  favoritePlaces.mockReset().mockResolvedValue([])
   photos.mockReset().mockResolvedValue([])
   liveMapProps.mockReset()
   setCity.mockReset()
@@ -204,25 +213,57 @@ describe('ExplorePage cities', () => {
   })
 })
 
-describe('ExplorePage popular routes', () => {
-  it('shows the ready-made routes of the city instead of the place list', async () => {
-    popularRoutes.mockResolvedValue([route('a1-3f', 'Ulus ve çevresi')])
+describe('ExplorePage favourites (Popüler)', () => {
+  it('shows the city’s favourite routes and places instead of the place list', async () => {
+    communityRoutes.mockResolvedValue([route('c-1a-2b', 'Kocatepe ve 2 durak daha')])
+    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { district: 'Çankaya' })])
     renderPage('/explore?sehir=ankara&category=CAFE')
-    await userEvent.click(await screen.findByRole('button', { name: /Popüler rotalar/ }))
+    await userEvent.click(await screen.findByRole('button', { name: /Popüler/ }))
 
     expect(search).toContain('rotalar=1')
-    expect(screen.getByRole('button', { name: /Popüler rotalar/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(await screen.findByText('Ulus ve çevresi')).toBeInTheDocument()
-    expect(popularRoutes).toHaveBeenCalledWith('ankara', undefined)
+    expect(screen.getByRole('button', { name: /Popüler/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('Kocatepe ve 2 durak daha')).toBeInTheDocument()
+    expect(await screen.findByText('Kızılay Kahve')).toBeInTheDocument()
+    expect(communityRoutes).toHaveBeenCalledWith('ankara', undefined)
+    expect(favoritePlaces).toHaveBeenCalledWith('ankara', undefined)
+    // The famous-sights routes are not the favourites
+    expect(popularRoutes).not.toHaveBeenCalled()
     // categories and the place tabs are about places
     expect(screen.queryByRole('button', { name: 'Tümü' })).not.toBeInTheDocument()
     expect(screen.queryByRole('tab', { name: 'Yakınımda' })).not.toBeInTheDocument()
+  })
 
+  it('only the district’s favourites when a district is chosen', async () => {
+    renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
+    await waitFor(() => expect(communityRoutes).toHaveBeenCalledWith('istanbul', 'kadikoy'))
+    expect(favoritePlaces).toHaveBeenCalledWith('istanbul', 'kadikoy')
+  })
+
+  it('all Türkiye from the city list, without a district', async () => {
+    renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
+    await userEvent.click(await screen.findByRole('button', { name: /Şehir seç/ }))
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Şehir seç' })).getByRole('button', { name: 'Tüm Türkiye' }))
+
+    expect(search).toContain('sehir=turkiye')
+    expect(search).not.toContain('ilce=')
+    await waitFor(() => expect(communityRoutes).toHaveBeenLastCalledWith(undefined, undefined))
+    expect(favoritePlaces).toHaveBeenLastCalledWith(undefined, undefined)
+    expect(screen.getByRole('button', { name: /İlçe seç/ })).toBeDisabled()
+    expect(screen.getByText('Türkiye: favori rotalar')).toBeInTheDocument()
+  })
+
+  it('offers the famous-sights routes while the area has no favourite routes', async () => {
+    popularRoutes.mockResolvedValue([route('a1-3f', 'Ulus ve çevresi')])
+    renderPage('/explore?sehir=ankara&rotalar=1')
+    expect(await screen.findByText('Henüz favori rota yok')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ünlü yerler rotalarına bak' }))
+
+    expect(await screen.findByText('Ulus ve çevresi')).toBeInTheDocument()
+    expect(popularRoutes).toHaveBeenCalledWith('ankara', undefined)
     expect(screen.getByText('2 durak')).toBeInTheDocument()
     expect(screen.getByText(/42 dk yürüyüş/)).toBeInTheDocument()
     expect(screen.getByText(/Kişi başı ~150 TL · 1 durağın fiyatı bilinmiyor/)).toBeInTheDocument()
     expect(screen.getByText('12:00 · Öğle yemeği')).toBeInTheDocument()
-    // why these are popular, and each stop with its kind (sight, lunch ...) instead of one theme
     expect(screen.getByText('Wikipedia’da en çok okunan yerler')).toBeInTheDocument()
     expect(screen.getByText('09:30 · Gezi')).toBeInTheDocument()
     expect(document.querySelector('[data-stop-type="LUNCH"]')).not.toBeNull()
@@ -235,30 +276,30 @@ describe('ExplorePage popular routes', () => {
     expect(screen.getByRole('button', { name: /Ulus ve çevresi/ })).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('sends guests to login before starting a route', async () => {
-    popularRoutes.mockResolvedValue([route('a1-3f', 'Ulus ve çevresi')])
+  it('sends guests to login before starting a favourite route', async () => {
+    communityRoutes.mockResolvedValue([route('c-1a-2b', 'Ulus ve çevresi')])
     renderPage('/explore?sehir=ankara&rotalar=1')
     await userEvent.click(await screen.findByRole('button', { name: /Ulus ve çevresi/ }))
     await userEvent.click(screen.getByRole('button', { name: /Bu rotayı başlat/ }))
     expect(await screen.findByText('Giriş sayfası')).toBeInTheDocument()
-    expect(startPopularRoute).not.toHaveBeenCalled()
+    expect(startCommunityRoute).not.toHaveBeenCalled()
   })
 
-  it('starts the route for premium users and opens it', async () => {
+  it('starts a favourite route for premium users and opens it', async () => {
     auth = { user: { id: 1 }, hasAccess: true }
-    popularRoutes.mockResolvedValue([route('k9-11', 'Moda ve çevresi')])
-    startPopularRoute.mockResolvedValue({ id: 77 })
+    communityRoutes.mockResolvedValue([route('c-9k-11', 'Moda ve çevresi')])
+    startCommunityRoute.mockResolvedValue({ id: 77 })
     renderPage('/explore?sehir=istanbul&ilce=kadikoy&rotalar=1')
     await userEvent.click(await screen.findByRole('button', { name: /Moda ve çevresi/ }))
-    expect(popularRoutes).toHaveBeenLastCalledWith('istanbul', 'kadikoy')
     await userEvent.click(screen.getByRole('button', { name: /Bu rotayı başlat/ }))
-    expect(startPopularRoute).toHaveBeenCalledWith({ city: 'istanbul', district: 'kadikoy', key: 'k9-11', date: '2026-09-28' })
+    expect(startCommunityRoute).toHaveBeenCalledWith({ city: 'istanbul', district: 'kadikoy', key: 'c-9k-11', date: '2026-09-28' })
     expect(await screen.findByText('Rota sayfası')).toBeInTheDocument()
   })
 
-  it('says so when the area has no routes yet', async () => {
+  it('says so when the area has no favourites yet', async () => {
     renderPage('/explore?sehir=izmir&rotalar=1')
-    expect(await screen.findByText('Bu bölge için henüz yeterli mekan yok')).toBeInTheDocument()
+    expect(await screen.findByText('Henüz favori rota yok')).toBeInTheDocument()
+    expect(await screen.findByText('Henüz favori mekan yok')).toBeInTheDocument()
   })
 })
 

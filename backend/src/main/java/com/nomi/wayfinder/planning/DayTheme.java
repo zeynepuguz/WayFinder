@@ -16,8 +16,9 @@ public enum DayTheme {
     RAINY(List.of("museum", "art"), null, null),
     // Free sights (parks, viewpoints) and cheap meals (planning/PlaceScorer "budget"); never a guessed price
     LOW_BUDGET(List.of("budget", "nature", "view"), null, null),
-    // Fewer, closer stops with a break for dessert; parks (one sight interest, so DayTemplate keeps two sights)
-    FAMILY(List.of("nature"),
+    // Fewer, closer stops with a break for dessert; parks (one sight interest, so DayTemplate keeps two sights) and
+    // places Nomi users found good with children ("family" community tag, RatingReason.FAMILY_FRIENDLY)
+    FAMILY(List.of("nature", "family"),
             List.of(StopType.SIGHTSEEING, StopType.LUNCH, StopType.SIGHTSEEING, StopType.DESSERT), WalkingTolerance.LOW);
 
     private final List<String> interests;

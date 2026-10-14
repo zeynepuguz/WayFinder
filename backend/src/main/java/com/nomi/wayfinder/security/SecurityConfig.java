@@ -59,7 +59,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         // Guests can look around the app before signing in / paying
                         .requestMatchers(HttpMethod.GET, "/api/v1/places/**", "/api/v1/cities/**", "/api/v1/districts/**",
-                                "/api/v1/routes/popular", "/api/v1/weather/**",
+                                "/api/v1/routes/popular", "/api/v1/routes/community", "/api/v1/weather/**",
                                 "/api/v1/recommendations/**", "/api/v1/home/**", "/api/v1/billing/plans").permitAll()
                         // Published user photos (development; Caddy serves them in production)
                         .requestMatchers(HttpMethod.GET, "/media/photos/**").permitAll()
@@ -67,6 +67,10 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/*/photos").authenticated()
                         // ... and report a place they think has closed (admin/PlaceReviewService)
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/*/reports").authenticated()
+                        // ... and rate food and drink places (service/PlaceCommunityService)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/places/*/rating", "/api/v1/places/*/rating/reasons")
+                        .authenticated()
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/places/*/rating").authenticated()
                         // Place data comes from admins / data pipeline, not from users
                         .requestMatchers(HttpMethod.POST, "/api/v1/places/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/api/v1/places/**").hasRole("ADMIN")

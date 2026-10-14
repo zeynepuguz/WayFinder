@@ -601,6 +601,33 @@ svg { flex-shrink: 0; }
 .rating { display: inline-flex; align-items: center; gap: 3px; color: var(--ink); font-weight: 700; }
 .rating svg { color: #f5a524; fill: #f5a524; }
 
+/* Place page: the visitor's own stars (components/PlaceRating) */
+.star-input { display: flex; gap: 4px; }
+.star-input button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink-3);
+}
+.star-input button.on { color: #f5a524; }
+.star-input button.on svg { fill: #f5a524; }
+.star-input button:disabled { opacity: 0.6; }
+/* A text link inside a sentence ("Nedenini değiştir") */
+.link-btn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--brand-strong);
+  font: inherit;
+  font-weight: 650;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .reasons { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .reasons li { display: flex; gap: 8px; font-size: 13px; color: var(--ink-2); line-height: 18px; }
 .reasons li svg { color: var(--success); margin-top: 1px; }
@@ -621,13 +648,11 @@ svg { flex-shrink: 0; }
   flex-direction: column;
   gap: 18px;
 }
-.brand-mark { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
-.brand-logo {
-  width: 32px; height: 32px; border-radius: 10px;
-  display: grid; place-items: center;
-  background: linear-gradient(135deg, #ff7a4d, #e8452a);
-  color: #fff;
-  box-shadow: 0 6px 14px -6px rgb(232 69 42 / 70%);
+.brand-mark { display: inline-flex; align-items: center; }
+/* The black wordmark; white on the dark theme */
+.brand-wordmark { display: block; height: 40px; width: auto; }
+@media (prefers-color-scheme: dark) {
+  .brand-wordmark { filter: invert(1); }
 }
 
 .location-chip {

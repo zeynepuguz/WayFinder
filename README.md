@@ -117,6 +117,31 @@ verdikleri paket `REVOKED` olur (`VoidedPurchaseSync`). Servis hesabı ayarlanan
 aynı cevap döner. E-posta için bir SMTP sağlayıcısı gerekir (`MAIL_*`); yerelde `MAIL_DEV_LOG_CODES=true` ile kod
 backend loguna yazılır.
 
+## Beğenilen rotalar
+
+- Rota sahibi rotasını beğenir ya da beğenmez (`PUT /routes/{id}/feedback`, paket gerekmez). Aynı mekanları aynı
+  sırayla içeren rotalar tek rota sayılır; beğeni − beğenmeme > 0 olanlar kullanılır.
+- Yeni bir rota istenince (form ya da asistan) yakında beğenilmiş benzer bir gün aranır (`planning/RouteSimilarity`:
+  başlangıç ≤ 1,5 km, aynı tür duraklar, başlangıç saati ± 2 saat, daha fazla yürütmüyor, kişi başı bütçeyi aşmıyor,
+  ilgi alanlarının en az yarısı ortak). Bulunursa mekanları sabitlenip o gün için yeniden planlanır (kapalı / yağmurda
+  uygun olmayan mekan değişir); mekanların en az %60'ı korunamazsa ya da bütçe aşılırsa rota sıfırdan planlanır.
+- Rotayı kaydetmek (kalp) de beğeni sayılır; 👎 kaydetmenin önüne geçer.
+- Keşfet > Popüler: favori rotalar (`GET /routes/community`) ve favori mekanlar (`GET /places/favorites`); şehir
+  listesinde "Tüm Türkiye" = Türkiye geneli, şehir = o şehir, ilçe = sadece o ilçe. Favori rota yoksa ünlü yerler
+  (Wikipedia) rotalarına bir butonla bakılır. Rota başlatmak
+  paket ister.
+
+## Kullanıcı puanları ve favoriler
+
+- Giriş yapmış herkes yeme içme mekanlarına (kahvaltı, restoran, kafe, tatlı) 1-5 yıldız verir: `PUT /places/{id}/rating`
+  (kişi başı mekana tek puan, günde en çok 40 puan; paket gerekmez). Toplamlar mekan satırında tutulur
+  (`user_rating_sum/count`, `favorite_count` = mekanı kaydeden kullanıcı sayısı), her gece yeniden sayılır.
+- Puan Bayes ortalamasıdır (`planning/CommunityScore`): her mekan 5 "ortalama" oyla başlar; tek bir 5 yıldız 3,8'i
+  ancak 4,0 yapar, 30 kişi 4,8 yapar. Kartlarda kullanıcı puanı 3 oydan sonra gösterilir.
+- Etkisi: şehir / ilçe listelerinde bölgenin favorileri en başta; "Bölgenin favorisi" rozeti (5 oy ve ortalama ≥ 4,3
+  ya da 5 kayıt); rota planlayıcı iyi puanlı ve çok kaydedilen mekanları, en çok da kullanıcının kendi kaydettiklerini
+  öne alır (hava, ilgi alanı ve mesafe yine belirleyicidir).
+
 ## Mekan verisi
 
 - **OpenStreetMap:** 81 il, ilçeler ve mahalleler. Canlı Overpass API'den ilçe ilçe (`backend/.../osm`); Overpass

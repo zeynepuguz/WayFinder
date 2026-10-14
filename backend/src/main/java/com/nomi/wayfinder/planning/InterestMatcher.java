@@ -36,18 +36,23 @@ public final class InterestMatcher {
         return TAGS.containsKey(interest);
     }
 
+    // Imported tags, category / coast rules, and what enough Nomi users said (community tags)
     public static boolean matches(Place place, String interest) {
-        if (place == null || interest == null) {
-            return false;
-        }
-        Set<String> tags = TAGS.get(interest);
-        if (tags == null) {
-            // Other place tags ("coffee", "dessert", ...) still match themselves
-            return place.hasTag(interest);
-        }
-        if (tags.stream().anyMatch(place::hasTag)) {
-            return true;
-        }
+        return place != null && interest != null && (tagMatch(place, interest, true) || ruleMatch(place, interest));
+    }
+
+    /** The same match without what Nomi's users said: from imported data alone. */
+    public static boolean matchesImported(Place place, String interest) {
+        return place != null && interest != null && (tagMatch(place, interest, false) || ruleMatch(place, interest));
+    }
+
+    private static boolean tagMatch(Place place, String interest, boolean withCommunity) {
+        // Other place tags ("coffee", "dessert", "family", ...) match themselves
+        Set<String> tags = TAGS.getOrDefault(interest, Set.of(interest));
+        return tags.stream().anyMatch(tag -> place.getTags().contains(tag) || withCommunity && place.hasCommunityTag(tag));
+    }
+
+    private static boolean ruleMatch(Place place, String interest) {
         PlaceCategory category = place.getCategory();
         return switch (interest) {
             // By the sea: tagged (beach, aquarium, lighthouse, "sahil") or within ~300 m of the coastline

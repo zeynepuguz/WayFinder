@@ -526,7 +526,8 @@ public class RoutePlanner {
                     cost,
                     leg.allowance(),
                     open,
-                    slot.type()
+                    slot.type(),
+                    request.savedPlaceIds().contains(place.getId())
             ));
             // Look-ahead: stay close to where the rest of the day goes
             if (leg.anchor() != null && leg.anchorWeight() > 0) {

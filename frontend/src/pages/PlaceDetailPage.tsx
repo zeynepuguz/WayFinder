@@ -2,14 +2,15 @@ import { Clock, ExternalLink, Globe, Heart, Info, MapPin, Navigation, Phone, Tim
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
-import { OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
+import { PlaceRating } from '../components/PlaceRating'
+import { FavoriteBadge, OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { PlaceReportAndReview } from '../components/PlaceReview'
 import { RouteMap } from '../components/RouteMap'
 import { Alert, BackButton, ErrorState, Skeleton } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, TAG_LABELS } from '../lib/format'
+import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, shownRating, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
 
@@ -67,7 +68,8 @@ export function PlaceDetailPage() {
           <span className="t-overline">{CATEGORY_LABELS[place.category]}{place.neighborhood && ` · ${place.neighborhood}`}</span>
           <h1 className="t-title" style={{ fontSize: 26, lineHeight: '32px' }}>{place.name}</h1>
           <div className="row wrap" style={{ gap: 8 }}>
-            <Rating value={place.rating} />
+            <Rating value={shownRating(place)} />
+            {place.favorite && <FavoriteBadge />}
             <OpenBadge openNow={place.openNow} />
             {place.verified && <VerifiedBadge />}
             {place.indoor ? <span className="badge badge-sea"><Umbrella size={12} /> {t('Kapalı alan', 'Indoor')}</span>
@@ -103,6 +105,8 @@ export function PlaceDetailPage() {
             {place.tags.map(tag => <span key={tag} className="badge">{TAG_LABELS[tag] ?? tag}</span>)}
           </div>
         )}
+
+        <PlaceRating placeId={place.id} />
 
         <RouteMap height={180} points={[{ latitude: place.latitude, longitude: place.longitude, label: '•', title: place.name }]} />
 
