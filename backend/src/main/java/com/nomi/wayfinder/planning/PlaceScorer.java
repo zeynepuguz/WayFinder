@@ -64,14 +64,10 @@ public class PlaceScorer {
             reasons.add(String.format(Locale.ROOT, Texts.t("Puanı %.1f", "Rated %.1f"), place.getRating()));
         }
 
-        // 1b) Favourites: the user's own saved places count a lot (they chose them), places many users saved a little
+        // 1b) The user's own saved places count a lot (they chose them). Other users' saves are private: not counted
         if (c.savedByUser()) {
             score += OWN_FAVORITE_BONUS;
             reasons.add(Texts.t("Kaydettiğin bir yer", "One of your saved places"));
-        }
-        score += CommunityScore.savesBonus(place.getFavoriteCount());
-        if (!c.savedByUser() && place.getFavoriteCount() >= CommunityScore.FAVORITE_FROM_SAVES) {
-            reasons.add(Texts.t("Bölgede çok kaydedilen bir yer", "Saved by many people around here"));
         }
 
         // 3) Weather at the time of the visit

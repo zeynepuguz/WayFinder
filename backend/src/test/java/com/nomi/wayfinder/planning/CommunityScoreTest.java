@@ -56,19 +56,11 @@ class CommunityScoreTest {
     }
 
     @Test
-    void anAreasFavouriteNeedsEnoughPeople() {
-        assertThat(CommunityScore.isFavorite(5, 1, 0)).isFalse();
-        assertThat(CommunityScore.isFavorite(23, 5, 0)).isTrue();
-        assertThat(CommunityScore.isFavorite(20, 5, 0)).isFalse();
-        assertThat(CommunityScore.isFavorite(0, 0, 5)).isTrue();
-        assertThat(CommunityScore.isFavorite(0, 0, 4)).isFalse();
-    }
-
-    @Test
-    void savesBonusGrowsSlowlyAndStopsAtTheCap() {
-        assertThat(CommunityScore.savesBonus(0)).isZero();
-        assertThat(CommunityScore.savesBonus(5)).isBetween(4.0, 5.0);
-        assertThat(CommunityScore.savesBonus(100_000)).isEqualTo(CommunityScore.SAVES_BONUS_CAP);
+    void anAreasFavouriteNeedsEnoughPeopleRatingItWell() {
+        assertThat(CommunityScore.isFavorite(5, 1)).isFalse();
+        assertThat(CommunityScore.isFavorite(23, 5)).isTrue();
+        assertThat(CommunityScore.isFavorite(20, 5)).isFalse();
+        assertThat(CommunityScore.isFavorite(0, 0)).isFalse();
     }
 
     @Test
@@ -103,14 +95,14 @@ class CommunityScoreTest {
     }
 
     @Test
-    void aPlaceManyUsersSavedGetsALittleMoreAndSaysSo() {
-        Place popular = rated(place(1, "Kafe A", PlaceCategory.CAFE, true, 4.2, 0), 0, 0, 12);
+    void otherUsersSavesArePrivateAndChangeNothing() {
+        Place savedByMany = rated(place(1, "Kafe A", PlaceCategory.CAFE, true, 4.2, 0), 0, 0, 12);
         Place other = place(2, "Kafe B", PlaceCategory.CAFE, true, 4.2, 0);
 
-        PlaceScorer.ScoredPlace result = score(popular, false);
+        PlaceScorer.ScoredPlace result = score(savedByMany, false);
 
-        assertThat(result.score()).isGreaterThan(score(other, false).score());
-        assertThat(result.reasons()).contains("Bölgede çok kaydedilen bir yer");
+        assertThat(result.score()).isEqualTo(score(other, false).score());
+        assertThat(result.reasons()).noneMatch(r -> r.contains("kaydedilen"));
     }
 
     @Test

@@ -232,7 +232,7 @@ describe('ExplorePage popular routes and favourite places', () => {
   })
 
   it('“Favori mekanlar” is its own box, and only one box is open at a time', async () => {
-    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { district: 'Çankaya' })])
+    favoritePlaces.mockResolvedValue([place(5, 'Kızılay Kahve', { district: 'Çankaya', userRating: 4.6, userRatingCount: 12 })])
     renderPage('/explore?sehir=ankara&rotalar=1')
     await userEvent.click(await screen.findByRole('button', { name: 'Favori mekanlar' }))
 
@@ -242,6 +242,9 @@ describe('ExplorePage popular routes and favourite places', () => {
     expect(screen.getByRole('button', { name: 'Popüler rotalar' })).toHaveAttribute('aria-pressed', 'false')
     expect(await screen.findByText('Kızılay Kahve')).toBeInTheDocument()
     expect(screen.getByText('Ankara: favori mekanlar')).toBeInTheDocument()
+    // Ranked by the users' stars, which the row shows with the vote count
+    expect(screen.getByText('4.6')).toBeInTheDocument()
+    expect(screen.getByText(/· 12 oy/)).toBeInTheDocument()
     expect(favoritePlaces).toHaveBeenCalledWith('ankara', undefined)
   })
 
@@ -320,7 +323,7 @@ describe('ExplorePage popular routes and favourite places', () => {
 
   it('says so when the area has no favourite places yet', async () => {
     renderPage('/explore?sehir=izmir&favoriler=1')
-    expect(await screen.findByText('Henüz favori mekan yok')).toBeInTheDocument()
+    expect(await screen.findByText('Henüz puanlanan mekan yok')).toBeInTheDocument()
   })
 })
 

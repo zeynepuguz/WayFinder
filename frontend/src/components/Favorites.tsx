@@ -15,7 +15,8 @@ import { EmptyState, ErrorState, ListSkeleton } from './ui'
  */
 export function FavoriteRoutes({ city, district, areaName }: { city: string | null; district: string | null; areaName: string }) {
   const t = useT()
-  const routes = useAsync(() => api.communityRoutes(city ?? undefined, district ?? undefined), [city, district])
+  const routes = useAsync(() => api.communityRoutes(city ?? undefined, district ?? undefined), [city, district],
+    { cacheKey: `community-routes:${city}:${district}` })
   const [open, setOpen] = useState<string | null>(null)
   const [famous, setFamous] = useState(false)
   useEffect(() => { setOpen(null); setFamous(false) }, [city, district])
@@ -46,19 +47,26 @@ export function FavoriteRoutes({ city, district, areaName }: { city: string | nu
   )
 }
 
-/** "Favori mekanlar": places users saved, or rated 4 or better on average; most saved first. */
+/**
+ * "Favori mekanlar": the places Nomi users rated with stars, best first (Bayesian, so one 5-star vote does not beat
+ * twenty 4.8s). Saving a place is the user's own business and does not count here.
+ */
 export function FavoritePlaces({ city, district, areaName }: { city: string | null; district: string | null; areaName: string }) {
   const t = useT()
-  const places = useAsync(() => api.favoritePlaces(city ?? undefined, district ?? undefined), [city, district])
+  const places = useAsync(() => api.favoritePlaces(city ?? undefined, district ?? undefined), [city, district],
+    { cacheKey: `favorite-places:${city}:${district}` })
 
   return (
     <section className="stack">
-      <h2 className="t-headline"><MapPin size={17} style={{ verticalAlign: -3 }} /> {t(`${areaName}: favori mekanlar`, `${areaName}: favourite places`)}</h2>
+      <div className="stack-sm">
+        <h2 className="t-headline"><MapPin size={17} style={{ verticalAlign: -3 }} /> {t(`${areaName}: favori mekanlar`, `${areaName}: favourite places`)}</h2>
+        <span className="t-caption">{t('Nomi kullanıcılarının yıldız puanına göre, en yüksekten.', 'By Nomi users’ star ratings, best first.')}</span>
+      </div>
       {places.loading ? <ListSkeleton rows={3} height={96} />
         : places.error ? <ErrorState message={places.error} onRetry={() => void places.reload()} />
-          : places.data?.length ? places.data.map(place => <PlaceRow key={place.id} place={place} showDistrict={!district} />)
-            : <EmptyState icon={MapPin} title={t('Henüz favori mekan yok', 'No favourite places yet')}
-                          text={t('Kullanıcıların kaydettiği ya da yüksek puan verdiği mekanlar burada görünür.', 'Places people save or rate highly show up here.')} />}
+          : places.data?.length ? places.data.map(place => <PlaceRow key={place.id} place={place} showDistrict={!district} showVotes />)
+            : <EmptyState icon={MapPin} title={t('Henüz puanlanan mekan yok', 'No rated places yet')}
+                          text={t('Kullanıcılar mekanlara yıldız verdikçe en yüksek puanlılar burada sıralanır.', 'As people rate places, the best rated show up here.')} />}
     </section>
   )
 }

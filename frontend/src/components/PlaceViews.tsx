@@ -49,8 +49,10 @@ export function FavoriteBadge() {
 
 // Compact row for lists
 // showDistrict: city-wide lists add the district ("Kafe · Üsküdar") so same-named places can be told apart
-export function PlaceRow({ place, showDistrict }: { place: Place; showDistrict?: boolean }) {
+// showVotes: the users' own average and vote count ("★ 4.6 · 12 oy"), for lists ranked by them (Favori mekanlar)
+export function PlaceRow({ place, showDistrict, showVotes }: { place: Place; showDistrict?: boolean; showVotes?: boolean }) {
   const t = useT()
+  const votes = place.userRatingCount ?? 0
   return (
     <div className="card" style={{ padding: 0 }}>
       <Link to={`/places/${place.id}`} className="place-row card-press">
@@ -58,7 +60,9 @@ export function PlaceRow({ place, showDistrict }: { place: Place; showDistrict?:
         <div className="place-row-body">
           <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
           <div className="meta">
-            <Rating value={shownRating(place)} />
+            {showVotes && place.userRating != null
+              ? <span><Rating value={place.userRating} /> {t(`· ${votes} oy`, `· ${votes} ${votes === 1 ? 'vote' : 'votes'}`)}</span>
+              : <Rating value={shownRating(place)} />}
             <span>{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
             {place.distanceMeters != null && <span><MapPin size={12} />{formatDistance(place.distanceMeters)}</span>}
           </div>

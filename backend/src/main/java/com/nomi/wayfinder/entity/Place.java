@@ -173,9 +173,8 @@ public class Place {
     @Column(columnDefinition = "text[]", insertable = false, updatable = false)
     private List<String> communityTags = new ArrayList<>();
 
-    // Sort key "the area's favourites first": planning/CommunityScore.rating in SQL, plus a little for saves
-    @Formula("((COALESCE(rating, 3.8) * 5 + user_rating_sum) / (5.0 + user_rating_count)"
-            + " + LEAST(favorite_count, 20) * 0.02)")
+    // Sort key "the area's best rated first": planning/CommunityScore.rating in SQL (saves are private, not counted)
+    @Formula("((COALESCE(rating, 3.8) * 5 + user_rating_sum) / (5.0 + user_rating_count))")
     private double communityScore;
 
     @Column(nullable = false, updatable = false)

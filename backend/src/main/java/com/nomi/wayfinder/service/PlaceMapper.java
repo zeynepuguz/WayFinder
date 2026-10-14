@@ -96,8 +96,7 @@ public class PlaceMapper {
         response.setUserRating(CommunityScore.average(place.getUserRatingSum(), place.getUserRatingCount()));
         response.setUserRatingCount(place.getUserRatingCount());
         response.setFavoriteCount(place.getFavoriteCount());
-        response.setFavorite(CommunityScore.isFavorite(place.getUserRatingSum(), place.getUserRatingCount(),
-                place.getFavoriteCount()));
+        response.setFavorite(CommunityScore.isFavorite(place.getUserRatingSum(), place.getUserRatingCount()));
         response.setSuspect(place.isSuspect());
 
         return response;

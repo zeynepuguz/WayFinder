@@ -176,8 +176,9 @@ public class PlaceCommunityService {
     }
 
     /**
-     * "Favori mekanlar" of a district, a city (districtId null) or all Türkiye (both null): places users saved, or
-     * rated 4 or better on average; most saved first, then the users' rating (CommunityScore, in SQL).
+     * "Favori mekanlar" of a district, a city (districtId null) or all Türkiye (both null): the places Nomi users
+     * rated, best first by their stars (CommunityScore's Bayesian rating, in SQL: one 5-star vote does not beat
+     * twenty 4.8s), then by how many voted. Saving a place is the user's own business and does not count here.
      */
     @Transactional(readOnly = true)
     public List<Long> favoritePlaceIds(Long cityId, Long districtId, int limit) {
@@ -191,12 +192,11 @@ public class PlaceCommunityService {
         args.add(limit);
         return jdbc.queryForList("""
                 SELECT id FROM places
-                WHERE hidden = FALSE AND review IS NULL AND unconfirmed = FALSE
-                  AND (favorite_count > 0 OR (user_rating_count > 0 AND user_rating_sum >= 4 * user_rating_count))"""
+                WHERE hidden = FALSE AND review IS NULL AND unconfirmed = FALSE AND user_rating_count > 0"""
                 + scope + """
 
-                ORDER BY favorite_count DESC,
-                         (coalesce(rating, 3.8) * 5 + user_rating_sum) / (5.0 + user_rating_count) DESC, id
+                ORDER BY (coalesce(rating, 3.8) * 5 + user_rating_sum) / (5.0 + user_rating_count) DESC,
+                         user_rating_count DESC, id
                 LIMIT ?""", Long.class, args.toArray());
     }
 

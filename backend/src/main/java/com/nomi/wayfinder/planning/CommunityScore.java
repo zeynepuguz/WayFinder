@@ -15,13 +15,10 @@ public final class CommunityScore {
     public static final int PRIOR_VOTES = 5;
     // "Kullanıcı puanı 4.6 (12 oy)" is only shown from this many votes on; below it the number says little
     public static final int SHOWN_FROM_VOTES = 3;
-    // A place this many users saved, or this many rated this well, is one of the area's favourites
-    public static final int FAVORITE_FROM_SAVES = 5;
+    // A place this many users rated this well on average is one of the area's favourites. Saving a place is the
+    // user's own business: it counts only for that user's routes, never in public lists
     public static final int FAVORITE_FROM_VOTES = 5;
     public static final double FAVORITE_MIN_AVERAGE = 4.3;
-    // Planner bonus for saves: grows slowly (5 saves ~4.5, 20 saves ~7.6), never above the cap
-    static final double SAVES_WEIGHT = 2.5;
-    static final double SAVES_BONUS_CAP = 10;
 
     private CommunityScore() {
     }
@@ -38,14 +35,8 @@ public final class CommunityScore {
         return ratingCount <= 0 ? null : Math.round(ratingSum * 10.0 / ratingCount) / 10.0;
     }
 
-    /** "Bölgenin favorisi": at least 5 users rated it 4.3 or better on average, or at least 5 users saved it. */
-    public static boolean isFavorite(int ratingSum, int ratingCount, int favoriteCount) {
-        boolean wellRated = ratingCount >= FAVORITE_FROM_VOTES
-                && (double) ratingSum / ratingCount >= FAVORITE_MIN_AVERAGE;
-        return wellRated || favoriteCount >= FAVORITE_FROM_SAVES;
-    }
-
-    public static double savesBonus(int favoriteCount) {
-        return favoriteCount <= 0 ? 0 : Math.min(SAVES_BONUS_CAP, SAVES_WEIGHT * Math.log1p(favoriteCount));
+    /** "Bölgenin favorisi": at least 5 users rated it, 4.3 or better on average. */
+    public static boolean isFavorite(int ratingSum, int ratingCount) {
+        return ratingCount >= FAVORITE_FROM_VOTES && (double) ratingSum / ratingCount >= FAVORITE_MIN_AVERAGE;
     }
 }

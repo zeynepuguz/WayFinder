@@ -208,9 +208,24 @@ class PlaceRatingFlowTest {
     }
 
     @Test
+    void savingAPlaceDoesNotMakeItAFavouriteRatingDoes() throws Exception {
+        JsonNode user = account();
+        // Saving is the user's own business
+        savedPlaces.save(user.get("user").get("id").asLong(), cafeId);
+        JsonNode beforeRating = body(mvc.perform(get("/api/v1/places/favorites").param("city", citySlug)
+                .param("district", districtSlug).param("limit", "30")));
+        assertThat(beforeRating.findValuesAsString("id")).doesNotContain(String.valueOf(cafeId));
+
+        // Stars put it in the favourites, best rated first: alone in its district, so first there
+        rate(user, cafeId, 5).andExpect(status().isOk());
+        JsonNode district = body(mvc.perform(get("/api/v1/places/favorites").param("city", citySlug)
+                .param("district", districtSlug).param("limit", "30")));
+        assertThat(district.get(0).get("id").asLong()).isEqualTo(cafeId);
+    }
+
+    @Test
     void favouritePlacesForTheDistrictTheCityAndAllTurkey() throws Exception {
-        long userId = account().get("user").get("id").asLong();
-        savedPlaces.save(userId, cafeId);
+        rate(account(), cafeId, 5).andExpect(status().isOk());
 
         for (String[] scope : new String[][]{{citySlug, districtSlug}, {citySlug, null}, {null, null}}) {
             var request = get("/api/v1/places/favorites").param("limit", "30");
