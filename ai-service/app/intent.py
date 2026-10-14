@@ -13,7 +13,7 @@ from typing import Protocol
 
 from . import usage
 from .config import Settings, openai_client
-from .schemas import ALLOWED_INTERESTS, AssistantIntent, IntentRequest, IntentType, ReplanType
+from .schemas import ALLOWED_INTERESTS, AssistantIntent, IntentRequest, IntentType, PlanParams, ReplanType
 
 log = logging.getLogger(__name__)
 
@@ -37,7 +37,9 @@ interests, enums) are always the same English keys below, whatever language the 
 
 Intent types:
 - PLAN_ROUTE: the user wants a new day plan (mentions budget, group size, stops, "plan", "ne yapabiliriz",
-  "plan a day in Kadıköy", "what can we do", ...).
+  "plan a day in Kadıköy", "what can we do", ...). Asking for a ROUTE is always PLAN_ROUTE, also with "öner":
+  "İstanbul için bir rota öner", "bize rota önerir misin", "suggest a route in Bursa". Fill plan even when the
+  user named nothing else (empty stops / interests, nulls).
 - REPLAN: the user wants to change their CURRENT route (only if context.hasRoute is true):
   TIRED ("yorulduk" / "we're tired"), WEATHER_CHANGED ("yağmur başladı" / "it started raining"),
   LESS_WALKING ("daha az yürüyelim" / "less walking"), REMOVE_STOP ("burayı çıkar" / "remove this"),
@@ -45,6 +47,7 @@ Intent types:
   ADD_INTEREST ("biraz daha tarihi yer ekle" / "add more historical places"),
   RUNNING_LATE ("geciktik, saatleri kaydır" / "we're running late"). One message may contain several edits, in order.
 - RECOMMEND: asks for a suggestion of one kind of place nearby ("yakında kahve öner" / "recommend a café nearby"). Set recommendType.
+  Never for a route ("rota"): that is PLAN_ROUTE.
 - WEATHER: asks about the weather.
 - SHOW_ROUTE: asks to see the current route / next stop.
 - UNKNOWN: anything else (greetings, unrelated questions).
@@ -159,8 +162,10 @@ def sanitize(intent: AssistantIntent, request: IntentRequest, today: date | None
     # (REPLAN without a route is fine: the backend answers "you have no route yet")
     if intent.type == IntentType.REPLAN and not intent.edits:
         intent.type = IntentType.UNKNOWN
+    # "İstanbul için bir rota öner" names no budget, stops or group: still a plan, with the user's defaults
     if intent.type == IntentType.PLAN_ROUTE and intent.plan is None:
-        intent.type = IntentType.UNKNOWN
+        intent.plan = PlanParams(partySize=None, budget=None, walkingTolerance=None, stops=[], interests=[],
+                                 startTime=None)
 
     intent.source = "ai"
     return intent

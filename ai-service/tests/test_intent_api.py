@@ -252,3 +252,15 @@ def test_sentry_never_sends_messages_or_photos(monkeypatch):
     assert captured["send_default_pii"] is False
     assert captured["max_request_body_size"] == "never"
     assert captured["include_local_variables"] is False
+
+
+def test_a_route_asked_for_without_details_stays_a_plan():
+    intent = AssistantIntent(type=IntentType.PLAN_ROUTE, plan=None, edits=[], recommendType=None, source=None,
+                             area="İstanbul")
+    request = IntentRequest(message="İstanbul için bir rota öner", context=IntentContext(hasRoute=False, remainingStops=[]))
+
+    clean = sanitize(intent, request)
+
+    assert clean.type == IntentType.PLAN_ROUTE
+    assert clean.plan is not None and clean.plan.stops == [] and clean.plan.budget is None
+    assert clean.area == "İstanbul"

@@ -142,6 +142,13 @@ public class AssistantService {
         }
 
         AssistantIntent intent = intentParser.parse(request.message(), context(route));
+        // We only ask "nereden başlayalım?" / "şimdi mi, başka gün mü?" while planning a route: the answer finishes that
+        // plan, whatever the parser makes of the request read again ("İstanbul için bir rota öner" once came back as
+        // RECOMMEND, and the user got lunch places around their own position)
+        if (pending != null && intent.type() != AssistantIntent.IntentType.PLAN_ROUTE) {
+            intent = new AssistantIntent(AssistantIntent.IntentType.PLAN_ROUTE, intent.plan(), List.of(), null,
+                    intent.source(), intent.date(), intent.area());
+        }
 
         AssistantReply reply = switch (intent.type()) {
             case PLAN_ROUTE -> planRoute(userId, request, intent, pending);
@@ -272,6 +279,15 @@ public class AssistantService {
         return name.replaceAll("[.!?,]", " ").replaceAll("\\s+", " ").trim();
     }
 
+    /** "Esenler otogar" says more than "Esenler"; "Kadıköy'den" or "kadıköy" does not. */
+    static boolean namesMoreThan(String answer, String areaName) {
+        return words(answer) > words(areaName);
+    }
+
+    private static long words(String text) {
+        return text == null ? 0 : java.util.Arrays.stream(text.trim().split("\\s+")).filter(w -> !w.isBlank()).count();
+    }
+
     // Breakfast asked for without a day once breakfast time is over: the user may mean tomorrow, or a late breakfast now
     static final LocalTime BREAKFAST_OVER = LocalTime.of(11, 30);
 
@@ -331,12 +347,17 @@ public class AssistantService {
                 Optional<NamedArea> answered = areaResolver.resolve(null, name, refLat, refLon)
                         .filter(a -> planArea.isEmpty() || a.kind() != NamedArea.Kind.CITY
                                 || !a.name().equals(planArea.get().name()));
-                Optional<RouteStartService.Start> place = answered.isPresent() || startService == null
-                        ? Optional.empty() : startService.placeNamed(name, refLat, refLon);
-                if (answered.isPresent()) {
-                    area = answered;
-                } else if (place.isPresent()) {
+                // "Esenler otogar": more than the district's name, so the place itself first (searched around the
+                // district), the district when it is not found. A bare "Kadıköy" is the district
+                boolean placeFirst = answered.isEmpty() || namesMoreThan(name, answered.get().name());
+                double placeLat = answered.map(NamedArea::latitude).orElse(refLat);
+                double placeLon = answered.map(NamedArea::longitude).orElse(refLon);
+                Optional<RouteStartService.Start> place = !placeFirst || startService == null
+                        ? Optional.empty() : startService.placeNamed(name, placeLat, placeLon);
+                if (place.isPresent()) {
                     named = new StartPlace(place.get().latitude(), place.get().longitude(), place.get().label());
+                } else if (answered.isPresent()) {
+                    area = answered;
                 } else {
                     startNote = composer.startNotFound(name);
                 }

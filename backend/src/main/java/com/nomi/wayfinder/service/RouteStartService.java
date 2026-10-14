@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -128,7 +129,47 @@ public class RouteStartService {
         List<Start> found = jdbc.query(PLACE_NAMED,
                 (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
                 longitude, latitude, PLACE_SEARCH_RADIUS_METERS, "%" + text + "%", text, longitude, latitude);
-        return found.stream().findFirst();
+        if (!found.isEmpty()) {
+            return found.stream().findFirst();
+        }
+        return placeWithWords(text, latitude, longitude);
+    }
+
+    /**
+     * "Esenler otogarı": no place is called that, but "Sarı Fırın Otogar Esenler" stands at the bus station. A place
+     * whose name has every word (any order, Turkish case endings cut: "otogarı" finds "otogar"), nearest first.
+     */
+    private Optional<Start> placeWithWords(String text, double latitude, double longitude) {
+        List<String> stems = Arrays.stream(text.split("\\s+"))
+                .filter(w -> w.length() >= 3)
+                .map(RouteStartService::stem)
+                .distinct()
+                .limit(4)
+                .toList();
+        if (stems.size() < 2) {
+            return Optional.empty();
+        }
+        StringBuilder sql = new StringBuilder("""
+                SELECT p.name, ST_Y(p.location::geometry) AS lat, ST_X(p.location::geometry) AS lon
+                FROM places p
+                WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?)
+                  AND NOT p.hidden AND NOT p.unconfirmed""");
+        List<Object> args = new ArrayList<>(List.of(longitude, latitude, PLACE_SEARCH_RADIUS_METERS));
+        for (String stem : stems) {
+            sql.append(" AND lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) LIKE ?");
+            args.add("%" + stem + "%");
+        }
+        sql.append(" ORDER BY ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography)) LIMIT 1");
+        args.add(longitude);
+        args.add(latitude);
+        return jdbc.query(sql.toString(),
+                (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
+                args.toArray()).stream().findFirst();
+    }
+
+    // A word without its likely Turkish ending: "otogari" -> "otoga", "meydani" -> "meyda" (only for long words)
+    static String stem(String word) {
+        return word.length() >= 6 ? word.substring(0, word.length() - 2) : word;
     }
 
     /**
