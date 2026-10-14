@@ -7,7 +7,7 @@ import { useT } from '../lib/i18n'
 // /iletisim, /kosullar, /gizlilik: the about and legal pages (Google Play needs the privacy policy at a public URL)
 
 const OWNER = 'Zeynep Uğuz'
-const UPDATED = '8 Ekim 2026'
+const UPDATED = '14 Ekim 2026'
 
 function Email() {
   return SUPPORT_EMAIL ? <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> : <>[DESTEK E-POSTASI]</>
@@ -110,7 +110,15 @@ function Terms() {
           <li>Yalnızca kendi çektiğin ya da yayınlama hakkına sahip olduğun fotoğrafları yükleyebilirsin. Fotoğraf
             yükleyerek Nomi'ye, bu fotoğrafı uygulamada ve web sitesinde ilgili mekan veya bölge sayfasında gösterme
             amacıyla ücretsiz, münhasır olmayan, dünya çapında ve sen silene kadar süren bir kullanım izni verirsin.
-            Fotoğrafın telif hakkı sende kalır. Yayınlanan fotoğrafın yanında adının yalnızca ilk kısmı görünür.</li>
+            Fotoğrafın telif hakkı sende kalır. Yayınlanan fotoğrafın yanında gerçek adın değil, kullanıcı adın ve
+            (eklediysen) profil fotoğrafın görünür.</li>
+          <li>Her kullanıcının bir kullanıcı adı vardır; kullanıcı adına dokunan herkes herkese açık profilini (kullanıcı
+            adı, profil fotoğrafı, Nomi'ye katıldığın ay ve eklediğin onaylı fotoğraflar) görebilir. Başka bir kişiyi,
+            markayı veya Nomi'yi taklit eden ya da hakaret içeren kullanıcı adları kullanılamaz; böyle bir ad
+            değiştirilebilir.</li>
+          <li>Profil fotoğrafı eklemek isteğe bağlıdır. Yalnızca kendine ait ya da kullanma hakkına sahip olduğun bir
+            görsel kullanabilirsin; aşağıdaki yasak içerik kuralları profil fotoğrafları için de geçerlidir ve uygun
+            olmayan profil fotoğrafları kaldırılır.</li>
           <li>Yasak içerik: çıplaklık veya müstehcenlik, şiddet, nefret söylemi, yasa dışı faaliyetler, başkalarına ait
             kişisel veriler (kimlik, plaka, ekran), insanların ön planda olduğu fotoğraflar, ekran görüntüleri, reklam
             ve başkasına ait telifli görseller. Küfür ve hakaret içeren öneriler gönderilmez. Kurallara aykırı içerik
@@ -150,8 +158,10 @@ function Privacy() {
         Kişisel Verilerin Korunması Kanunu'na (KVKK) uygun olarak işlenir.</p>
       <Section title="1. Topladığımız veriler">
         <ul>
-          <li><strong>Hesap bilgileri:</strong> e-posta adresin, adın ve şifren. Şifren yalnızca geri çevrilemez
-            biçimde (hash) saklanır.</li>
+          <li><strong>Hesap bilgileri:</strong> e-posta adresin, adın ve soyadın, kullanıcı adın ve şifren. Şifren
+            yalnızca geri çevrilemez biçimde (hash) saklanır.</li>
+          <li><strong>Profil fotoğrafı (isteğe bağlı):</strong> eklersen kare olarak kırpılıp yeniden kaydedilir;
+            içindeki konum, tarih ve cihaz bilgileri silinir. Profil fotoğrafı hiçbir hizmet sağlayıcıya gönderilmez.</li>
           <li><strong>Tercihler:</strong> ilgi alanların, bütçen, kişi sayın ve yürüyüş tercihin.</li>
           <li><strong>Konum:</strong> izin verirsen yakındaki mekanları göstermek ve rota planlamak için cihazının konumu
             kullanılır. Konum sürekli izlenmez; yalnızca uygulama açıkken ve bir istek yaptığında gönderilir.
@@ -168,13 +178,18 @@ function Privacy() {
             kayıtları kısa süreli tutulur.</li>
         </ul>
         <p>Durak hatırlatıcıları telefonunda yerel bildirim olarak kurulur; bunun için sunucuya ek veri gönderilmez.</p>
+        <p><strong>Herkese açık olanlar:</strong> kullanıcı adın, profil fotoğrafın, Nomi'ye katıldığın ay ve eklediğin
+          onaylı fotoğraflar (hangi mekana veya bölgeye ait oldukları ve sayıları) diğer kullanıcılara ve web sitesini
+          ziyaret edenlere görünür. Adın, soyadın, e-posta adresin ve konumun hiçbir zaman herkese açık gösterilmez.
+          Gruptaki kişiler grup planlarında görünen adını görür (5. madde, Kullanım Koşulları).</p>
       </Section>
       <Section title="2. Verileri neden kullanıyoruz">
         <ul>
           <li>Hesabını oluşturmak, giriş yapmanı ve şifreni sıfırlamanı sağlamak,</li>
           <li>rota ve mekan önerileri sunmak, rotanı hava durumuna, saate ve isteklerine göre yeniden düzenlemek,</li>
           <li>grup planlarında rotayı ve oyları gruptakilere göstermek,</li>
-          <li>yüklediğin fotoğrafları yayınlamadan önce doğrulamak ve onaylananları göstermek,</li>
+          <li>yüklediğin fotoğrafları yayınlamadan önce doğrulamak ve onaylananları kullanıcı adın ve profil
+            fotoğrafınla birlikte göstermek,</li>
           <li>mekan bildirimlerini ve önerileri değerlendirmek, kapanmış mekanları kaldırmak,</li>
           <li>satın aldığın paketi doğrulamak, süresini yönetmek ve iadeleri işlemek,</li>
           <li>hizmetin güvenliğini sağlamak ve kötüye kullanımı engellemek.</li>
@@ -186,8 +201,8 @@ function Privacy() {
           <li><strong>OpenAI:</strong> asistana yazdığın mesajın metni ve rotandaki mekan adları, mesajın anlamını
             çıkarmak için gönderilir; e-posta adresin, adın ve konumun gönderilmez. Fotoğraf yüklersen, fotoğrafın
             küçültülmüş ve üst verileri silinmiş bir kopyası mekanın adıyla birlikte içerik kontrolü için gönderilir.</li>
-          <li><strong>Google Places:</strong> bir mekanın hâlâ açık olup olmadığını kontrol etmek için mekanın adı ve
-            konumu gönderilir; senin hesap bilgilerin veya konumun gönderilmez.</li>
+          <li><strong>Google Places:</strong> bir mekanın hâlâ açık olup olmadığını kontrol etmek için mekanın adı,
+            ilçesi, şehri ve konumu gönderilir; senin hesap bilgilerin veya konumun gönderilmez.</li>
           <li><strong>Google Play:</strong> satın almaların doğrulanması ve iadelerin takibi için.</li>
           <li><strong>Open-Meteo:</strong> hava durumu için konum (enlem/boylam) gönderilir; hesap bilgisi gönderilmez.</li>
           <li><strong>Harita sağlayıcısı:</strong> cihazın harita görsellerini doğrudan bu sağlayıcıdan indirir.</li>
@@ -200,11 +215,13 @@ function Privacy() {
       <Section title="4. Saklama süresi ve hesap silme">
         <p>Verilerin hesabın açık olduğu sürece saklanır. Uygulamada Profil → Hesabımı sil ile hesabını istediğin zaman
           silebilirsin; hesabınla birlikte rotaların, grup üyeliklerin ve oyların, kaydettiklerin, mesajların,
-          tercihlerin, fotoğrafların, bildirimlerin ve satın alma kayıtların kalıcı olarak silinir. Gönderdiğin öneriler
+          tercihlerin, fotoğrafların, profil fotoğrafın, bildirimlerin ve satın alma kayıtların kalıcı olarak silinir. Gönderdiğin öneriler
           hesabından ayrılarak saklanabilir. Google Play'in tuttuğu sipariş kayıtları Google'ın kendi politikalarına
           tabidir. Uygulamaya erişemiyorsan silme talebini <Email /> adresine gönderebilirsin.</p>
         <p>Her mekan ve bölge için yalnızca en son onaylanan 10 fotoğraf saklanır. Reddedilen fotoğrafların dosyaları
-          7 gün, sonuç kayıtları 30 gün sonra silinir.</p>
+          7 gün, sonuç kayıtları 30 gün sonra silinir. Profil fotoğrafın sen kaldırana, değiştirene ya da hesabını
+          silene kadar saklanır; kaldırdığında dosyası hemen silinir. Kullanıcı adını Profil'den istediğin zaman
+          değiştirebilirsin.</p>
       </Section>
       <Section title="5. Güvenlik">
         <p>Bağlantılar HTTPS ile şifrelenir, şifreler hash'lenerek saklanır ve sunucu erişimi sınırlandırılır. Hiçbir
