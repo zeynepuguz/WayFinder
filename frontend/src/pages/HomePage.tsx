@@ -1,11 +1,13 @@
 import {
-  ArrowRight, ArrowUp, ChevronRight, Cloud, Coffee, Crown, Map as MapIcon, MapPin, Navigation, Route as RouteIcon, Search, UserRound,
-  Waves, Wallet, type LucideIcon,
+  ArrowRight, ArrowUp, ChevronDown, ChevronRight, Cloud, Coffee, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Route as RouteIcon,
+  Search, Sunset, UserRound, Wallet, type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { LEGAL_PATHS } from '../lib/legal'
 import { api } from '../api'
-import type { PlaceCategory } from '../api/types'
+import type { City, PlaceCategory } from '../api/types'
+import { CitySheet, DistrictSheet } from '../components/AreaSheets'
 import { useGate } from '../components/gate'
 import { HScroll } from '../components/HScroll'
 import { PlaceCard } from '../components/PlaceViews'
@@ -17,45 +19,73 @@ import { locationLabel, useUserLocation } from '../context/LocationContext'
 import { CATEGORY_LABELS, isOpenRoute, locativeTr, STOP_TYPE_LABELS, todayIso } from '../lib/format'
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
+import { useDistricts } from '../lib/districts'
+import { setHomeArea, useHomeArea } from '../lib/homeArea'
 import { locale, useT, type Translate } from '../lib/i18n'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 
-// Ready-made ideas: tapping one asks the assistant (paid) with this prompt
-const ideas = (t: Translate): { title: string; text: string; prompt: string; icon: LucideIcon }[] => [
-  {
-    title: t('Kahve & Tatlı Turu', 'Coffee & Dessert Tour'),
-    text: t('Nitelikli kahve ve tarihi pastaneler', 'Specialty coffee and historic patisseries'),
-    prompt: t('Kahve ve tatlı ağırlıklı, az yürümeli bir rota planla', 'Plan a route focused on coffee and desserts, with little walking'),
-    icon: Coffee,
-  },
-  {
-    title: t('Uygun Bütçeli Gün', 'Day on a Budget'),
-    text: t('2 kişi, 1000 TL ile tam gün', 'A full day for 2 with 1000 TL'),
-    prompt: t('2 kişiyiz, 1000 TL bütçemiz var, uygun bütçeli bir günlük gezi planla', 'We are 2 people with a 1000 TL budget, plan an affordable day trip'),
-    icon: Wallet,
-  },
-  {
-    title: t('Moda’da Gün Batımı', 'Sunset in Moda'),
-    text: t('Sahil yürüyüşü, dondurma, akşam yemeği', 'Seaside walk, ice cream, dinner'),
-    prompt: t('Akşamüstü Moda sahilinde yürüyüş, tatlı ve akşam yemeği içeren bir rota planla', 'Plan an evening route with a walk along the Moda seafront, dessert and dinner'),
-    icon: Waves,
-  },
-]
+/**
+ * Ready-made ideas: tapping one asks the assistant (paid) with this prompt, for the place Ana Sayfa is about.
+ * where = "Kocaeli İzmit’te" / "in İzmit, Kocaeli" for a picked place; null = the device location (the assistant
+ * already plans from there).
+ */
+const ideas = (t: Translate, where: { tr: string; en: string } | null): { title: string; text: string; prompt: string; icon: LucideIcon }[] => {
+  const tr = (text: string) => (where ? `${where.tr} ${text.charAt(0).toLocaleLowerCase('tr')}${text.slice(1)}` : text)
+  const en = (text: string) => (where ? `${text} ${where.en}` : text)
+  return [
+    {
+      title: t('Kahve & Tatlı Turu', 'Coffee & Dessert Tour'),
+      text: t('Nitelikli kahve ve tatlıcılar', 'Specialty coffee and dessert shops'),
+      prompt: t(tr('Kahve ve tatlı ağırlıklı, az yürümeli bir rota planla'), en('Plan a route focused on coffee and desserts, with little walking')),
+      icon: Coffee,
+    },
+    {
+      title: t('Tarih & Kültür Günü', 'History & Culture Day'),
+      text: t('Müzeler, tarihi yerler ve aralarda mola', 'Museums, historic sights and breaks in between'),
+      prompt: t(tr('Tarihi yerler ve müzeler ağırlıklı bir günlük rota planla'), en('Plan a day route focused on historic sights and museums')),
+      icon: Landmark,
+    },
+    {
+      title: t('Akşamüstü Yürüyüşü', 'Evening Walk'),
+      text: t('Yürüyüş, tatlı ve akşam yemeği', 'A walk, dessert and dinner'),
+      prompt: t(tr('Akşamüstü yürüyüş, tatlı ve akşam yemeği içeren bir rota planla'), en('Plan an evening route with a walk, dessert and dinner')),
+      icon: Sunset,
+    },
+  ]
+}
 
 const CATEGORIES: PlaceCategory[] = ['CAFE', 'RESTAURANT', 'DESSERT', 'MUSEUM', 'PARK', 'ATTRACTION']
 
 export function HomePage() {
   const { user, hasAccess } = useAuth()
   const location = useUserLocation()
-  const { city, citySlug } = useCity()
+  const cityState = useCity()
   const navigate = useNavigate()
   const gate = useGate()
   const t = useT()
 
+  // Ana Sayfa's own place: the device location, or a city / district picked here (Keşfet's choice never changes it)
+  const area = useHomeArea()
+  const detected = useAsync(() => api.cityAt(location.latitude, location.longitude), [location.latitude, location.longitude],
+    { cacheKey: `city-at:${location.latitude}:${location.longitude}` })
+  const point = area ? area.district ?? area.city : location
+  const areaCity: City | null = area?.city ?? (detected.data && detected.data.placeCount > 0 ? detected.data : null)
+  const areaName = area ? (area.district ? `${area.district.name}, ${area.city.name}` : area.city.name) : detected.data?.name ?? null
+  const where = area
+    ? area.district
+      ? { tr: `${area.city.name} ${locativeTr(area.district.name)}`, en: `in ${area.district.name}, ${area.city.name}` }
+      : { tr: locativeTr(area.city.name), en: `in ${area.city.name}` }
+    : null
+
+  // Picking a place: the city first, then "Genel" (the whole city) or one of its districts
+  const [cityOpen, setCityOpen] = useState(false)
+  const [pickedCity, setPickedCity] = useState<City | null>(null)
+  const districts = useDistricts(pickedCity?.slug ?? null)
+
   const { data, error, loading, reload } = useAsync(
-    () => api.home(location.latitude, location.longitude),
-    [location.latitude, location.longitude, user?.id],
-    { cacheKey: `home:${user?.id ?? 0}:${location.latitude}:${location.longitude}` },
+    () => api.home(point.latitude, point.longitude),
+    [point.latitude, point.longitude, user?.id],
+    { cacheKey: `home:${user?.id ?? 0}:${point.latitude}:${point.longitude}` },
   )
 
   const hour = new Date().getHours()
@@ -90,18 +120,35 @@ export function HomePage() {
           </div>
         </div>
 
-        <button className="location-chip" onClick={location.refresh} style={{ alignSelf: 'flex-start' }}>
-          <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
-          <Navigation size={13} /> {locationLabel(location.source)}
-        </button>
+        <div className="row wrap" style={{ gap: 8 }}>
+          {area ? (
+            <button className="location-chip" onClick={() => setCityOpen(true)} aria-label={`${t('Yer seç', 'Choose a place')}: ${areaName}`}>
+              <MapPin size={13} /> {areaName}
+            </button>
+          ) : (
+            <button className="location-chip" onClick={location.refresh}>
+              <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
+              <Navigation size={13} /> {locationLabel(location.source)}
+            </button>
+          )}
+          {area ? (
+            <button className="chip-link" onClick={() => setHomeArea(null)}>
+              <Navigation size={14} /> {t('Konumumu kullan', 'Use my location')}
+            </button>
+          ) : (
+            <button className="chip-link" onClick={() => setCityOpen(true)}>
+              <MapPin size={14} /> {t('Yer seç', 'Choose a place')} <ChevronDown size={14} />
+            </button>
+          )}
+        </div>
 
         <div className="stack-sm">
-          {city && <span className="t-overline">{city.name}</span>}
+          {areaName && <span className="t-overline">{areaName}</span>}
           <h1 className="t-display">
             {user
               ? `${greeting}, ${user.displayName.split(' ')[0]}`
-              : city
-                ? t(`${locativeTr(city.name)} bugün ne yapsak?`, `What shall we do in ${city.name} today?`)
+              : areaCity
+                ? t(`${locativeTr((area?.district ?? areaCity).name)} bugün ne yapsak?`, `What shall we do in ${(area?.district ?? areaCity).name} today?`)
                 : t('Bugün ne yapsak?', 'What shall we do today?')}
           </h1>
         </div>
@@ -178,7 +225,7 @@ export function HomePage() {
           {!hasAccess && <span className="badge badge-premium"><Crown size={12} /> Premium</span>}
         </div>
         <div className="stack-sm">
-          {ideas(t).map(({ title, text, prompt, icon: Icon }) => (
+          {ideas(t, where).map(({ title, text, prompt, icon: Icon }) => (
             <button key={title} className="card card-press idea-row" onClick={() => ask(prompt)}>
               <span className="idea-icon"><Icon size={20} /></span>
               <span className="grow">
@@ -189,18 +236,27 @@ export function HomePage() {
             </button>
           ))}
           {/* Ready-made routes of the chosen city (free to look at; starting one needs Premium) */}
-          <Link to={`/explore?${citySlug ? `sehir=${citySlug}&` : ''}rotalar=1`} className="card card-press idea-row">
+          <Link to={`/explore?${areaCity ? `sehir=${areaCity.slug}&${area?.district ? `ilce=${area.district.slug}&` : ''}` : ''}rotalar=1`} className="card card-press idea-row">
             <span className="idea-icon"><RouteIcon size={20} /></span>
             <span className="grow">
               <span className="idea-title">{t('Popüler rotalar', 'Popular routes')}</span>
               <span className="t-caption">
-                {city
-                  ? t(`${city.name} için hazır rotalar: tarih, lezzet, kahve, parklar`, `Ready-made routes for ${city.name}: history, food, coffee, parks`)
-                  : t('Hazır rotalar: tarih, lezzet, kahve, parklar', 'Ready-made routes: history, food, coffee, parks')}
+                {areaName
+                  ? t(`${areaName} için Nomi kullanıcılarının beğendiği rotalar`, `Routes Nomi users liked in ${areaName}`)
+                  : t('Nomi kullanıcılarının beğendiği rotalar', 'Routes Nomi users liked')}
               </span>
             </span>
             <ChevronRight size={20} className="muted" />
           </Link>
+          {/* Needs prices for most places first: shown, not offered yet */}
+          <div className="card idea-row idea-soon" aria-disabled="true">
+            <span className="idea-icon"><Wallet size={20} /></span>
+            <span className="grow">
+              <span className="idea-title">{t('Uygun Bütçeli Gün', 'Day on a Budget')}</span>
+              <span className="t-caption">{t('Yeterli fiyat bilgisi toplanınca açılacak', 'Opens once we have enough price information')}</span>
+            </span>
+            <span className="badge">{t('Yakında', 'Soon')}</span>
+          </div>
         </div>
       </section>
 
@@ -235,6 +291,14 @@ export function HomePage() {
           <MapPin size={12} style={{ verticalAlign: -1 }} /> {t('Nomi Türkiye genelinde hizmet veriyor.', 'Nomi works across Türkiye.')}
         </p>
       )}
+
+      <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={area?.city.slug ?? null} state={cityState}
+                 myLocation={{ selected: area === null, onChoose: () => { setHomeArea(null); setCityOpen(false) } }}
+                 onChoose={c => { setCityOpen(false); setPickedCity(c) }} />
+      <DistrictSheet open={pickedCity !== null} onClose={() => setPickedCity(null)} districts={districts}
+                     selected={area && pickedCity && area.city.slug === pickedCity.slug ? area.district?.slug ?? null : null}
+                     allLabel={pickedCity ? t(`Genel – tüm ${pickedCity.name}`, `All of ${pickedCity.name}`) : undefined}
+                     onChoose={d => { if (pickedCity) setHomeArea({ city: pickedCity, district: d }); setPickedCity(null) }} />
 
       {/* Website only: about and legal pages */}
       {!isNativeApp() && (

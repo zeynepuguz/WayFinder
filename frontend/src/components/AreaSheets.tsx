@@ -1,4 +1,4 @@
-import { Check, MapPin, Search } from 'lucide-react'
+import { Check, MapPin, Navigation, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { City, District } from '../api/types'
 import type { useCity } from '../context/CityContext'
@@ -10,12 +10,14 @@ import { ErrorState, Sheet, Skeleton } from './ui'
 // Every button is type="button": the sheets may be rendered inside a <form> and must never submit it.
 
 // Bottom sheet: search field, "All districts" and every district with its number of places
-export function DistrictSheet({ open, onClose, selected, districts, onChoose }: {
+export function DistrictSheet({ open, onClose, selected, districts, onChoose, allLabel }: {
   open: boolean
   onClose: () => void
   selected: string | null
   districts: ReturnType<typeof useDistricts>
   onChoose: (district: District | null) => void
+  // The first row (the whole city); "Tüm ilçeler" when not given
+  allLabel?: string
 }) {
   const t = useT()
   const [search, setSearch] = useState('')
@@ -41,7 +43,7 @@ export function DistrictSheet({ open, onClose, selected, districts, onChoose }: 
           {!search.trim() && (
             <button type="button" className="list-item" aria-pressed={selected == null} onClick={() => onChoose(null)}>
               <span className="list-item-icon"><MapPin size={18} /></span>
-              <span className="grow" style={{ fontWeight: 700 }}>{t('Tüm ilçeler', 'All districts')}</span>
+              <span className="grow" style={{ fontWeight: 700 }}>{allLabel ?? t('Tüm ilçeler', 'All districts')}</span>
               {selected == null && <Check size={18} color="var(--brand-ink)" />}
             </button>
           )}
@@ -67,7 +69,7 @@ export function DistrictSheet({ open, onClose, selected, districts, onChoose }: 
 }
 
 // Bottom sheet: search field and all 81 cities; cities without places yet are shown as "coming soon"
-export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey }: {
+export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey, myLocation }: {
   open: boolean
   onClose: () => void
   selected: string | null
@@ -75,6 +77,8 @@ export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey 
   onChoose: (city: City) => void
   // "Tüm Türkiye" on top (Keşfet > Popüler); absent where a city is needed
   allTurkey?: { selected: boolean; onChoose: () => void }
+  // "Konumumu kullan" on top (Ana Sayfa): back to the device location
+  myLocation?: { selected: boolean; onChoose: () => void }
 }) {
   const t = useT()
   const [search, setSearch] = useState('')
@@ -101,6 +105,13 @@ export function CitySheet({ open, onClose, selected, state, onChoose, allTurkey 
             <div className="stack" style={{ padding: 12 }}>
               {[0, 1, 2, 3].map(i => <Skeleton key={i} height={40} radius={12} />)}
             </div>
+          )}
+          {myLocation && !search.trim() && (
+            <button type="button" className="list-item" aria-pressed={myLocation.selected} onClick={myLocation.onChoose}>
+              <span className="list-item-icon"><Navigation size={18} /></span>
+              <span className="grow" style={{ fontWeight: 700 }}>{t('Konumumu kullan', 'Use my location')}</span>
+              {myLocation.selected && <Check size={18} color="var(--brand-ink)" />}
+            </button>
           )}
           {allTurkey && !search.trim() && (
             <button type="button" className="list-item" aria-pressed={allTurkey.selected} onClick={allTurkey.onChoose}>
