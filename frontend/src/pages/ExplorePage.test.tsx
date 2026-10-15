@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { StrictMode } from 'react'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 import type { City, District, Page, Place, PopularRoute } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { place } from '../test/fixtures'
@@ -43,7 +44,8 @@ vi.mock('../api', () => ({
 const liveMapProps = vi.fn()
 vi.mock('../components/LiveMap', () => ({ LiveMap: (props: unknown) => { liveMapProps(props); return null } }))
 vi.mock('../components/RouteMap', () => ({ RouteMap: () => <div data-testid="route-map" /> }))
-vi.mock('../context/LocationContext', () => ({ useUserLocation: () => ({ latitude: 40.99, longitude: 29.02 }) }))
+let userLocation = { latitude: 40.99, longitude: 29.02 }
+vi.mock('../context/LocationContext', () => ({ useUserLocation: () => userLocation }))
 let auth = { user: null as null | { id: number }, hasAccess: false }
 vi.mock('../context/AuthContext', () => ({ useAuth: () => auth }))
 const setCity = vi.fn()
@@ -396,5 +398,94 @@ describe('ExplorePage back navigation', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
     expect(searchPlaces.mock.calls.length).toBe(calls)
     scrollTo.mockRestore()
+  })
+
+  it('back from a place on the 2nd page shows pages 1-2 as they were, not page 1 again', async () => {
+    searchPlaces
+      .mockResolvedValueOnce(page([place(1, 'Moda Kahve'), place(2, 'Yeldeğirmeni Fırın')], 0, 3))
+      .mockResolvedValueOnce(page([place(3, 'Kuzguncuk Çay'), place(4, 'Fenerbahçe Parkı')], 1, 3))
+    function Back() {
+      const navigate = useNavigate()
+      return <button type="button" onClick={() => navigate(-1)}>Geri</button>
+    }
+    // StrictMode runs effects twice, as any later re-render can: the restored list must survive it
+    render(
+      <StrictMode>
+        <MemoryRouter initialEntries={['/explore?sehir=istanbul&ilce=kadikoy']}>
+          <Routes>
+            <Route path="/explore" element={<ExplorePage />} />
+            <Route path="/places/:id" element={<Back />} />
+          </Routes>
+        </MemoryRouter>
+      </StrictMode>,
+    )
+    await userEvent.click(await screen.findByRole('button', { name: 'Daha fazla göster' }))
+    await userEvent.click(await screen.findByRole('link', { name: /Kuzguncuk Çay/ }))
+    const calls = searchPlaces.mock.calls.length
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Geri' }))
+
+    expect(await screen.findByText('Kuzguncuk Çay')).toBeInTheDocument()
+    expect(screen.getByText('Moda Kahve')).toBeInTheDocument()
+    await new Promise(resolve => setTimeout(resolve, 50))
+    expect(screen.getByText('Fenerbahçe Parkı')).toBeInTheDocument()
+    // not reloaded from the first page; the 3rd page is still one tap away
+    expect(searchPlaces.mock.calls.length).toBe(calls)
+    expect(screen.getByRole('button', { name: 'Daha fazla göster' })).toBeInTheDocument()
+  })
+
+  it('a late GPS fix does not throw a city list with more pages back to page 1', async () => {
+    searchPlaces
+      .mockResolvedValueOnce(page([place(1, 'Moda Kahve')], 0, 3))
+      .mockResolvedValueOnce(page([place(3, 'Kuzguncuk Çay')], 1, 3))
+    const ui = <MemoryRouter initialEntries={['/explore?sehir=istanbul&ilce=kadikoy']}><ExplorePage /></MemoryRouter>
+    const { rerender } = render(ui)
+    await userEvent.click(await screen.findByRole('button', { name: 'Daha fazla göster' }))
+    expect(await screen.findByText('Kuzguncuk Çay')).toBeInTheDocument()
+    const calls = searchPlaces.mock.calls.length
+
+    // The phone's GPS answers seconds after the app opened
+    userLocation = { latitude: 41.02, longitude: 29.1 }
+    rerender(ui)
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    expect(searchPlaces.mock.calls.length).toBe(calls)
+    expect(screen.getByText('Kuzguncuk Çay')).toBeInTheDocument()
+    userLocation = { latitude: 40.99, longitude: 29.02 }
+  })
+
+  it('back from Favori mekanlar / Popüler rotalar returns to the Explore list, not the screen before it', async () => {
+    searchPlaces.mockResolvedValue(page([place(1, 'Moda Kahve')]))
+    function Back() {
+      const navigate = useNavigate()
+      return <button type="button" onClick={() => navigate(-1)}>Telefonun geri tuşu</button>
+    }
+    render(
+      <MemoryRouter initialEntries={['/', '/explore?sehir=istanbul']} initialIndex={1}>
+        <Routes>
+          <Route path="/" element={<p>Ana sayfa</p>} />
+          <Route path="/explore" element={<><ExplorePage /><Probe /><Back /></>} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(await screen.findByText('Moda Kahve')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Favori mekanlar' }))
+    expect(search).toContain('favoriler=1')
+    // switching boxes is not another step back
+    await userEvent.click(screen.getByRole('button', { name: 'Popüler rotalar' }))
+    expect(search).toContain('rotalar=1')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Telefonun geri tuşu' }))
+    expect(search).toBe('?sehir=istanbul')
+    expect(await screen.findByText('Moda Kahve')).toBeInTheDocument()
+    expect(screen.queryByText('Ana sayfa')).not.toBeInTheDocument()
+
+    // "‹ Mekanlar" works the same way
+    await userEvent.click(screen.getByRole('button', { name: 'Popüler rotalar' }))
+    await userEvent.click(screen.getByRole('button', { name: /Mekanlar/ }))
+    expect(search).toBe('?sehir=istanbul')
+    await userEvent.click(screen.getByRole('button', { name: 'Telefonun geri tuşu' }))
+    expect(await screen.findByText('Ana sayfa')).toBeInTheDocument()
   })
 })

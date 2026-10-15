@@ -47,7 +47,8 @@ function ShellEffects() {
   const key = useRef(location.key)
   key.current = location.key
 
-  // Back: the screen the user came from, as they left it; home when the app was opened right on this page
+  // Back: the screen the user came from, as they left it; home when the app was opened right on this page.
+  // navigate changes on every page change: the shell keeps one listener and always calls the latest handler
   useEffect(() => {
     void setupNativeShell(() => {
       if (path.current === '/') return false

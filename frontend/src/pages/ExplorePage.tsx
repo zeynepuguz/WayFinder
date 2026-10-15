@@ -39,6 +39,8 @@ interface ListSnapshot {
   page: number
   hasMore: boolean
   scrollY: number
+  // What the list was loaded for (see loadKey): the same inputs on return never reload it
+  loadKey: string
 }
 const listCache = new Map<string, ListSnapshot>()
 
@@ -92,7 +94,8 @@ export function ExplorePage() {
   const routerLocation = useLocation()
   const cacheKey = routerLocation.pathname + routerLocation.search
   const [restored] = useState(() => listCache.get(cacheKey) ?? null)
-  const skipLoad = useRef(restored !== null)
+  // The inputs the shown list was loaded for; a restored list keeps its own, so it is not loaded again
+  const loadedKey = useRef<string | null>(restored?.loadKey ?? null)
   const latestLoad = useRef(0)
 
   const [mode, setMode] = useState<Mode>(restored?.mode
@@ -109,7 +112,7 @@ export function ExplorePage() {
 
   // Remember the list when leaving (to a place, another tab); restore the scroll position once on return
   const snapshot = useRef<ListSnapshot | null>(null)
-  snapshot.current = { mode, query, indoorOnly, maxCost, places, page, hasMore, scrollY: 0 }
+  snapshot.current = { mode, query, indoorOnly, maxCost, places, page, hasMore, scrollY: 0, loadKey: loadedKey.current ?? '' }
   const keyRef = useRef(cacheKey)
   keyRef.current = cacheKey
   useLayoutEffect(() => {
@@ -126,8 +129,10 @@ export function ExplorePage() {
     if (districtSlug) setMode('all')
   }, [districtSlug])
 
-  // Changes some search params (null removes one) and keeps the others (category, view, city, district)
-  function updateParams(changes: Record<string, string | null>) {
+  // Changes some search params (null removes one) and keeps the others (category, view, city, district).
+  // Filters replace the history entry; push = a new entry, so the back button returns to what was on screen
+  function updateParams(changes: Record<string, string | null>, push = false) {
+    const options = push ? { state: { fromList: true } } : { replace: true, state: routerLocation.state }
     const apply = (next: URLSearchParams) => {
       Object.entries(changes).forEach(([key, value]) => {
         if (value) next.set(key, value)
@@ -141,18 +146,22 @@ export function ExplorePage() {
       if (slugCategory) next.set('category', slugCategory)
       next.set('sehir', DEFAULT_CITY)
       const search = apply(next).toString()
-      navigate(search ? `/explore?${search}` : '/explore', { replace: true })
+      navigate(search ? `/explore?${search}` : '/explore', options)
       return
     }
-    setParams(current => apply(new URLSearchParams(current)), { replace: true })
+    setParams(current => apply(new URLSearchParams(current)), options)
   }
 
   const setCategory = (c: PlaceCategory | null) => updateParams({ category: c, tur: null })
   const setWorshipKind = (kind: string | null) => updateParams({ tur: kind })
   // The map and the popular routes exclude each other: each route card has its own map
   const setView = (v: View) => updateParams(v === 'map' ? { view: 'map', rotalar: null } : { view: null })
-  const togglePopular = () => updateParams({ rotalar: popular ? null : '1', favoriler: null, view: null })
-  const toggleFavorites = () => updateParams({ favoriler: favorites ? null : '1', rotalar: null, view: null })
+  // A box opened from the place list is a new step: back (the phone's or "‹ Mekanlar") returns to the list.
+  // Switching between the two boxes stays one step
+  const openedFromList = (routerLocation.state as { fromList?: boolean } | null)?.fromList === true
+  const closeBox = () => (openedFromList ? navigate(-1) : updateParams({ rotalar: null, favoriler: null }))
+  const togglePopular = () => (popular ? closeBox() : updateParams({ rotalar: '1', favoriler: null, view: null }, !community))
+  const toggleFavorites = () => (favorites ? closeBox() : updateParams({ favoriler: '1', rotalar: null, view: null }, !community))
   const chooseCity = (c: City) => {
     setCityOpen(false)
     cityState.setCity(c.slug)
@@ -171,20 +180,25 @@ export function ExplorePage() {
   }
   const activeFilters = (indoorOnly ? 1 : 0) + (maxCost ? 1 : 0)
 
+  // Everything the list depends on. The position only matters for "Yakınımda": a late GPS fix must not throw a
+  // city list with pages 2-4 loaded back to page 1
+  const loadKey = [mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost,
+    mode === 'nearby' ? `${location.latitude},${location.longitude}` : ''].join('|')
+
   useEffect(() => {
     // The map loads its own places for the visible area; popular routes load their own data
     if (view === 'map' || community) return
     // The city list waits until the city is known (saved choice or detection)
     if (mode === 'all' && !citySlug) return
-    // Restored from the cache: the first run keeps it
-    if (skipLoad.current) {
-      skipLoad.current = false
-      return
-    }
-    const timer = setTimeout(() => void load(0), query ? 300 : 0)
+    // Already showing this list (restored on the way back, or the effect ran again): keep it and its pages
+    if (loadedKey.current === loadKey) return
+    const timer = setTimeout(() => {
+      loadedKey.current = loadKey
+      void load(0)
+    }, query ? 300 : 0)
     return () => clearTimeout(timer)
     // Reload from the first page whenever a filter changes (search is debounced)
-  }, [view, community, mode, category, worshipKind, citySlug, districtSlug, query, indoorOnly, maxCost, location.latitude, location.longitude])
+  }, [view, community, loadKey])
 
   async function load(nextPage: number) {
     // Only the newest request may change the list: a slow answer for old filters must not overwrite it
@@ -261,7 +275,7 @@ export function ExplorePage() {
   // An open box: back to the places, or the other box
   const boxTabs = (
     <div className="row wrap" style={{ gap: 8 }}>
-      <button type="button" className="chip" onClick={() => updateParams({ rotalar: null, favoriler: null })}>
+      <button type="button" className="chip" onClick={closeBox}>
         <ChevronLeft size={15} /> {t('Mekanlar', 'Places')}
       </button>
       <button type="button" className={`chip ${popular ? 'active' : ''}`} onClick={togglePopular} aria-pressed={popular}>

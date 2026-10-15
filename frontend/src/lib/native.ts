@@ -14,17 +14,33 @@ async function paintStatusBar(dark: boolean) {
   }
 }
 
-// Android shell setup: status bar colors, splash screen, hardware back button
+// What the hardware back button does now: the latest handler wins, so callers may pass a new one on every render
+let goBackHandler: () => boolean = () => false
+let started = false
+
+/**
+ * Android shell setup: status bar colors, splash screen, hardware back button. The setup and the back button
+ * listener happen once per app run; calling it again only replaces the back handler. (Each extra listener used to
+ * add one more step back per press, landing on Ana Sayfa or leaving the app.)
+ */
 export async function setupNativeShell(goBack: () => boolean) {
-  if (!isNativeApp()) return
+  goBackHandler = goBack
+  if (!isNativeApp() || started) return
+  started = true
 
   await paintStatusBar(isDark())
   onThemeChange(dark => void paintStatusBar(dark))
 
   // Back button: go back inside the app, leave the app from a root screen
   await CapacitorApp.addListener('backButton', () => {
-    if (!goBack()) void CapacitorApp.exitApp()
+    if (!goBackHandler()) void CapacitorApp.exitApp()
   })
 
   await SplashScreen.hide()
+}
+
+// Tests start with a fresh shell
+export function resetNativeShell() {
+  started = false
+  goBackHandler = () => false
 }
