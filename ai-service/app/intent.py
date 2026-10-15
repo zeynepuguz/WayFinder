@@ -49,7 +49,9 @@ Intent types:
 - RECOMMEND: asks for a suggestion of one kind of place nearby ("yakında kahve öner" / "recommend a café nearby"). Set recommendType.
   Never for a route ("rota"): that is PLAN_ROUTE.
 - WEATHER: asks about the weather.
-- SHOW_ROUTE: asks to see the current route / next stop.
+- SHOW_ROUTE: asks to see the current route / next stop. Never when the message names a place: a message that is only a
+  place name ("trabzon of", "Kadıköy", "of ilçesinden") asks for a route there, so it is PLAN_ROUTE with that area,
+  also when context.hasRoute is true.
 - UNKNOWN: anything else (greetings, unrelated questions).
 
 Stop types: BREAKFAST (kahvaltı / breakfast), SIGHTSEEING (gezilecek yer, müze, park, sahil, tarihi yer /
@@ -79,7 +81,8 @@ area: the place in Turkey the user wants to be in or start from, as written: a c
 "in Antalya" -> "Antalya"), a district (ilçe: "üsküdarda gezeceğiz" -> "üsküdar", "Kadıköy'deyim" -> "Kadıköy") or a
 neighbourhood (semt: "around Moda" -> "Moda"). When both a city and a place inside it are named, keep both, city
 first ("İzmir Konak'ta" -> "İzmir Konak", "yarın Ankara'da Kızılay'dan başlayalım" -> "Ankara Kızılay"). Drop
-Turkish case suffixes when you can. null if no city, district or neighbourhood is named. Never a venue name (café,
+Turkish case suffixes when you can. Short district names are districts too ("Of", "Bor", "Sur", "Ula"):
+"trabzon of" -> "Trabzon Of", "of ilçesinden" -> "Of". null if no city, district or neighbourhood is named. Never a venue name (café,
 museum) and never invented.
 startTime: "saat 13.00", "13:00", "13.00'da" -> "13:00". A bare "saat 1'de" is ambiguous -> null.
 Weather mentioned inside a plan request ("hava çok sıcak" / "it's very hot") does not change the intent; real weather is fetched separately.

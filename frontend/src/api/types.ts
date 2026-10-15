@@ -394,6 +394,8 @@ export interface Route {
   date: string
   status: RouteStatus
   saved: boolean
+  // In "Rotalarım"; false for a route the assistant planned until the user adds it (absent on older servers = true)
+  listed?: boolean
   startLatitude: number
   startLongitude: number
   startTime: string

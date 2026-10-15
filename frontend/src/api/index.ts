@@ -93,7 +93,7 @@ export const api = {
   routes: (saved = false) => http.get<RouteSummary[]>('/routes', { saved }),
   route: (id: number) => http.get<Route>(`/routes/${id}`),
   planRoute: (request: RoutePlanRequest) => http.post<Route>('/routes', request),
-  updateRoute: (id: number, changes: { saved?: boolean; title?: string; status?: string }) =>
+  updateRoute: (id: number, changes: { saved?: boolean; title?: string; status?: string; listed?: boolean }) =>
     http.patch<Route>(`/routes/${id}`, changes),
   deleteRoute: (id: number) => http.delete<void>(`/routes/${id}`),
   updateStop: (routeId: number, stopId: number, status: StopStatus) =>
@@ -142,8 +142,11 @@ export const api = {
   removeAvatarOf: (username: string) => http.delete<void>(`/admin/users/${encodeURIComponent(username)}/avatar`),
 
   // Without conversationId the backend starts a new chat; the reply carries its id
-  sendMessage: (message: string, latitude: number, longitude: number, conversationId?: number | null) =>
-    http.post<AssistantReply>('/assistant/messages', { message, latitude, longitude, conversationId: conversationId ?? undefined }),
+  // routeId (route page, no chat): the backend continues the chat about that route, or starts one
+  sendMessage: (message: string, latitude: number, longitude: number, conversationId?: number | null, routeId?: number | null) =>
+    http.post<AssistantReply>('/assistant/messages', {
+      message, latitude, longitude, conversationId: conversationId ?? undefined, routeId: routeId ?? undefined,
+    }),
   conversations: () => http.get<ConversationSummary[]>('/assistant/conversations'),
   conversationMessages: (id: number) => http.get<ChatMessage[]>(`/assistant/conversations/${id}/messages`),
   renameConversation: (id: number, title: string) => http.patch<ConversationSummary>(`/assistant/conversations/${id}`, { title }),

@@ -94,8 +94,13 @@ public final class RouteDtos {
     public record RouteUpdateRequest(
             RouteStatus status,
             Boolean saved,
-            @Size(min = 1, max = 255) String title
+            @Size(min = 1, max = 255) String title,
+            // true = add the assistant's route to "Rotalarım"
+            Boolean listed
     ) {
+        public RouteUpdateRequest(RouteStatus status, Boolean saved, String title) {
+            this(status, saved, title, null);
+        }
     }
 
     public record StopStatusRequest(@NotNull StopStatus status) {
@@ -126,8 +131,20 @@ public final class RouteDtos {
             Instant createdAt,
             Instant updatedAt,
             // Who plans this route together; null where the caller is not known (the assistant's route preview)
-            GroupInfo group
+            GroupInfo group,
+            // In "Rotalarım"; false for a route the assistant planned until the user adds it
+            boolean listed
     ) {
+        public RouteResponse(Long id, String title, LocalDate date, RouteStatus status, boolean saved, double startLatitude,
+                             double startLongitude, String startLabel, LocalTime startTime, LocalTime endTime, int partySize,
+                             Integer budget, int totalEstimatedCost, int totalWalkingMeters, int totalWalkingMinutes,
+                             WalkingTolerance walkingTolerance, List<String> interests, WeatherSnapshot weather,
+                             List<String> notes, List<StopResponse> stops, Instant createdAt, Instant updatedAt,
+                             GroupInfo group) {
+            this(id, title, date, status, saved, startLatitude, startLongitude, startLabel, startTime, endTime, partySize,
+                    budget, totalEstimatedCost, totalWalkingMeters, totalWalkingMinutes, walkingTolerance, interests,
+                    weather, notes, stops, createdAt, updatedAt, group, true);
+        }
     }
 
     /**

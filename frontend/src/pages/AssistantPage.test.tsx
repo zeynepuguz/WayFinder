@@ -1,9 +1,12 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { StrictMode } from 'react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router'
 import type { AssistantReply, ChatMessage, ConversationSummary, Recommendation, Route as RouteT } from '../api/types'
+import { RouteOffer } from '../components/RouteOffer'
+import { ToastProvider } from '../components/ui'
 import { forgetLastChat, rememberChat } from '../lib/lastChat'
+import { offerRoute } from '../lib/routeOffer'
 import { place } from '../test/fixtures'
 import { AssistantPage, resetAutoSend } from './AssistantPage'
 
@@ -12,8 +15,12 @@ const conversations = vi.fn()
 const conversationMessages = vi.fn()
 const renameConversation = vi.fn()
 const deleteConversation = vi.fn()
+const updateRoute = vi.fn()
+const deleteRoute = vi.fn()
 vi.mock('../api', () => ({
   api: {
+    updateRoute: (...args: unknown[]) => updateRoute(...args),
+    deleteRoute: (...args: unknown[]) => deleteRoute(...args),
     sendMessage: (...args: unknown[]) => sendMessage(...args),
     conversations: () => conversations(),
     conversationMessages: (id: number) => conversationMessages(id),
@@ -212,5 +219,79 @@ describe('AssistantPage conversations', () => {
     await waitFor(() => expect(deleteConversation).toHaveBeenCalledWith(1))
     // the open chat was deleted: back to a new, empty chat (never "continued" again by the Asistan tab)
     await waitFor(() => expect(screen.getByTestId('url')).toHaveTextContent(/^\/assistant\?new=1$/))
+  })
+})
+
+describe('AssistantPage offers its route when the user leaves', () => {
+  function Elsewhere() {
+    const navigate = useNavigate()
+    return <button type="button" onClick={() => navigate('/')}>Ana Sayfa</button>
+  }
+  function renderWithOffer() {
+    return render(
+      <ToastProvider>
+        <MemoryRouter initialEntries={['/assistant']}>
+          <RouteOffer />
+          <Routes>
+            <Route path="/assistant" element={<><AssistantPage /><Elsewhere /></>} />
+            <Route path="/" element={<p>Ana sayfa ekranı</p>} />
+            <Route path="/routes/:id" element={<p>Rota ekranı</p>} />
+          </Routes>
+        </MemoryRouter>
+      </ToastProvider>,
+    )
+  }
+  const planned = { ...route, title: 'Bugünkü rota', listed: false }
+
+  async function planAndLeave(target: 'home' | 'route') {
+    sendMessage.mockResolvedValue(reply({ reply: 'Rotan hazır', route: planned, recommendations: [], conversationId: 3 }))
+    renderWithOffer()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Mesaj' }), 'Gün planla')
+    await userEvent.click(screen.getByRole('button', { name: 'Gönder' }))
+    await screen.findByText('Rotan hazır')
+    // nothing is asked inside the chat
+    expect(screen.queryByText(/Rotalarım’a eklensin mi/)).not.toBeInTheDocument()
+    if (target === 'home') await userEvent.click(screen.getByRole('button', { name: 'Ana Sayfa' }))
+    else await userEvent.click(screen.getAllByRole('link').find(a => a.getAttribute('href') === '/routes/5')!)
+  }
+
+  beforeEach(() => offerRoute(null))
+
+  it('“Rotalarıma ekle” adds it', async () => {
+    updateRoute.mockResolvedValue({ ...planned, listed: true })
+    await planAndLeave('home')
+
+    const sheet = await screen.findByRole('dialog', { name: 'Asistanın oluşturduğu rota' })
+    expect(within(sheet).getByText('Bugünkü rota')).toBeInTheDocument()
+    expect(within(sheet).getByText('Bu rota Rotalarım’a eklensin mi?')).toBeInTheDocument()
+    await userEvent.click(within(sheet).getByRole('button', { name: /Rotalarıma ekle/ }))
+
+    expect(updateRoute).toHaveBeenCalledWith(5, { listed: true })
+    expect(screen.queryByRole('dialog', { name: 'Asistanın oluşturduğu rota' })).not.toBeInTheDocument()
+    expect(screen.getByText('Ana sayfa ekranı')).toBeInTheDocument()
+  })
+
+  it('“Sil” deletes it', async () => {
+    deleteRoute.mockResolvedValue(undefined)
+    await planAndLeave('home')
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Asistanın oluşturduğu rota' })).getByRole('button', { name: /Sil/ }))
+    expect(deleteRoute).toHaveBeenCalledWith(5)
+    expect(updateRoute).not.toHaveBeenCalled()
+  })
+
+  it('is not asked when the user opens that route from the chat (its page has its own “Ekle”)', async () => {
+    await planAndLeave('route')
+    expect(await screen.findByText('Rota ekranı')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Asistanın oluşturduğu rota' })).not.toBeInTheDocument()
+  })
+
+  it('is not asked about a route already in Rotalarım', async () => {
+    sendMessage.mockResolvedValue(reply({ reply: 'Rotan güncellendi', route: { ...route, listed: true }, recommendations: [], conversationId: 3 }))
+    renderWithOffer()
+    await userEvent.type(screen.getByRole('textbox', { name: 'Mesaj' }), 'Çok yorulduk')
+    await userEvent.click(screen.getByRole('button', { name: 'Gönder' }))
+    await screen.findByText('Rotan güncellendi')
+    await userEvent.click(screen.getByRole('button', { name: 'Ana Sayfa' }))
+    expect(screen.queryByRole('dialog', { name: 'Asistanın oluşturduğu rota' })).not.toBeInTheDocument()
   })
 })

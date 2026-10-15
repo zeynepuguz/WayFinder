@@ -81,6 +81,10 @@ class AssistantConversationsTest {
         });
         when(conversationRepository.findByIdAndUserId(anyLong(), anyLong())).thenAnswer(inv -> Optional.ofNullable(
                 conversations.get(inv.<Long>getArgument(0))).filter(c -> c.getUserId().equals(inv.getArgument(1))));
+        when(conversationRepository.findFirstByUserIdAndRouteIdOrderByLastMessageAtDescIdDesc(anyLong(), anyLong()))
+                .thenAnswer(inv -> conversations.values().stream()
+                        .filter(c -> c.getUserId().equals(inv.getArgument(0)) && inv.getArgument(1).equals(c.getRouteId()))
+                        .findFirst());
 
         AssistantMessageRepository messageRepository = mock(AssistantMessageRepository.class);
         when(messageRepository.save(any(AssistantMessage.class))).thenAnswer(inv -> {
@@ -230,6 +234,27 @@ class AssistantConversationsTest {
         AssistantConversationRepository repository = mock(AssistantConversationRepository.class);
         when(repository.save(any(AssistantConversation.class))).thenAnswer(inv -> inv.getArgument(0));
         return repository;
+    }
+
+    @Test
+    void theAssistantsRouteWaitsInTheChatUntilTheUserAddsIt() {
+        AssistantReply reply = send(PLAN, null);
+
+        assertThat(reply.route().listed()).isFalse();
+        assertThat(routes.get(reply.route().id()).isListed()).isFalse();
+    }
+
+    @Test
+    void aChangeWrittenOnTheRoutePageContinuesThatRoutesChat() {
+        AssistantReply planned = send(PLAN, null);
+        long routeId = planned.route().id();
+
+        // "Rotanda değişiklik yapmak ister misin?": the route's id, no chat id
+        AssistantReply changed = service.handle(USER, new AssistantRequest(TIRED, 41.0, 29.0, routeId, null));
+
+        assertThat(changed.conversationId()).isEqualTo(planned.conversationId());
+        assertThat(changed.route().id()).isEqualTo(routeId);
+        assertThat(conversations).hasSize(1);
     }
 
     private AssistantReply send(String message, Long conversationId) {

@@ -24,6 +24,10 @@ import java.util.*;
  * - longest name wins ("Kuzguncuk" over "Kuzgun"), then a place in the user's current city, then a district
  *   over a neighbourhood
  *
+ * Short district names ("Of", "Bor", "Ula", "Sur") are everyday words too, so they count only when the message says
+ * it is the district ("of ilçesinden"), names its city next to it ("trabzon of", "Of, Trabzon") or is nothing but
+ * the name (the AI service's area field: "Of").
+ *
  * Left out on purpose: names shorter than MIN_NAME_LETTERS (cities: MIN_CITY_LETTERS, "Van", "Muş"), common words
  * that are also district / neighbourhood names ("Merkez", "Cumhuriyet") and neighbourhood names used for several
  * places far apart inside one city (which one would it be?).
@@ -54,10 +58,17 @@ public final class AreaMatcher {
             "pazar", "tepe", "koy", "mahalle", "cami", "camii", "orman", "park", "bahce", "sanayi", "zafer",
             "baris", "gazi", "yildiz", "guzel", "cicek", "gunes", "deniz", "istiklal", "ataturk", "hurriyet",
             "saray", "koru", "bagla", "kavak", "cinar", "sokak", "cadde", "meydan", "kent", "site", "evler",
-            "istanbul", "turkiye");
+            "istanbul", "turkiye",
+            // "bir günlük rota" is a day's route, not the Günlük neighbourhood
+            "gunluk", "haftalik", "aylik", "aksam", "sabah", "gece");
+
+    // Words that only say what kind of place the name is ("Of ilçesinden", "Moda semtinde")
+    static final java.util.regex.Pattern ADMIN_WORD = java.util.regex.Pattern.compile("(ilce|semt|mahalle|district|neighbou?rhood).*");
 
     // First word of a name -> the names starting with it
     private final Map<String, List<Entry>> byFirstWord;
+    // Short one-word district names ("of") -> the districts, matched only with a hint (see the class comment)
+    private final Map<String, List<Entry>> shortDistricts;
     private final int size;
 
     public AreaMatcher(List<NamedArea> areas) {
@@ -68,6 +79,15 @@ public final class AreaMatcher {
             index.computeIfAbsent(entry.tokens()[0], k -> new ArrayList<>()).add(entry);
         }
         this.byFirstWord = index;
+        Map<String, List<Entry>> shortIndex = new HashMap<>();
+        for (NamedArea area : areas) {
+            String key = key(area.name());
+            if (area.kind() == NamedArea.Kind.DISTRICT && !key.isEmpty() && !key.contains(" ")
+                    && key.length() < MIN_NAME_LETTERS && !COMMON_WORDS.contains(key)) {
+                shortIndex.computeIfAbsent(key, k -> new ArrayList<>()).add(new Entry(area, new String[]{key}, key.length(), key));
+            }
+        }
+        this.shortDistricts = shortIndex;
     }
 
     public boolean isEmpty() {
@@ -108,6 +128,7 @@ public final class AreaMatcher {
                     }
                 }
             }
+            findShortDistrict(tokens, i, found);
         }
         if (found.isEmpty()) {
             return Optional.empty();
@@ -149,6 +170,31 @@ public final class AreaMatcher {
             return Optional.of(best.area());
         }
         return Optional.ofNullable(namedCity).map(Entry::area);
+    }
+
+    /**
+     * A short district name at token i, when the words around it say it is the district: "of ilçesinden", "trabzon of"
+     * / "of trabzon" (its own city next to it), or the text is nothing but the name ("Of", "Of'tan", "of ilçesi").
+     */
+    private void findShortDistrict(List<String> tokens, int i, Map<String, List<Entry>> found) {
+        if (shortDistricts.isEmpty() || NOT_PLACES.contains(tokens.get(i))) {
+            return;
+        }
+        long meaningful = tokens.stream().filter(t -> !ADMIN_WORD.matcher(t).matches()).count();
+        boolean districtWordNext = i + 1 < tokens.size() && tokens.get(i + 1).startsWith("ilce");
+        for (String stem : stems(tokens.get(i))) {
+            for (Entry entry : shortDistricts.getOrDefault(stem, List.of())) {
+                String city = cityKey(entry.area().city());
+                boolean cityNext = (i > 0 && stems(tokens.get(i - 1)).contains(city))
+                        || (i + 1 < tokens.size() && stems(tokens.get(i + 1)).contains(city));
+                if (districtWordNext || cityNext || meaningful == 1) {
+                    List<Entry> same = found.computeIfAbsent(entry.key(), k -> new ArrayList<>());
+                    if (!same.contains(entry)) {
+                        same.add(entry);
+                    }
+                }
+            }
+        }
     }
 
     /**

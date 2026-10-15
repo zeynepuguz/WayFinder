@@ -13,4 +13,7 @@ public interface AssistantConversationRepository extends JpaRepository<Assistant
     Optional<AssistantConversation> findByIdAndUserId(Long id, Long userId);
 
     List<AssistantConversation> findByUserIdOrderByLastMessageAtDescIdDesc(Long userId, Pageable pageable);
+
+    // The chat about this route ("Rotanda değişiklik yapmak ister misin?" on the route page continues it)
+    Optional<AssistantConversation> findFirstByUserIdAndRouteIdOrderByLastMessageAtDescIdDesc(Long userId, Long routeId);
 }

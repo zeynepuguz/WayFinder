@@ -36,6 +36,10 @@ public class Route {
     @Column(nullable = false)
     private boolean saved;
 
+    // In "Rotalarım" (and Ana Sayfa's "Aktif rotan"); a route the assistant plans is not, until the user adds it
+    @Column(nullable = false)
+    private boolean listed = true;
+
     @JdbcTypeCode(SqlTypes.GEOGRAPHY)
     @Column(columnDefinition = "geography(Point, 4326)", nullable = false)
     private Point startLocation;
@@ -172,6 +176,14 @@ public class Route {
 
     public void setSaved(boolean saved) {
         this.saved = saved;
+    }
+
+    public boolean isListed() {
+        return listed;
+    }
+
+    public void setListed(boolean listed) {
+        this.listed = listed;
     }
 
     public Point getStartLocation() {

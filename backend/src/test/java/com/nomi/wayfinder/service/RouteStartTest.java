@@ -142,7 +142,7 @@ class RouteStartTest {
         when(placeRepository.countPlannable(anyDouble(), anyDouble(), anyDouble(), anyCollection())).thenReturn(3L);
         RouteResponse sparse = routeService.planRoute(1L, request(40.8255, 29.3737, null, null, null));
         assertThat(sparse.startLabel()).isEqualTo("Konumun");
-        assertThat(sparse.notes().getFirst()).contains("çok az mekan var (3)").contains("şehir ve ilçe seçebilirsin");
+        assertThat(sparse.notes().getFirst()).contains("çok az mekan var").contains("başka bir semt ya da ilçe");
 
         when(placeRepository.countPlannable(anyDouble(), anyDouble(), anyDouble(), anyCollection())).thenReturn(40L);
         RouteResponse busy = routeService.planRoute(1L, request(40.99, 29.02, null, null, null));

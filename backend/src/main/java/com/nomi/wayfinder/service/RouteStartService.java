@@ -12,10 +12,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+
 
 /**
  * Where a new route starts ("Rotalarım › Yeni rota"):
@@ -97,102 +96,6 @@ public class RouteStartService {
         }
         return bestSight("p.city_id", city.id())
                 .orElse(new Start(city.labelLatitude(), city.labelLongitude(), StartKind.CITY, city.name()));
-    }
-
-    // Visible places whose name contains the text, near a point: the exact name first, then the best known, then nearest
-    private static final String PLACE_NAMED = """
-            SELECT p.name, ST_Y(p.location::geometry) AS lat, ST_X(p.location::geometry) AS lon
-            FROM places p
-            WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?)
-              AND NOT p.hidden AND NOT p.unconfirmed
-              AND lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) LIKE ?
-            ORDER BY lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) = ? DESC,
-                     p.popularity DESC NULLS LAST,
-                     ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography))
-            LIMIT 1
-            """;
-    static final int PLACE_SEARCH_RADIUS_METERS = 40_000;
-
-    /**
-     * The place the user named as the start ("Anıtkabir", "Kızılay Meydanı"), within PLACE_SEARCH_RADIUS_METERS of
-     * the point (the city they plan in, else their position); empty for names shorter than 3 letters or not found.
-     */
-    public Optional<Start> placeNamed(String name, double latitude, double longitude) {
-        String text = name == null ? "" : name.replace('İ', 'i').replace('I', 'i').replace('ı', 'i')
-                .replace('Ş', 's').replace('ş', 's').replace('Ğ', 'g').replace('ğ', 'g')
-                .replace('Ü', 'u').replace('ü', 'u').replace('Ö', 'o').replace('ö', 'o')
-                .replace('Ç', 'c').replace('ç', 'c').toLowerCase(java.util.Locale.ROOT).trim()
-                .replaceAll("[%_]", "");
-        if (text.length() < 3) {
-            return Optional.empty();
-        }
-        List<Start> found = jdbc.query(PLACE_NAMED,
-                (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
-                longitude, latitude, PLACE_SEARCH_RADIUS_METERS, "%" + text + "%", text, longitude, latitude);
-        if (!found.isEmpty()) {
-            return found.stream().findFirst();
-        }
-        return placeWithWords(text, latitude, longitude);
-    }
-
-    /**
-     * "Esenler otogarı": no place is called that, but "Sarı Fırın Otogar Esenler" stands at the bus station. A place
-     * whose name has every word (any order, Turkish case endings cut: "otogarı" finds "otogar"), nearest first.
-     */
-    private Optional<Start> placeWithWords(String text, double latitude, double longitude) {
-        List<String> stems = Arrays.stream(text.split("\\s+"))
-                .filter(w -> w.length() >= 3)
-                .map(RouteStartService::stem)
-                .distinct()
-                .limit(4)
-                .toList();
-        if (stems.size() < 2) {
-            return Optional.empty();
-        }
-        StringBuilder sql = new StringBuilder("""
-                SELECT p.name, ST_Y(p.location::geometry) AS lat, ST_X(p.location::geometry) AS lon
-                FROM places p
-                WHERE ST_DWithin(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography), ?)
-                  AND NOT p.hidden AND NOT p.unconfirmed""");
-        List<Object> args = new ArrayList<>(List.of(longitude, latitude, PLACE_SEARCH_RADIUS_METERS));
-        for (String stem : stems) {
-            sql.append(" AND lower(translate(p.name, 'İIıŞşĞğÜüÖöÇç', 'iiissgguuoocc')) LIKE ?");
-            args.add("%" + stem + "%");
-        }
-        sql.append(" ORDER BY ST_Distance(p.location, CAST(ST_SetSRID(ST_MakePoint(?, ?), 4326) AS geography)) LIMIT 1");
-        args.add(longitude);
-        args.add(latitude);
-        return jdbc.query(sql.toString(),
-                (rs, i) -> new Start(rs.getDouble("lat"), rs.getDouble("lon"), StartKind.SIGHT, rs.getString("name")),
-                args.toArray()).stream().findFirst();
-    }
-
-    // A word without its likely Turkish ending: "otogari" -> "otoga", "meydani" -> "meyda" (only for long words)
-    static String stem(String word) {
-        return word.length() >= 6 ? word.substring(0, word.length() - 2) : word;
-    }
-
-    /**
-     * Real places of a city for the assistant's "nereden başlayalım?" hint: its best-known sight and its busiest
-     * district (most places), so a user in Muş is not told "Kızılay".
-     */
-    public List<String> startExamples(String citySlug) {
-        Optional<CityService.City> city = citySlug == null ? Optional.empty() : cityService.findBySlug(citySlug);
-        if (city.isEmpty()) {
-            return List.of();
-        }
-        List<String> examples = new ArrayList<>();
-        bestSight("p.city_id", city.get().id()).map(Start::label).ifPresent(examples::add);
-        jdbc.query("""
-                        SELECT d.name FROM districts d JOIN places p ON p.district_id = d.id
-                        WHERE d.city_id = ? AND NOT p.hidden GROUP BY d.name ORDER BY count(*) DESC LIMIT 1
-                        """, rs -> {
-                    String name = rs.getString(1);
-                    if (name != null && !name.isBlank() && !"Merkez".equalsIgnoreCase(name) && !examples.contains(name)) {
-                        examples.add(name);
-                    }
-                }, city.get().id());
-        return examples;
     }
 
     // Package-private for tests

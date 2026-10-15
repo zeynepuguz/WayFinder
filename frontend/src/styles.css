@@ -1277,3 +1277,12 @@ details > .reasons { margin-top: 8px; }
 /* Ana Sayfa: "Yer seç" / "Konumumu kullan" next to the location chip */
 .chip-link { display: inline-flex; align-items: center; gap: 4px; padding: 5px 4px; border: 0; background: none; color: var(--brand-ink); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
 .idea-soon { opacity: 0.6; cursor: default; }
+
+/* After leaving the assistant: its route, "Rotalarıma ekle" / "Sil" (components/RouteOffer) */
+.offer-stops { list-style: none; margin: 0; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; font-weight: 600; }
+.offer-stops .time { display: inline-block; width: 52px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+
+/* Route page: "Rotanda değişiklik yapmak ister misin?" */
+.ask-change { padding: 16px; }
+.ask-change .composer-box { margin-top: 4px; }
+.ask-change-answer { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: var(--r-md); background: var(--surface-2); font-size: 14px; line-height: 20px; white-space: pre-wrap; }

@@ -15,6 +15,7 @@ import { useUserLocation } from '../context/LocationContext'
 import { errorMessage } from '../lib/format'
 import { tr, useT } from '../lib/i18n'
 import { forgetLastChat, lastChat, rememberChat } from '../lib/lastChat'
+import { offerRoute } from '../lib/routeOffer'
 
 interface Message {
   key: string
@@ -153,6 +154,12 @@ function Chat({ canSend }: { canSend: boolean }) {
     bottomRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'end' })
   }, [messages, sending])
 
+  // The newest route planned in this visit that is not in "Rotalarım": offered (add / delete) when the user leaves
+  const unlisted = [...messages].reverse().find(m => m.route)?.route
+  const offer = useRef<Route | null>(null)
+  offer.current = unlisted && unlisted.listed === false ? unlisted : null
+  useEffect(() => () => offerRoute(offer.current), [])
+
   async function send(text: string, chatId: number | null = conversationId) {
     const message = text.trim()
     if (!message || sending) return
@@ -248,6 +255,7 @@ function Chat({ canSend }: { canSend: boolean }) {
               || (m.fartherRecommendations && m.fartherRecommendations.length > 0)) && (
               <div className="chat-attachment">
                 {m.route && <RoutePreview route={m.route} />}
+
                 {!m.route && m.routeId && (
                   <Link to={`/routes/${m.routeId}`} className="section-link">{t('Rotayı aç', 'Open route')} <ChevronRight size={16} /></Link>
                 )}
@@ -323,3 +331,4 @@ function withoutStopLines(text: string): string {
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
 }
+

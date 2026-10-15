@@ -235,10 +235,10 @@ public class RouteService {
             return result;
         }
         List<String> notes = new ArrayList<>(result.notes());
-        notes.addFirst(Texts.t("Bulunduğun yerin 1,5 km çevresinde rotaya uygun çok az mekan var (" + plannable
-                        + "). Daha iyi bir rota için Yeni rota ekranında bir şehir ve ilçe seçebilirsin.",
-                "There are very few places for a route within 1.5 km of where you are (" + plannable
-                        + "). For a better route, choose a city and district on the New route screen."));
+        notes.addFirst(Texts.t("Bulunduğun yerin çevresinde rotaya uygun çok az mekan var; başka bir semt ya da ilçe "
+                        + "seçersen daha dolu bir rota çıkar.",
+                "There are very few places for a route around where you are; choose another neighbourhood or "
+                        + "district for a fuller route."));
         return new PlanResult(result.stops(), notes, result.forecast(), result.weatherAdvice());
     }
 
@@ -288,8 +288,10 @@ public class RouteService {
             routeRepository.findAllById(groups.memberRouteIds(userId)).forEach(r -> routes.add(expireIfPast(r)));
             routes.sort(Comparator.comparing(Route::getCreatedAt).reversed());
         }
-        // A plan that found no place at all ("0 durak") is not a route to show
+        // A plan that found no place at all ("0 durak") is not a route to show; nor is an assistant's route the
+        // user has not added (it stays in its chat)
         return routes.stream().filter(r -> !r.getStops().isEmpty())
+                .filter(r -> r.isListed() || !r.getUserId().equals(userId))
                 .map(r -> routeMapper.toSummary(r, !r.getUserId().equals(userId))).toList();
     }
 
@@ -312,11 +314,26 @@ public class RouteService {
         }
         if (request.saved() != null) {
             route.setSaved(request.saved());
+            // Saving a route also puts it in "Rotalarım"
+            if (request.saved()) {
+                route.setListed(true);
+            }
+        }
+        if (request.listed() != null) {
+            route.setListed(request.listed());
         }
         if (request.title() != null) {
             route.setTitle(request.title().trim());
         }
 
+        return respond(route, userId);
+    }
+
+    /** The assistant's new route stays in its chat until the user adds it to "Rotalarım". */
+    @Transactional
+    public RouteResponse keepInChatOnly(Long userId, Long routeId) {
+        Route route = findOwnedRoute(userId, routeId);
+        route.setListed(false);
         return respond(route, userId);
     }
 
@@ -369,6 +386,7 @@ public class RouteService {
         return routeRepository.findByUserIdAndDateAndStatusInOrderByUpdatedAtDesc(
                         userId, date, List.of(RouteStatus.ACTIVE, RouteStatus.DRAFT)).stream()
                 .filter(r -> !r.getStops().isEmpty())
+                .filter(Route::isListed)
                 .findFirst();
     }
 

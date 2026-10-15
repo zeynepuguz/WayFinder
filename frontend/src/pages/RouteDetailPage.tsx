@@ -1,8 +1,8 @@
 import {
-  BatteryLow, Check, MapPin, Lightbulb, ChevronDown, CloudRain, Footprints, Bookmark, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
+  ArrowUp, BatteryLow, Check, ChevronRight, MapPin, Lightbulb, ChevronDown, CloudRain, Footprints, Bookmark, Plus, RefreshCw, Shuffle, Trash2, TriangleAlert, Wallet,
   Clock, Ellipsis, History, MapPinned, SkipForward, ThumbsDown, ThumbsUp, X,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router'
 import { api } from '../api'
 import type { ReplanRequest, Route, RouteStop, StopStatus, StopType } from '../api/types'
@@ -184,6 +184,15 @@ export function RouteDetailPage() {
           </Alert>
         )}
         {actionError && <Alert tone="danger"><span>{actionError}</span></Alert>}
+        {owner && route.listed === false && (
+          <Alert tone="info" icon={Plus} action={
+            <button className="btn btn-sm btn-primary" disabled={busy} onClick={() => act(() => api.updateRoute(routeId, { listed: true }), false)}>
+              {t('Ekle', 'Add')}
+            </button>
+          }>
+            <span>{t('Bu rota henüz Rotalarım’da değil.', 'This route is not in My routes yet.')}</span>
+          </Alert>
+        )}
         {past && (
           <Alert tone="info" icon={History}>
             <span>{t('Bu rota geçmiş bir güne ait; artık değiştirilemez. Yeni bir rota oluşturabilir ya da asistana yazabilirsin.',
@@ -239,6 +248,12 @@ export function RouteDetailPage() {
         </section>
 
         {owner && route.stops.length > 0 && <RouteFeedback routeId={route.id} />}
+
+        {/* Written in plain words, understood by the assistant ("bir müze ekle", "öğle yemeğini balık yap") */}
+        {!finished && (
+          <AskForChange route={route} latitude={location.latitude} longitude={location.longitude}
+                        onChanged={(updated, list) => { setRoute(updated); setChanges(list); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+        )}
 
         <RouteGroup route={route} onChange={setRoute} />
 
@@ -411,5 +426,71 @@ function AddSheet({ busy, onPick }: { busy: boolean; onPick: (change: Change) =>
       </div>
       <p className="t-caption">{t('Değişiklikler bulunduğun konumdan itibaren planlanır.', 'Changes are planned from where you are now.')}</p>
     </div>
+  )
+}
+
+/**
+ * "Rotanda değişiklik yapmak ister misin?": the user writes what to change; the assistant (in the chat about this
+ * route) understands it and changes the route here. Needs a pass, like the assistant.
+ */
+function AskForChange({ route, latitude, longitude, onChanged }: {
+  route: Route
+  latitude: number
+  longitude: number
+  onChanged: (route: Route, changes: string[]) => void
+}) {
+  const t = useT()
+  const gate = useGate()
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [answer, setAnswer] = useState<{ reply: string; conversationId: number; otherRouteId: number | null } | null>(null)
+
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    const message = text.trim()
+    if (!message || busy || !gate()) return
+    setBusy(true)
+    setError(null)
+    try {
+      const reply = await api.sendMessage(message, latitude, longitude, null, route.id)
+      setAnswer({
+        reply: reply.reply, conversationId: reply.conversationId,
+        otherRouteId: reply.route && reply.route.id !== route.id ? reply.route.id : null,
+      })
+      setText('')
+      if (reply.route && reply.route.id === route.id) onChanged(reply.route, reply.changes)
+    } catch (e) {
+      setError(errorMessage(e, t('İsteğin gönderilemedi', 'Your request could not be sent')))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card ask-change stack-sm" aria-label={t('Rotanda değişiklik', 'Change your route')}>
+      <h2 className="t-headline">{t('Rotanda değişiklik yapmak ister misin?', 'Would you like to change your route?')}</h2>
+      <p className="t-caption">{t('Ne istediğini yaz, asistan anlayıp rotanı düzenlesin. Örnek: “bir müze ekle”, “öğle yemeğini balık yap”, “daha az yürüyelim”.',
+        'Write what you’d like and the assistant updates your route. E.g. “add a museum”, “make lunch fish”, “less walking”.')}</p>
+      {answer && (
+        <div className="ask-change-answer">
+          <p>{answer.reply}</p>
+          <div className="row wrap" style={{ gap: 12 }}>
+            {answer.otherRouteId && (
+              <Link to={`/routes/${answer.otherRouteId}`} className="section-link">{t('Yeni rotayı aç', 'Open the new route')} <ChevronRight size={16} /></Link>
+            )}
+            <Link to={`/assistant?c=${answer.conversationId}`} className="section-link">{t('Sohbette devam et', 'Continue in the chat')} <ChevronRight size={16} /></Link>
+          </div>
+        </div>
+      )}
+      {error && <Alert tone="danger"><span>{error}</span></Alert>}
+      <form className="composer-box" onSubmit={e => void submit(e)}>
+        <input value={text} onChange={e => setText(e.target.value)} maxLength={1000} disabled={busy}
+               placeholder={t('Rotanda neyi değiştirelim?', 'What should we change?')} aria-label={t('Rotanda değişiklik isteğin', 'Your change request')} />
+        <button type="submit" className="send-btn" disabled={busy || !text.trim()} aria-label={t('Gönder', 'Send')}>
+          {busy ? <Spinner /> : <ArrowUp size={20} />}
+        </button>
+      </form>
+    </section>
   )
 }

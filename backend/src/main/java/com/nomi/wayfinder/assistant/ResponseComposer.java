@@ -23,64 +23,12 @@ public class ResponseComposer {
         return planCreated(route, null);
     }
 
-    // "ünlü bir rota": one of the area's popular routes (its famous sights, by Wikipedia popularity)
-    static final String WHEN_QUESTION_TR = "Kahvaltı saati geçti.";
-    static final String WHEN_QUESTION_EN = "Breakfast time is over for today.";
-
-    // Breakfast asked for in the evening without a day: the next message answers it (AssistantService)
-    public String askWhenForBreakfast() {
-        return Texts.t(WHEN_QUESTION_TR + " Bu rotayı şimdi için mi istiyorsun, yoksa başka bir gün için mi? "
-                        + "\"Şimdi\", \"yarın sabah\" ya da \"cumartesi\" gibi yazabilirsin.",
-                WHEN_QUESTION_EN + " Do you want this route for now, or for another day? "
-                        + "You can write \"now\", \"tomorrow morning\" or \"Saturday\".");
-    }
-
-    static boolean isWhenQuestion(String reply) {
-        return reply != null && (reply.startsWith(WHEN_QUESTION_TR) || reply.startsWith(WHEN_QUESTION_EN));
-    }
-
-    static final String START_QUESTION_TR = "rotaya nereden başlayalım?";
-    static final String START_QUESTION_EN = "where should the route start?";
-
-    /**
-     * No city named: which city, and where in it (the next message answers it, AssistantService).
-     *
-     * @param currentCity the city the user is in (from their position), null when unknown
-     */
-    public String askCityAndStart(String currentCity) {
-        String here = currentCity == null ? ""
-                : Texts.t(" Şu an bulunduğun şehir " + currentCity + "; \"buradan\" yazarsan bulunduğun yerden başlarım.",
-                " You are in " + currentCity + " now; write \"here\" and I will start where you are.");
-        return Texts.t("Rotayı hangi şehirde planlayalım ve nereden başlayalım?" + here
-                        + " Başka bir yer için şehir ve semt adını yazabilirsin, örneğin \"Bursa, Nilüfer\".",
-                "Which city should the route be in, and " + START_QUESTION_EN + here
-                        + " For another place write the city and the neighbourhood, for example \"Bursa, Nilüfer\".");
-    }
-
-    /**
-     * Only a city named: where in it.
-     *
-     * @param examples real places of that city for the hint (its best-known sight, a district); may be empty
-     */
-    public String askStart(String city, List<String> examples) {
-        String hint = examples == null || examples.isEmpty() ? ""
-                : " (" + Texts.t("örneğin ", "for example ") + String.join(", ",
-                examples.stream().map(e -> "\"" + e + "\"").toList()) + ")";
-        return Texts.t(city + " içinde " + START_QUESTION_TR + " Bir semt ya da yer adı yazabilirsin" + hint
-                        + "; \"fark etmez\" dersen en bilinen yerinden başlarım.",
-                "In " + city + ", " + START_QUESTION_EN + " Write a neighbourhood or a place" + hint
-                        + "; if you say \"anywhere\" I will start at its best-known sight.");
-    }
-
-    static boolean isStartQuestion(String reply) {
-        String lower = reply == null ? "" : reply.toLowerCase(Locale.ROOT);
-        return lower.contains("nereden başlayalım?") || lower.contains(START_QUESTION_EN);
-    }
-
-    // The start the user wrote was not found anywhere near: the route starts at the default instead
-    public String startNotFound(String name) {
-        return Texts.t("\"" + name + "\" adında bir yer bulamadım; rotayı en uygun başlangıç noktasından başlattım. ",
-                "I could not find a place called \"" + name + "\"; the route starts at the best starting point. ");
+    // Breakfast asked for in the evening without a day: planned for tomorrow morning, and said so
+    public String breakfastTomorrow() {
+        return Texts.t("Bugünün kahvaltı saati geçtiği için rotayı yarın sabah için planladım; bugün istersen "
+                        + "\"bugün olsun\" yaz. ",
+                "Breakfast time is over for today, so I planned the route for tomorrow morning; write \"today\" "
+                        + "if you want it today. ");
     }
 
     public String popularPlanCreated(RouteResponse route, String area) {
@@ -109,13 +57,12 @@ public class ResponseComposer {
                 TurkishSuffix.ablative(startArea) + " başlayan bir rota hazırladım. ",
                 "I made a route starting in " + startArea + ". ");
         if (route.stops().isEmpty()) {
-            if (startArea != null) {
-                return Texts.t(startArea + " çevresinde bu koşullarla uygun bir rota oluşturamadım. ",
-                        "I could not create a suitable route around " + startArea + " with these conditions. ")
-                        + String.join(" ", route.notes());
-            }
-            return Texts.t("Bu koşullarla uygun bir rota oluşturamadım. ",
-                    "I could not create a suitable route with these conditions. ") + String.join(" ", route.notes());
+            String where = startArea == null ? Texts.t("Bu çevrede", "Around here")
+                    : Texts.t(startArea + " çevresinde", "Around " + startArea);
+            return Texts.t(where + " bu saatlerde açık ve uygun bir mekan bulamadım. Başka bir semt, ilçe ya da saat "
+                            + "yazarsan yeniden planlarım.",
+                    where + " I found no suitable place open at these hours. Write another neighbourhood, district or "
+                            + "time and I will plan again.");
         }
 
         StringBuilder sb = new StringBuilder(intro);
@@ -260,12 +207,13 @@ public class ResponseComposer {
                 stop.plannedStart(), stop.typeLabel(), stop.place().name(), cost);
     }
 
+    // The weather and the most important note only; every note is on the route's page
     private static void appendWeatherAndNotes(StringBuilder sb, RouteResponse route) {
         if (route.weather() != null && route.weather().advice() != null) {
             sb.append("\n\n").append(route.weather().advice());
         }
         if (!route.notes().isEmpty()) {
-            sb.append("\n\n").append(String.join(" ", route.notes()));
+            sb.append("\n\n").append(route.notes().getFirst());
         }
     }
 

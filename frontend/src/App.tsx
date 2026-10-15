@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation, useNavigate } from 'react-router'
 import { PAYMENT_REQUIRED_EVENT } from './api/client'
 import { AppLayout } from './components/AppLayout'
+import { RouteOffer } from './components/RouteOffer'
 import { Spinner, ToastProvider } from './components/ui'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { CityProvider } from './context/CityContext'
@@ -81,6 +82,7 @@ function AppRoutes() {
   return (
     <>
       <ShellEffects />
+      <RouteOffer />
       <Routes>
         <Route path="welcome" element={<OnboardingPage />} />
         <Route path="login" element={<AuthPage />} />

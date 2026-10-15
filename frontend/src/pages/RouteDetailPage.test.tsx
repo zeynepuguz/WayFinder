@@ -1,10 +1,19 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route as RouterRoute, Routes } from 'react-router'
 import type { Route } from '../api/types'
 import { RouteDetailPage } from './RouteDetailPage'
 
 const route = vi.fn()
-vi.mock('../api', () => ({ api: { route: (...args: unknown[]) => route(...args) } }))
+const sendMessage = vi.fn()
+const updateRoute = vi.fn()
+vi.mock('../api', () => ({
+  api: {
+    route: (...args: unknown[]) => route(...args),
+    sendMessage: (...args: unknown[]) => sendMessage(...args),
+    updateRoute: (...args: unknown[]) => updateRoute(...args),
+  },
+}))
 vi.mock('../components/gate', () => ({ useGate: () => () => true }))
 vi.mock('../components/RouteMap', () => ({ RouteMap: () => <div data-testid="route-map" /> }))
 vi.mock('../context/LocationContext', () => ({ useUserLocation: () => ({ latitude: 40.99, longitude: 29.02, source: 'gps' }) }))
@@ -44,5 +53,33 @@ describe('RouteDetailPage', () => {
     renderPage({ interests: ['history'] })
     expect(await screen.findByText('Tarih')).toBeInTheDocument()
     expect(screen.queryByText(/Başlangıç:/)).not.toBeInTheDocument()
+  })
+
+  it('“Rotanda değişiklik yapmak ister misin?”: the assistant changes this route from the request written here', async () => {
+    route.mockResolvedValue(ROUTE)
+    sendMessage.mockResolvedValue({
+      reply: 'Rotanı güncelledim: bir müze ekledim.', intent: { type: 'REPLAN', source: 'AI' },
+      route: { ...ROUTE, title: 'Müzeli gün' }, recommendations: [], changes: ['Müze eklendi'], conversationId: 12,
+    })
+    renderPage()
+    await userEvent.type(await screen.findByRole('textbox', { name: 'Rotanda değişiklik isteğin' }), 'bir müze ekle')
+    await userEvent.click(screen.getByRole('button', { name: 'Gönder' }))
+
+    // the route's id goes along, no chat id: the backend continues the chat about this route
+    expect(sendMessage).toHaveBeenCalledWith('bir müze ekle', 40.99, 29.02, null, 5)
+    expect(await screen.findByText('Rotanı güncelledim: bir müze ekledim.')).toBeInTheDocument()
+    expect(screen.getByText('Müzeli gün')).toBeInTheDocument()
+    expect(screen.getByText('Müze eklendi')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Sohbette devam et/ })).toHaveAttribute('href', '/assistant?c=12')
+  })
+
+  it('offers to add an assistant’s route that is not in Rotalarım yet', async () => {
+    route.mockResolvedValue({ ...ROUTE, listed: false })
+    updateRoute.mockResolvedValue({ ...ROUTE, listed: true })
+    renderPage()
+    expect(await screen.findByText('Bu rota henüz Rotalarım’da değil.')).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ekle' }))
+    expect(updateRoute).toHaveBeenCalledWith(5, { listed: true })
+    expect(screen.queryByText('Bu rota henüz Rotalarım’da değil.')).not.toBeInTheDocument()
   })
 })

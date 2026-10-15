@@ -32,6 +32,9 @@ public final class DayTemplate {
     // "Gezi" in the form is a toggle, not "one place": at least this many sights, more with several sight interests
     static final int MIN_SIGHTS = 2;
     static final int MAX_SIGHTS = 3;
+    // Shorter than this ("akşamüstü yürüyüş, tatlı ve akşam yemeği", 17:15-22:00) is no day trip: the sights asked
+    // for stay as asked. A second sight there only made a walk 500 m the other way and back in small towns (Of)
+    static final int DAY_TRIP_MINUTES = 6 * 60;
 
     private DayTemplate() {
     }
@@ -51,7 +54,7 @@ public final class DayTemplate {
                     .filter(s -> fitsWindow(s.targetTime(), start, end))
                     .toList();
         }
-        requested = withEnoughSights(requested, interests);
+        requested = withEnoughSights(requested, interests, minutesBetween(start, end) >= DAY_TRIP_MINUTES);
 
         List<PlanningSlot> slots = new ArrayList<>();
         int sightseeingCount = 0;
@@ -75,19 +78,33 @@ public final class DayTemplate {
         return slots;
     }
 
-    // The requested stops with MIN_SIGHTS..MAX_SIGHTS sightseeing stops when sights are wanted at all
     static List<StopType> withEnoughSights(List<StopType> requested, List<String> interests) {
+        return withEnoughSights(requested, interests, true);
+    }
+
+    /**
+     * The requested stops with MIN_SIGHTS..MAX_SIGHTS sightseeing stops when sights are wanted at all; in a short
+     * window (dayTrip false) one sight is enough, and an asked number of sights is kept.
+     */
+    static List<StopType> withEnoughSights(List<StopType> requested, List<String> interests, boolean dayTrip) {
         long sightInterests = interests == null ? 0 : interests.stream().filter(SIGHT_INTERESTS::contains).count();
         long asked = requested.stream().filter(t -> t == StopType.SIGHTSEEING).count();
         if (asked == 0 && sightInterests == 0) {
             return requested;
         }
-        long wanted = Math.max(asked, sightInterests >= 2 ? MAX_SIGHTS : MIN_SIGHTS);
+        long wanted = !dayTrip ? Math.max(asked, 1)
+                : Math.max(asked, sightInterests >= 2 ? MAX_SIGHTS : MIN_SIGHTS);
         List<StopType> result = new ArrayList<>(requested);
         for (long i = asked; i < wanted; i++) {
             result.add(StopType.SIGHTSEEING);
         }
         return result;
+    }
+
+    // Length of the user's window; one that runs past midnight ends the next day
+    static long minutesBetween(LocalTime start, LocalTime end) {
+        long minutes = java.time.Duration.between(start, end).toMinutes();
+        return minutes <= 0 ? minutes + 24 * 60 : minutes;
     }
 
     // A template stop is kept if its time is inside the user's window (with a little slack at the start)

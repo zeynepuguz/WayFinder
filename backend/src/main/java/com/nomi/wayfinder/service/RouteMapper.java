@@ -47,7 +47,8 @@ public class RouteMapper {
                 stops,
                 route.getCreatedAt(),
                 route.getUpdatedAt(),
-                group
+                group,
+                route.isListed()
         );
     }
 

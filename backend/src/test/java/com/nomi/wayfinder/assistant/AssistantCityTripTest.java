@@ -65,13 +65,17 @@ class AssistantCityTripTest {
     @Test
     void famousSightsOfTheNamedCityForTheWholeGroup() {
         RouteResponse popular = mock(RouteResponse.class);
+        when(popular.id()).thenReturn(9L);
         when(popularRoutes.startBest(eq(1L), eq("bursa"), isNull(), any(), eq(4), eq(4000), eq(true)))
                 .thenReturn(Optional.of(popular));
+        // The assistant's route waits in the chat until the user adds it to "Rotalarım"
+        RouteResponse kept = mock(RouteResponse.class);
+        when(routeService.keepInChatOnly(1L, 9L)).thenReturn(kept);
 
         AssistantReply reply = service.handle(1L, new AssistantRequest(MESSAGE, GPS_LAT, GPS_LON, null));
 
         assertThat(reply.reply()).isEqualTo("Popular");
-        assertThat(reply.route()).isSameAs(popular);
+        assertThat(reply.route()).isSameAs(kept);
         verify(routeService, never()).createRoute(anyLong(), any());
     }
 
