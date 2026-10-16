@@ -5,7 +5,8 @@ import type { City, District, HomeResponse, RouteSummary } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { todayIso } from '../lib/format'
 import { setHomeArea } from '../lib/homeArea'
-import { HomePage } from './HomePage'
+import { HomePage, ideaNow } from './HomePage'
+import { tr } from '../lib/i18n'
 
 const city = (slug: string, name: string, latitude: number, longitude: number): City => ({
   slug, name, placeCount: 1000, districtCount: 12, latitude, longitude, south: 0, west: 0, north: 0, east: 0,
@@ -66,13 +67,18 @@ function renderHome() {
   )
 }
 
+// The idea depends on the time of day: 14:00 (afternoon: Tarih & Kültür) unless a test says otherwise
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 9, 15, 14, 0))
   vi.clearAllMocks()
   setHomeArea(null)
   resetDistrictCache()
   cityAt.mockResolvedValue(ISTANBUL)
   districts.mockResolvedValue([IZMIT])
 })
+
+afterEach(() => vi.useRealTimers())
 
 describe('HomePage route card', () => {
   it('shows today’s route as the active route', async () => {
@@ -85,7 +91,7 @@ describe('HomePage route card', () => {
   it('never shows a route of a past day as active', async () => {
     home.mockResolvedValue(response({ currentRoute: summary(1, '27 Eylül Pazar Rotası', shift(-1)) }))
     renderHome()
-    await screen.findByText('Rota fikirleri')
+    await screen.findByText('Şimdi için öneri')
     await Promise.resolve()
     expect(screen.queryByText('Aktif rotan')).not.toBeInTheDocument()
     expect(screen.queryByText('27 Eylül Pazar Rotası')).not.toBeInTheDocument()
@@ -110,10 +116,10 @@ describe('HomePage asks the assistant in a new chat', () => {
   it('an idea card starts a new chat with its prompt', async () => {
     home.mockResolvedValue(response({}))
     renderHome()
-    await userEvent.click(screen.getByRole('button', { name: /Kahve & Tatlı Turu/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Tarih & Kültür/ }))
     const url = screen.getByTestId('url').textContent ?? ''
     expect(url).toMatch(/^\/assistant\?new=1&q=/)
-    expect(new URLSearchParams(url.split('?')[1]).get('q')).toBe('Kahve ve tatlı ağırlıklı, az yürümeli bir rota planla')
+    expect(new URLSearchParams(url.split('?')[1]).get('q')).toBe('Tarihi yerler ve müzeler ağırlıklı bir rota planla')
   })
 })
 
@@ -139,18 +145,19 @@ describe('HomePage place', () => {
 
     expect(await screen.findAllByText('İzmit, Kocaeli')).not.toHaveLength(0)
     expect(home).toHaveBeenLastCalledWith(40.76, 29.92)
-    await userEvent.click(screen.getByRole('button', { name: /Kahve & Tatlı Turu/ }))
+    await userEvent.click(screen.getByRole('button', { name: /Tarih & Kültür/ }))
     const url = screen.getByTestId('url').textContent ?? ''
-    expect(new URLSearchParams(url.split('?')[1]).get('q')).toBe('Kocaeli İzmit’te kahve ve tatlı ağırlıklı, az yürümeli bir rota planla')
+    expect(new URLSearchParams(url.split('?')[1]).get('q')).toBe('Kocaeli İzmit’te tarihi yerler ve müzeler ağırlıklı bir rota planla')
   })
 
-  it('“Genel” is the whole city, and the popular routes link opens that city', async () => {
+  it('“Genel” is the whole city: suggestions around it, ideas for it', async () => {
     home.mockResolvedValue(response({}))
     setHomeArea({ city: KOCAELI, district: null })
     renderHome()
     expect(home).toHaveBeenCalledWith(40.77, 29.94)
-    await userEvent.click(screen.getByRole('link', { name: /Popüler rotalar/ }))
-    expect(screen.getByTestId('url')).toHaveTextContent('/explore?sehir=kocaeli&rotalar=1')
+    await userEvent.click(screen.getByRole('button', { name: /Tarih & Kültür/ }))
+    const url = screen.getByTestId('url').textContent ?? ''
+    expect(new URLSearchParams(url.split('?')[1]).get('q')).toBe('Kocaeli’de tarihi yerler ve müzeler ağırlıklı bir rota planla')
   })
 
   it('“Konumumu kullan” returns to the device location', async () => {
@@ -162,12 +169,31 @@ describe('HomePage place', () => {
     expect(screen.getByRole('button', { name: /Yer seç/ })).toBeInTheDocument()
   })
 
-  it('“Uygun Bütçeli Gün” is shown last as coming soon and asks nothing', async () => {
+  it('shows one idea for right now, not a list', async () => {
     home.mockResolvedValue(response({}))
     renderHome()
-    const soon = screen.getByText('Uygun Bütçeli Gün').closest('[aria-disabled="true"]')
-    expect(soon).not.toBeNull()
-    expect(within(soon as HTMLElement).getByText('Yakında')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Uygun Bütçeli Gün/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Şimdi için öneri')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Tarih & Kültür/ })).toBeInTheDocument()
+    expect(screen.queryByText('Rota fikirleri')).not.toBeInTheDocument()
+    expect(screen.queryByText('Uygun Bütçeli Gün')).not.toBeInTheDocument()
+  })
+})
+
+describe('ideaNow: one idea that makes sense now', () => {
+  const title = (date: Date, rainy = false) => ideaNow(tr, null, date, rainy).title
+  const at = (h: number, m = 0) => new Date(2026, 9, 15, h, m)
+
+  it('by the time of day', () => {
+    expect(title(at(9))).toBe('Kahvaltı & Gezi')
+    expect(title(at(11, 29))).toBe('Kahvaltı & Gezi')
+    expect(title(at(11, 30))).toBe('Tarih & Kültür')
+    expect(title(at(17))).toBe('Akşamüstü Yürüyüşü')
+    expect(title(at(22))).toBe('Yarın İçin Plan')
+    expect(title(at(2))).toBe('Yarın İçin Plan')
+  })
+
+  it('indoors when it rains (no walk in the rain)', () => {
+    expect(title(at(17), true)).toBe('Kapalı Mekanlar')
+    expect(title(at(9), true)).toBe('Kapalı Mekanlar')
   })
 })

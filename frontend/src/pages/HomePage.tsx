@@ -1,6 +1,6 @@
 import {
-  ArrowRight, ArrowUp, ChevronDown, ChevronRight, Cloud, Coffee, Crown, Landmark, Map as MapIcon, MapPin, Navigation, Route as RouteIcon,
-  Search, Sunset, UserRound, Wallet, type LucideIcon,
+  ArrowRight, ArrowUp, CalendarDays, ChevronDown, ChevronRight, Cloud, CloudRain, Croissant, Crown, Landmark, Map as MapIcon,
+  MapPin, Navigation, Route as RouteIcon, Search, Sunset, UserRound, type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -12,7 +12,7 @@ import { useGate } from '../components/gate'
 import { HScroll } from '../components/HScroll'
 import { PlaceCard } from '../components/PlaceViews'
 import { ErrorState, Skeleton } from '../components/ui'
-import { BrandMark, CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
+import { CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useCity } from '../context/CityContext'
 import { locationLabel, useUserLocation } from '../context/LocationContext'
@@ -24,34 +24,55 @@ import { setHomeArea, useHomeArea } from '../lib/homeArea'
 import { locale, useT, type Translate } from '../lib/i18n'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 
+type Idea = { title: string; text: string; prompt: string; icon: LucideIcon }
+
 /**
- * Ready-made ideas: tapping one asks the assistant (paid) with this prompt, for the place Ana Sayfa is about.
+ * One ready-made idea that makes sense now: by the time of day, indoors when it rains. Tapping it asks the assistant
+ * for the place Ana Sayfa is about (without a pass: the paywall first, then the assistant with this idea).
  * where = "Kocaeli İzmit’te" / "in İzmit, Kocaeli" for a picked place; null = the device location (the assistant
  * already plans from there).
  */
-const ideas = (t: Translate, where: { tr: string; en: string } | null): { title: string; text: string; prompt: string; icon: LucideIcon }[] => {
+export function ideaNow(t: Translate, where: { tr: string; en: string } | null, now: Date, rainy: boolean): Idea {
+  const minutes = now.getHours() * 60 + now.getMinutes()
   const tr = (text: string) => (where ? `${where.tr} ${text.charAt(0).toLocaleLowerCase('tr')}${text.slice(1)}` : text)
   const en = (text: string) => (where ? `${text} ${where.en}` : text)
-  return [
-    {
-      title: t('Kahve & Tatlı Turu', 'Coffee & Dessert Tour'),
-      text: t('Nitelikli kahve ve tatlıcılar', 'Specialty coffee and dessert shops'),
-      prompt: t(tr('Kahve ve tatlı ağırlıklı, az yürümeli bir rota planla'), en('Plan a route focused on coffee and desserts, with little walking')),
-      icon: Coffee,
+  const idea = {
+    breakfast: {
+      title: t('Kahvaltı & Gezi', 'Breakfast & Sights'),
+      text: t('Kahvaltıyla başlayan bir sabah', 'A morning that starts with breakfast'),
+      prompt: t(tr('Kahvaltıyla başlayan, yakındaki gezilecek yerlerle bir sabah rotası planla'), en('Plan a morning route that starts with breakfast and visits sights nearby')),
+      icon: Croissant,
     },
-    {
-      title: t('Tarih & Kültür Günü', 'History & Culture Day'),
+    history: {
+      title: t('Tarih & Kültür', 'History & Culture'),
       text: t('Müzeler, tarihi yerler ve aralarda mola', 'Museums, historic sights and breaks in between'),
-      prompt: t(tr('Tarihi yerler ve müzeler ağırlıklı bir günlük rota planla'), en('Plan a day route focused on historic sights and museums')),
+      prompt: t(tr('Tarihi yerler ve müzeler ağırlıklı bir rota planla'), en('Plan a route focused on historic sights and museums')),
       icon: Landmark,
     },
-    {
+    evening: {
       title: t('Akşamüstü Yürüyüşü', 'Evening Walk'),
       text: t('Yürüyüş, tatlı ve akşam yemeği', 'A walk, dessert and dinner'),
       prompt: t(tr('Akşamüstü yürüyüş, tatlı ve akşam yemeği içeren bir rota planla'), en('Plan an evening route with a walk, dessert and dinner')),
       icon: Sunset,
     },
-  ]
+    indoors: {
+      title: t('Kapalı Mekanlar', 'Indoors Day'),
+      text: t('Yağmurda müze, kafe ve kapalı yerler', 'Museums, cafés and indoor places in the rain'),
+      prompt: t(tr('Yağmur olduğu için müze ve kafe gibi kapalı mekanlar ağırlıklı bir rota planla'), en('Plan a route of indoor places like museums and cafés because it is raining')),
+      icon: CloudRain,
+    },
+    tomorrow: {
+      title: t('Yarın İçin Plan', 'Plan for Tomorrow'),
+      text: t('Kahvaltıdan akşama tam bir gün', 'A full day from breakfast to dinner'),
+      prompt: t(tr('Yarın için tam günlük bir gezi rotası planla'), en('Plan a full day trip for tomorrow')),
+      icon: CalendarDays,
+    },
+  }
+  if (minutes >= 21 * 60 || minutes < 5 * 60) return idea.tomorrow
+  if (rainy) return idea.indoors
+  if (minutes < 11 * 60 + 30) return idea.breakfast
+  if (minutes < 16 * 60) return idea.history
+  return idea.evening
 }
 
 const CATEGORIES: PlaceCategory[] = ['CAFE', 'RESTAURANT', 'DESSERT', 'MUSEUM', 'PARK', 'ATTRACTION']
@@ -108,38 +129,39 @@ export function HomePage() {
   const WeatherIcon = weather ? WEATHER_ICON[weather.condition] ?? Cloud : Cloud
   const weatherTone = weather?.condition === 'RAIN' || weather?.condition === 'STORM' ? 'weather-rain'
     : weather && weather.apparentTemperature >= 30 ? 'weather-hot' : ''
+  const idea = ideaNow(t, where, new Date(), weatherTone === 'weather-rain')
+  const IdeaIcon = idea.icon
 
   return (
     <main className="screen">
       <section className="home-hero">
-        <div className="row-between">
-          <BrandMark />
-          <div className="row" style={{ gap: 8 }}>
+        {/* The place (left) and language / profile (right) on one line */}
+        <div className="home-top">
+          <div className="row wrap grow" style={{ gap: 8 }}>
+            {area ? (
+              <button className="location-chip" onClick={() => setCityOpen(true)} aria-label={`${t('Yer seç', 'Choose a place')}: ${areaName}`}>
+                <MapPin size={13} /> {areaName}
+              </button>
+            ) : (
+              <button className="location-chip" onClick={location.refresh}>
+                <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
+                <Navigation size={13} /> {locationLabel(location.source)}
+              </button>
+            )}
+            {area ? (
+              <button className="chip-link" onClick={() => setHomeArea(null)}>
+                <Navigation size={14} /> {t('Konumumu kullan', 'Use my location')}
+              </button>
+            ) : (
+              <button className="chip-link" onClick={() => setCityOpen(true)}>
+                <MapPin size={14} /> {t('Yer seç', 'Choose a place')} <ChevronDown size={14} />
+              </button>
+            )}
+          </div>
+          <div className="row" style={{ gap: 8, flexShrink: 0 }}>
             <LanguageSwitch compact />
             <Link to="/profile" className="icon-btn" aria-label={t('Profil', 'Profile')}><UserRound size={20} /></Link>
           </div>
-        </div>
-
-        <div className="row wrap" style={{ gap: 8 }}>
-          {area ? (
-            <button className="location-chip" onClick={() => setCityOpen(true)} aria-label={`${t('Yer seç', 'Choose a place')}: ${areaName}`}>
-              <MapPin size={13} /> {areaName}
-            </button>
-          ) : (
-            <button className="location-chip" onClick={location.refresh}>
-              <span className={`dot ${location.source === 'gps' ? 'dot-live' : ''}`} />
-              <Navigation size={13} /> {locationLabel(location.source)}
-            </button>
-          )}
-          {area ? (
-            <button className="chip-link" onClick={() => setHomeArea(null)}>
-              <Navigation size={14} /> {t('Konumumu kullan', 'Use my location')}
-            </button>
-          ) : (
-            <button className="chip-link" onClick={() => setCityOpen(true)}>
-              <MapPin size={14} /> {t('Yer seç', 'Choose a place')} <ChevronDown size={14} />
-            </button>
-          )}
         </div>
 
         <div className="stack-sm">
@@ -219,46 +241,17 @@ export function HomePage() {
         </Link>
       </section>
 
-      <section className="section">
-        <div className="section-head">
-          <h2 className="t-title" style={{ fontSize: 20 }}>{t('Rota fikirleri', 'Route ideas')}</h2>
-          {!hasAccess && <span className="badge badge-premium"><Crown size={12} /> Premium</span>}
-        </div>
-        <div className="stack-sm">
-          {ideas(t, where).map(({ title, text, prompt, icon: Icon }) => (
-            <button key={title} className="card card-press idea-row" onClick={() => ask(prompt)}>
-              <span className="idea-icon"><Icon size={20} /></span>
-              <span className="grow">
-                <span className="idea-title">{title}</span>
-                <span className="t-caption">{text}</span>
-              </span>
-              <ChevronRight size={20} className="muted" />
-            </button>
-          ))}
-          {/* Ready-made routes of the chosen city (free to look at; starting one needs Premium) */}
-          <Link to={`/explore?${areaCity ? `sehir=${areaCity.slug}&${area?.district ? `ilce=${area.district.slug}&` : ''}` : ''}rotalar=1`} className="card card-press idea-row">
-            <span className="idea-icon"><RouteIcon size={20} /></span>
-            <span className="grow">
-              <span className="idea-title">{t('Popüler rotalar', 'Popular routes')}</span>
-              <span className="t-caption">
-                {areaName
-                  ? t(`${areaName} için Nomi kullanıcılarının beğendiği rotalar`, `Routes Nomi users liked in ${areaName}`)
-                  : t('Nomi kullanıcılarının beğendiği rotalar', 'Routes Nomi users liked')}
-              </span>
-            </span>
-            <ChevronRight size={20} className="muted" />
-          </Link>
-          {/* Needs prices for most places first: shown, not offered yet */}
-          <div className="card idea-row idea-soon" aria-disabled="true">
-            <span className="idea-icon"><Wallet size={20} /></span>
-            <span className="grow">
-              <span className="idea-title">{t('Uygun Bütçeli Gün', 'Day on a Budget')}</span>
-              <span className="t-caption">{t('Yeterli fiyat bilgisi toplanınca açılacak', 'Opens once we have enough price information')}</span>
-            </span>
-            <span className="badge">{t('Yakında', 'Soon')}</span>
-          </div>
-        </div>
-      </section>
+      {/* One idea for right now; the assistant does the rest */}
+      <button className="card card-press idea-now" onClick={() => ask(idea.prompt)}>
+        <span className="idea-icon"><IdeaIcon size={22} /></span>
+        <span className="grow">
+          <span className="t-overline">{t('Şimdi için öneri', 'An idea for now')}</span>
+          <span className="idea-title">{idea.title}</span>
+          <span className="t-caption">{idea.text}</span>
+        </span>
+        {!hasAccess && <span className="badge badge-premium"><Crown size={12} /> Premium</span>}
+        <ChevronRight size={20} className="muted" />
+      </button>
 
       <section className="section">
         <h2 className="t-title" style={{ fontSize: 20 }}>{t('Kategoriler', 'Categories')}</h2>
