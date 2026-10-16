@@ -16,7 +16,7 @@ import { CATEGORY_ICON, WEATHER_ICON } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useCity } from '../context/CityContext'
 import { locationLabel, useUserLocation } from '../context/LocationContext'
-import { CATEGORY_LABELS, isOpenRoute, locativeTr, STOP_TYPE_LABELS, todayIso } from '../lib/format'
+import { CATEGORY_LABELS, formatDistance, isOpenRoute, locativeTr, STOP_TYPE_LABELS, todayIso } from '../lib/format'
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
 import { useDistricts } from '../lib/districts'
@@ -129,6 +129,15 @@ export function HomePage() {
   const WeatherIcon = weather ? WEATHER_ICON[weather.condition] ?? Cloud : Cloud
   const weatherTone = weather?.condition === 'RAIN' || weather?.condition === 'STORM' ? 'weather-rain'
     : weather && weather.apparentTemperature >= 30 ? 'weather-hot' : ''
+  // How far a suggestion is, and from what: the user (their position) or the centre of the picked place
+  const distanceFrom = (meters: number) => {
+    const distance = formatDistance(meters)
+    const minutes = Math.max(1, Math.ceil(meters * 1.3 / 75))
+    const centre = area ? (area.district ?? area.city).name : null
+    return centre
+      ? t(`${centre} merkezine ${distance}`, `${distance} from the centre of ${centre}`)
+      : t(`Sana ${distance} (~${minutes} dk yürüme)`, `${distance} from you (~${minutes} min walk)`)
+  }
   const idea = ideaNow(t, where, new Date(), weatherTone === 'weather-rain')
   const IdeaIcon = idea.icon
 
@@ -230,7 +239,8 @@ export function HomePage() {
         <HScroll>
           {loading && [0, 1].map(i => <Skeleton key={i} width={260} height={230} radius={14} />)}
           {data?.suggestions.map(s => (
-            <PlaceCard key={s.place.id} place={s.place} reason={s.reasons.find(r => r.startsWith('Hava') || r.startsWith('Indoor place')) ?? s.reasons[0]} />
+            <PlaceCard key={s.place.id} place={s.place}
+                       reason={s.reasons.find(r => r.startsWith('Hava') || r.startsWith('Indoor place')) ?? (s.place.distanceMeters != null ? distanceFrom(s.place.distanceMeters) : s.reasons[0])} />
           ))}
         </HScroll>
         {data && data.suggestions.length === 0 && (

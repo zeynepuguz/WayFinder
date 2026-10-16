@@ -26,9 +26,12 @@ public class PlaceController {
 
     private final PlaceService placeService;
     private final PlaceAvailabilityService availabilityService;
+    private final com.nomi.wayfinder.geocoding.PlaceAddressService addressService;
 
     public PlaceController(PlaceService placeService,
-                           PlaceAvailabilityService availabilityService) {
+                           PlaceAvailabilityService availabilityService,
+                           com.nomi.wayfinder.geocoding.PlaceAddressService addressService) {
+        this.addressService = addressService;
         this.placeService = placeService;
         this.availabilityService = availabilityService;
     }
@@ -91,6 +94,12 @@ public class PlaceController {
      * Is the place still there (Google Places, when a key is set) and where "Google Haritalar'da aç" should go:
      * the exact Google place, else a search around our pin. A place closed for good on Google is hidden from Nomi.
      */
+    /** The full address: the place's own street address, else looked up once from OpenStreetMap (null = none). */
+    @GetMapping("/{id}/address")
+    public java.util.Map<String, String> address(@PathVariable Long id) {
+        return java.util.Collections.singletonMap("address", addressService.address(id));
+    }
+
     @GetMapping("/{id}/availability")
     public PlaceAvailabilityService.Availability availability(@PathVariable Long id) {
         return availabilityService.check(id);

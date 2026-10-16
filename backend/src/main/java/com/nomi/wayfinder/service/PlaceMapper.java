@@ -70,7 +70,7 @@ public class PlaceMapper {
         // Same JSON field in both languages; English falls back to Turkish when there is no translation
         response.setDescription(Texts.english() && place.getDescriptionEn() != null
                 ? place.getDescriptionEn() : place.getDescription());
-        response.setAddress(place.getAddress());
+        response.setAddress(place.getAddress() != null && !place.getAddress().isBlank() ? place.getAddress() : place.getGeoAddress());
         response.setNeighborhood(place.getNeighborhood());
         response.setDistrict(place.getDistrictName());
         response.setCity(place.getCityName());

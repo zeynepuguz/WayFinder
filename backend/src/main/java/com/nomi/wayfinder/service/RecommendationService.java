@@ -185,13 +185,22 @@ public class RecommendationService {
         return results;
     }
 
+    // The scorer's first reason is about a route leg ("Başlangıç noktana 71 m"); a suggestion has no route
+    private static List<String> nearbyReasons(Evaluated e) {
+        List<String> reasons = new ArrayList<>(e.scored().reasons());
+        if (!reasons.isEmpty()) {
+            reasons.set(0, PlaceScorer.awayReason(e.distanceMeters(), e.walkingMinutes()));
+        }
+        return reasons;
+    }
+
     private List<Recommendation> toNearby(List<Evaluated> evaluated, StopType type, int limit) {
         return evaluated.stream()
                 .map(e -> new Recommendation(
                         placeMapper.toNearbyResponse(e.place(), e.distanceMeters()),
                         type,
                         Math.round(e.scored().score() * 10) / 10.0,
-                        e.scored().reasons(),
+                        nearbyReasons(e),
                         null))
                 .sorted(Comparator.comparingDouble(Recommendation::score).reversed())
                 .limit(limit)

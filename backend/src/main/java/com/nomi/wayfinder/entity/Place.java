@@ -35,6 +35,10 @@ public class Place {
 
     private String address;
 
+    // Looked up from OpenStreetMap when the place has no street address (geocoding/PlaceAddressService writes it)
+    @Column(insertable = false, updatable = false)
+    private String geoAddress;
+
     private String neighborhood;
 
     // WGS84 (GPS) point; geography type makes distances come back in meters
@@ -353,6 +357,10 @@ public class Place {
 
     public String getAddress() {
         return address;
+    }
+
+    public String getGeoAddress() {
+        return geoAddress;
     }
 
     public void setAddress(String address) {

@@ -233,14 +233,14 @@ class EnglishTextsTest {
 
     @Test
     void fartherRecommendationsGetTheirOwnSection() {
-        Recommendation near = recommendation("Yakın Kafe", List.of("Başlangıç noktana 300 m (~6 dk yürüme)"), null);
+        Recommendation near = recommendation("Yakın Kafe", List.of("300 m uzakta (~6 dk yürüme)"), null);
         Recommendation far = recommendation("Uzak Kafe",
                 List.of("1,8 km uzakta (yürüyerek ~32 dk)", "Puanı 4.7"), "Puanı daha yüksek (4.7)");
 
         assertThat(composer.recommendations(List.of(near), List.of(far), StopType.COFFEE.getLabel()))
                 .isEqualTo("""
                         Kahve için önerilerim:
-                        1. Yakın Kafe — Başlangıç noktana 300 m (~6 dk yürüme)
+                        1. Yakın Kafe — 300 m uzakta (~6 dk yürüme)
 
                         Daha uygun ama sana yakın değil:
                         • Uzak Kafe — 1,8 km uzakta (yürüyerek ~32 dk) · Puanı daha yüksek (4.7)""");

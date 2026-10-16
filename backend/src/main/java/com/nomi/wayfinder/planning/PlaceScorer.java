@@ -188,6 +188,13 @@ public class PlaceScorer {
                 Math.round(distanceMeters), walkingMinutes);
     }
 
+    // A suggestion has no route around it: just how far it is from the point asked about ("71 m uzakta")
+    public static String awayReason(double distanceMeters, int walkingMinutes) {
+        return Texts.english()
+                ? String.format(Locale.ROOT, "%d m away (~%d min walk)", Math.round(distanceMeters), walkingMinutes)
+                : String.format(Locale.ROOT, "%d m uzakta (~%d dk yürüme)", Math.round(distanceMeters), walkingMinutes);
+    }
+
     private static boolean isEvening(LocalTime time) {
         return !time.isBefore(LocalTime.of(17, 30));
     }

@@ -69,6 +69,8 @@ export const api = {
   districts: (city: string) => http.get<District[]>('/districts', { city }),
   place: (id: number) => http.get<Place>(`/places/${id}`),
   placeAvailability: (id: number) => http.get<PlaceAvailability>(`/places/${id}/availability`),
+  // The full address (the place's own, else looked up once from OpenStreetMap); null = none known
+  placeAddress: (id: number) => http.get<{ address: string | null }>(`/places/${id}/address`),
   // Stars by Nomi's users (food and drink places); rating again replaces the earlier stars
   placeRating: (id: number) => http.get<PlaceRating>(`/places/${id}/rating`),
   ratePlace: (id: number, stars: number) => http.put<PlaceRating>(`/places/${id}/rating`, { stars }),

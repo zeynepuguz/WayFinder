@@ -45,7 +45,7 @@ class AssistantFartherRecommendationsTest {
 
     @Test
     void recommendReturnsFartherPlacesAsTheirOwnLowerRankedList() {
-        Recommendation near = recommendation("Yakın Kafe", List.of("Başlangıç noktana 300 m (~6 dk yürüme)"), null);
+        Recommendation near = recommendation("Yakın Kafe", List.of("300 m uzakta (~6 dk yürüme)"), null);
         Recommendation far = recommendation("Uzak Kafe", List.of("1,8 km uzakta (yürüyerek ~32 dk)"), "Puanı daha yüksek (4.7)");
         when(intentParser.parse(anyString(), any()))
                 .thenReturn(new AssistantIntent(IntentType.RECOMMEND, null, List.of(), StopType.COFFEE, "RULES"));

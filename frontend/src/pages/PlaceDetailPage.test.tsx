@@ -2,13 +2,16 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { MemoryRouter, Route, Routes } from 'react-router'
 import type { Place } from '../api/types'
 import { PHOTO, place } from '../test/fixtures'
-import { PlaceDetailPage } from './PlaceDetailPage'
+import { PlaceDetailPage, placeArea } from './PlaceDetailPage'
 
 let current: Place
 // What the backend says about the place on Google (null = no answer)
 let availability: object | null = null
 vi.mock('../api', () => ({ api: { place: () => Promise.resolve(current), photos: () => Promise.resolve([]),
-  placeAvailability: () => (availability ? Promise.resolve(availability) : Promise.reject(new Error('offline'))) } }))
+  placeAvailability: () => (availability ? Promise.resolve(availability) : Promise.reject(new Error('offline'))),
+  placeAddress: () => Promise.resolve({ address: lookedUpAddress }) } }))
+// The full address the backend found on OpenStreetMap (null = none)
+let lookedUpAddress: string | null = null
 vi.mock('../components/RouteMap', () => ({ RouteMap: () => null }))
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: null, hasAccess: false }) }))
 vi.mock('../context/SavedPlacesContext', () => ({ useSavedPlaces: () => ({ isSaved: () => false, toggle: vi.fn() }) }))
@@ -20,6 +23,37 @@ function renderPage() {
     </MemoryRouter>,
   )
 }
+
+describe('PlaceDetailPage address', () => {
+  beforeEach(() => { lookedUpAddress = null })
+
+  it('without a street address, the full address looked up on OpenStreetMap', async () => {
+    lookedUpAddress = 'Dere Mah., Taşhan Sokak, 05100 Merkez/Amasya'
+    current = place(5, 'Burmalı Minare Camii', { category: 'ATTRACTION', district: 'Amasya Merkez', city: 'Amasya' })
+    renderPage()
+    expect(await screen.findByText('Dere Mah., Taşhan Sokak, 05100 Merkez/Amasya')).toBeInTheDocument()
+    expect(screen.queryByText('Amasya Merkez, Amasya')).not.toBeInTheDocument()
+  })
+
+  it('when none is known, the district and city are the address', async () => {
+    current = place(5, 'Burmalı Minare Camii', { category: 'ATTRACTION', district: 'Amasya Merkez', city: 'Amasya' })
+    renderPage()
+    expect(await screen.findByText('Amasya Merkez, Amasya')).toBeInTheDocument()
+  })
+
+  it('a street address is shown as it is', async () => {
+    current = place(5, 'Köşe Kahve', { address: 'Caferağa Mah. Moda Cad. 12', district: 'Kadıköy', city: 'İstanbul' })
+    renderPage()
+    expect(await screen.findByText('Caferağa Mah. Moda Cad. 12')).toBeInTheDocument()
+    expect(screen.queryByText('Kadıköy, İstanbul')).not.toBeInTheDocument()
+  })
+
+  it('neighbourhood, district, city, a repeated name once', () => {
+    expect(placeArea({ neighborhood: 'Moda', district: 'Kadıköy', city: 'İstanbul' })).toBe('Moda, Kadıköy, İstanbul')
+    expect(placeArea({ neighborhood: 'Kadıköy', district: 'Kadıköy', city: 'İstanbul' })).toBe('Kadıköy, İstanbul')
+    expect(placeArea({ neighborhood: null, district: null, city: null })).toBeNull()
+  })
+})
 
 describe('PlaceDetailPage photo', () => {
   it('shows the photo as hero with its credit, and drops both if it fails', async () => {

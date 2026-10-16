@@ -79,6 +79,8 @@ class TieredRecommendationTest {
 
         assertThat(result.nearby()).extracting(r -> r.place().getName()).containsExactly("Yakın Kafe");
         assertThat(result.nearby().getFirst().whyBetter()).isNull();
+        // A suggestion has no route: how far it is, not "Başlangıç noktana" (300 m * 1.3 / 75 = 5.2 -> 6 min)
+        assertThat(result.nearby().getFirst().reasons().getFirst()).isEqualTo("300 m uzakta (~6 dk yürüme)");
 
         assertThat(result.farther()).extracting(r -> r.place().getName()).containsExactly("Çok İyi Kafe");
         Recommendation far = result.farther().getFirst();

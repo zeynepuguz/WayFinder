@@ -7,7 +7,7 @@ import { useT } from '../lib/i18n'
 // /iletisim, /kosullar, /gizlilik: the about and legal pages (Google Play needs the privacy policy at a public URL)
 
 const OWNER = 'Zeynep Uğuz'
-const UPDATED = '14 Ekim 2026'
+const UPDATED = '16 Ekim 2026'
 
 function Email() {
   return SUPPORT_EMAIL ? <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a> : <>[DESTEK E-POSTASI]</>
@@ -204,6 +204,8 @@ function Privacy() {
           <li><strong>Google Places:</strong> bir mekanın hâlâ açık olup olmadığını kontrol etmek için mekanın adı,
             ilçesi, şehri ve konumu gönderilir; senin hesap bilgilerin veya konumun gönderilmez.</li>
           <li><strong>Google Play:</strong> satın almaların doğrulanması ve iadelerin takibi için.</li>
+          <li><strong>OpenStreetMap (Nominatim):</strong> sokak adresi kayıtlı olmayan bir mekanın açık adresini bulmak için
+            yalnızca mekanın konumu gönderilir; senin hesap bilgilerin veya konumun gönderilmez.</li>
           <li><strong>Open-Meteo:</strong> hava durumu için konum (enlem/boylam) gönderilir; hesap bilgisi gönderilmez.</li>
           <li><strong>Harita sağlayıcısı:</strong> cihazın harita görsellerini doğrudan bu sağlayıcıdan indirir.</li>
           <li><strong>E-posta gönderim hizmeti:</strong> şifre sıfırlama kodunu e-posta adresine göndermek için.</li>

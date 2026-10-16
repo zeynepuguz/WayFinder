@@ -5,6 +5,7 @@ import type { City, District, HomeResponse, RouteSummary } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { todayIso } from '../lib/format'
 import { setHomeArea } from '../lib/homeArea'
+import { place } from '../test/fixtures'
 import { HomePage, ideaNow } from './HomePage'
 import { tr } from '../lib/i18n'
 
@@ -124,6 +125,22 @@ describe('HomePage asks the assistant in a new chat', () => {
 })
 
 describe('HomePage place', () => {
+  const bedesten = { place: place(4, 'Bedestan Kapalı Çarşısı', { distanceMeters: 136 }), type: 'SIGHTSEEING' as const, score: 1,
+    reasons: ['136 m uzakta (~3 dk yürüme)'], whyBetter: null }
+
+  it('a suggestion says how far it is from the user', async () => {
+    home.mockResolvedValue(response({ suggestions: [bedesten] }))
+    renderHome()
+    expect(await screen.findByText('Sana 136 m (~3 dk yürüme)')).toBeInTheDocument()
+  })
+
+  it('with a picked place, how far from its centre', async () => {
+    home.mockResolvedValue(response({ suggestions: [bedesten] }))
+    setHomeArea({ city: KOCAELI, district: null })
+    renderHome()
+    expect(await screen.findByText('Kocaeli merkezine 136 m')).toBeInTheDocument()
+  })
+
   it('starts at the device location; Keşfet’s city does not change it', async () => {
     home.mockResolvedValue(response({}))
     renderHome()

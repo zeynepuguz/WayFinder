@@ -22,6 +22,9 @@ export function PlaceDetailPage() {
   const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id], { cacheKey: `place:${id}` })
   // Is it still there (Google Places)? Never blocks the page: without an answer the search around our pin is used
   const { data: availability } = useAsync(() => api.placeAvailability(Number(id)).catch(() => null), [id])
+  // Most places have no street address of their own: asked once, then stored by the backend
+  const { data: lookedUp } = useAsync(() => (place && !place.address
+    ? api.placeAddress(Number(id)).then(r => r.address).catch(() => null) : Promise.resolve(null)), [id, !place ? 'loading' : place.address ? 'has' : 'none'])
   const photo = usePlacePhoto(place?.image)
 
   if (loading) {
@@ -46,6 +49,8 @@ export function PlaceDetailPage() {
   const closed = availability?.status === 'CLOSED_PERMANENTLY'
   // No match on Google, or the owner marked it "may have closed"
   const notFound = availability?.status === 'NOT_FOUND' || Boolean(place.suspect)
+  // The street address, else the looked-up one; meanwhile (or when none is known) neighbourhood, district and city
+  const address = place.address?.trim() || lookedUp || placeArea(place)
 
   return (
     <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
@@ -80,7 +85,7 @@ export function PlaceDetailPage() {
         {place.description && <p className="ink-2">{place.description}</p>}
 
         <div className="card" style={{ padding: '4px 16px' }}>
-          {place.address && <div className="info-row"><MapPin size={18} />{place.address}</div>}
+          {address && <div className="info-row"><MapPin size={18} />{address}</div>}
           <div className="info-row">
             <Clock size={18} />
             {place.openingHours.length === 0 ? t('Çalışma saati bilgisi yok', 'Opening hours unknown')
@@ -178,4 +183,11 @@ export function PlaceDetailPage() {
       </div>
     </main>
   )
+}
+
+// "Moda, Kadıköy, İstanbul" (a name repeated, e.g. district and neighbourhood both "Kadıköy", is written once)
+export function placeArea(place: { neighborhood: string | null; district: string | null; city: string | null }): string | null {
+  const parts = [place.neighborhood, place.district, place.city].map(p => p?.trim()).filter((p): p is string => !!p)
+  const unique = parts.filter((part, i) => !parts.slice(0, i).some(earlier => earlier.toLocaleLowerCase('tr') === part.toLocaleLowerCase('tr')))
+  return unique.length ? unique.join(', ') : null
 }
