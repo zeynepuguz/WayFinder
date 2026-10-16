@@ -34,6 +34,11 @@ import java.util.Optional;
 public class PlaceAvailabilityService {
 
     private static final Logger log = LoggerFactory.getLogger(PlaceAvailabilityService.class);
+    // Places that are no business: Google Places search often does not know them, so a miss does not mean closed
+    static final java.util.Set<com.nomi.wayfinder.entity.PlaceCategory> NOT_A_BUSINESS = java.util.EnumSet.of(
+            com.nomi.wayfinder.entity.PlaceCategory.PARK, com.nomi.wayfinder.entity.PlaceCategory.ATTRACTION,
+            com.nomi.wayfinder.entity.PlaceCategory.WORSHIP, com.nomi.wayfinder.entity.PlaceCategory.CULTURE);
+
     // The second search (name + district + city): the same name this far from our pin is still our place
     static final int WIDE_RADIUS_METERS = 2000;
 
@@ -101,7 +106,10 @@ public class PlaceAvailabilityService {
             }
         }
         if (match.isEmpty()) {
-            return new Availability(Status.NOT_FOUND, nearPin, null);
+            // Not finding a park, a square or a mosque says nothing (Places search often leaves them out), nor a place
+            // the owner saw is there: no "may have closed" for them
+            boolean mayClose = !place.isPresenceConfirmed() && !NOT_A_BUSINESS.contains(place.getCategory());
+            return new Availability(mayClose ? Status.NOT_FOUND : Status.UNCHECKED, nearPin, null);
         }
         GooglePlace google = match.get();
         String exact = "https://www.google.com/maps/search/?api=1&query=" + encode(google.name())

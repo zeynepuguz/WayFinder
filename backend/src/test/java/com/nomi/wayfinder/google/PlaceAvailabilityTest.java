@@ -120,6 +120,29 @@ class PlaceAvailabilityTest {
     }
 
     @Test
+    void aParkGoogleDoesNotKnowIsNotWarnedAsClosed() {
+        // Fatih Sultan Mehmet Parkı, Çayırova: on Google Maps, but Places search never returns it
+        Place park = new Place();
+        ReflectionTestUtils.setField(park, "id", 9L);
+        park.setName("Fatih Sultan Mehmet Parkı");
+        park.setCategory(PlaceCategory.PARK);
+        park.setCoordinates(40.8127, 29.3679);
+        when(places.findById(9L)).thenReturn(Optional.of(park));
+        when(client.search(anyString(), anyDouble(), anyDouble())).thenReturn(List.of());
+
+        assertThat(service.check(9L).status()).isEqualTo(Status.UNCHECKED);
+    }
+
+    @Test
+    void aCafeTheOwnerConfirmedIsNotWarnedEither() {
+        when(client.search(anyString(), anyDouble(), anyDouble())).thenReturn(List.of());
+        assertThat(service.check(7L).status()).isEqualTo(Status.NOT_FOUND);
+
+        ReflectionTestUtils.setField(places.findById(7L).orElseThrow(), "presenceConfirmedAt", java.time.Instant.now());
+        assertThat(service.check(7L).status()).isEqualTo(Status.UNCHECKED);
+    }
+
+    @Test
     void withoutAKeyNothingIsAskedAndTheSearchStaysAroundThePin() {
         when(client.enabled()).thenReturn(false);
 

@@ -117,7 +117,8 @@ export interface OpeningHours {
 }
 
 // The owner's admin area (/admin/review/**)
-export type ReviewAction = 'REMOVE' | 'SUSPECT' | 'CLEAR'
+// CONFIRM: "Bu yer var" (a "may have closed" warning was wrong)
+export type ReviewAction = 'REMOVE' | 'SUSPECT' | 'CLEAR' | 'CONFIRM'
 export type ReportReason = 'CLOSED' | 'WRONG_LOCATION'
 
 export interface ReviewedPlace {

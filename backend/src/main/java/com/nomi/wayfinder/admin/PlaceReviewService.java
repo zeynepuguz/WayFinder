@@ -22,7 +22,8 @@ import java.util.List;
 @Service
 public class PlaceReviewService {
 
-    public enum Action { REMOVE, SUSPECT, CLEAR }
+    // CONFIRM: "Bu yer var" on the place page (no "may have closed" warning any more)
+    public enum Action { REMOVE, SUSPECT, CLEAR, CONFIRM }
 
     public enum ReportReason { CLOSED, WRONG_LOCATION }
 
@@ -73,6 +74,12 @@ public class PlaceReviewService {
             // Back to normal (also "geri al" in the removed places)
             case CLEAR -> jdbc.update("""
                     UPDATE places SET review = NULL, hidden = FALSE, reviewed_at = now(), updated_at = now()
+                    WHERE id = ?""", placeId);
+            // The owner saw it is there: no "may have closed" (Google, own mark, missing from Overture) and plannable
+            case CONFIRM -> jdbc.update("""
+                    UPDATE places SET presence_confirmed_at = now(), unconfirmed = FALSE,
+                           review = CASE WHEN review = 'SUSPECT' THEN NULL ELSE review END,
+                           reviewed_at = now(), updated_at = now()
                     WHERE id = ?""", placeId);
         };
         if (changed == 0) {

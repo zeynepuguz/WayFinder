@@ -1,4 +1,5 @@
 import { Clock, ExternalLink, Globe, Bookmark, Info, MapPin, Navigation, Phone, Timer, Umbrella, Wallet } from 'lucide-react'
+import { useState } from 'react'
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
@@ -6,9 +7,10 @@ import { PlaceRating } from '../components/PlaceRating'
 import { FavoriteBadge, OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { PlaceReportAndReview } from '../components/PlaceReview'
 import { RouteMap } from '../components/RouteMap'
-import { Alert, BackButton, ErrorState, Skeleton } from '../components/ui'
+import { Alert, BackButton, ErrorState, Skeleton, Spinner, useToast } from '../components/ui'
 import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
+import { useAuth } from '../context/AuthContext'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
 import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, shownRating, TAG_LABELS } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
@@ -21,6 +23,24 @@ export function PlaceDetailPage() {
   const t = useT()
   const { data: place, error, loading, reload } = useAsync(() => api.place(Number(id)), [id], { cacheKey: `place:${id}` })
   // Is it still there (Google Places)? Never blocks the page: without an answer the search around our pin is used
+  const { user } = useAuth()
+  const admin = user?.role === 'ADMIN'
+  const toast = useToast()
+  // The owner's "Bu yer var": the warning goes at once (the backend stops warning about this place)
+  const [confirmed, setConfirmed] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  async function confirm() {
+    setConfirming(true)
+    try {
+      await api.reviewPlace(Number(id), 'CONFIRM')
+      setConfirmed(true)
+      toast(t('Uyarı kaldırıldı', 'Warning removed'))
+    } catch {
+      toast(t('Uyarı kaldırılamadı', 'Couldn’t remove the warning'))
+    } finally {
+      setConfirming(false)
+    }
+  }
   const { data: availability } = useAsync(() => api.placeAvailability(Number(id)).catch(() => null), [id])
   // Most places have no street address of their own: asked once, then stored by the backend
   const { data: lookedUp } = useAsync(() => (place && !place.address
@@ -48,7 +68,9 @@ export function PlaceDetailPage() {
   const mapsUrl = httpUrl(availability?.mapsUrl) ?? googleMapsPinUrl(place)
   const closed = availability?.status === 'CLOSED_PERMANENTLY'
   // No match on Google, or the owner marked it "may have closed"
-  const notFound = availability?.status === 'NOT_FOUND' || Boolean(place.suspect)
+  // "May have closed" (no match on Google, or the owner's own mark) is for the owner to check, not for users
+  const notFound = !confirmed && (availability?.status === 'NOT_FOUND' || Boolean(place.suspect))
+  const warn = admin && notFound
   // The street address, else the looked-up one; meanwhile (or when none is known) neighbourhood, district and city
   const address = place.address?.trim() || lookedUp || placeArea(place)
 
@@ -171,13 +193,22 @@ export function PlaceDetailPage() {
 
       <div className="sticky-cta" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
         {closed && <Alert tone="danger">{t('Google Haritalar’a göre bu yer kalıcı olarak kapanmış. Artık Nomi’de önerilmeyecek.', 'According to Google Maps this place has closed for good. Nomi will not suggest it any more.')}</Alert>}
-        {notFound && <Alert tone="warning">{place.suspect
-          ? t('Bu yer kapanmış olabilir.', 'This place may have closed.')
-          : t('Bu yer ile eşleşen bir konum bulunamadı. Kapanmış olabilir.', 'No matching place was found here. It may have closed.')}</Alert>}
+        {warn && (
+          <Alert tone="warning" action={
+            <button type="button" className="btn btn-sm btn-secondary" disabled={confirming} onClick={() => void confirm()}>
+              {confirming ? <Spinner /> : t('Bu yer var', 'It is there')}
+            </button>
+          }>
+            <span>{place.suspect
+              ? t('Bu yer kapanmış olabilir.', 'This place may have closed.')
+              : t('Bu yer ile eşleşen bir konum bulunamadı. Kapanmış olabilir.', 'No matching place was found here. It may have closed.')}</span>
+            <span className="t-caption">{t('Bu uyarıyı sadece sen görüyorsun.', 'Only you see this warning.')}</span>
+          </Alert>
+        )}
         {availability?.status === 'CLOSED_TEMPORARILY' && <Alert tone="warning">{t('Google Haritalar’a göre bu yer geçici olarak kapalı.', 'According to Google Maps this place is temporarily closed.')}</Alert>}
         {!closed && (
-          <a className={`btn ${notFound ? 'btn-secondary' : 'btn-primary'} btn-lg grow`} href={mapsUrl} target="_blank" rel="noreferrer">
-            <Navigation size={18} /> {notFound ? t('Haritada yine de ara', 'Search the map anyway') : t('Google Haritalar’da aç', 'Open in Google Maps')}
+          <a className={`btn ${warn ? 'btn-secondary' : 'btn-primary'} btn-lg grow`} href={mapsUrl} target="_blank" rel="noreferrer">
+            <Navigation size={18} /> {warn ? t('Haritada yine de ara', 'Search the map anyway') : t('Google Haritalar’da aç', 'Open in Google Maps')}
           </a>
         )}
       </div>

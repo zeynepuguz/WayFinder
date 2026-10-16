@@ -9,11 +9,15 @@ let current: Place
 let availability: object | null = null
 vi.mock('../api', () => ({ api: { place: () => Promise.resolve(current), photos: () => Promise.resolve([]),
   placeAvailability: () => (availability ? Promise.resolve(availability) : Promise.reject(new Error('offline'))),
-  placeAddress: () => Promise.resolve({ address: lookedUpAddress }) } }))
+  placeAddress: () => Promise.resolve({ address: lookedUpAddress }),
+  reviewPlace: (...args: unknown[]) => reviewPlace(...args) } }))
+const reviewPlace = vi.fn()
 // The full address the backend found on OpenStreetMap (null = none)
 let lookedUpAddress: string | null = null
 vi.mock('../components/RouteMap', () => ({ RouteMap: () => null }))
-vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: null, hasAccess: false }) }))
+// null = a guest; { role: 'ADMIN' } = the owner
+let authUser: { id: number; role: string } | null = null
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: authUser, hasAccess: false }) }))
 vi.mock('../context/SavedPlacesContext', () => ({ useSavedPlaces: () => ({ isSaved: () => false, toggle: vi.fn() }) }))
 
 function renderPage() {
@@ -115,10 +119,19 @@ describe('PlaceDetailPage Overture place', () => {
     expect(screen.queryByRole('link', { name: /Google Haritalar’da aç/ })).not.toBeInTheDocument()
     cleanup()
 
+    // No match on Google is for the owner to check: users see the place as usual
     availability = { status: 'NOT_FOUND', mapsUrl: 'https://www.google.com/maps/search/Seyir/@40.647,35.82,17z', googleName: null }
     renderPage()
+    expect(await screen.findByRole('link', { name: /Google Haritalar’da aç/ })).toBeInTheDocument()
+    expect(screen.queryByText(/Kapanmış olabilir/)).not.toBeInTheDocument()
+    cleanup()
+
+    authUser = { id: 1, role: 'ADMIN' }
+    renderPage()
     expect(await screen.findByText(/eşleşen bir konum bulunamadı. Kapanmış olabilir/)).toBeInTheDocument()
+    expect(screen.getByText('Bu uyarıyı sadece sen görüyorsun.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Haritada yine de ara/ })).toBeInTheDocument()
+    authUser = null
   })
 
   it('never links a website that is not http(s)', async () => {
@@ -130,14 +143,28 @@ describe('PlaceDetailPage Overture place', () => {
 })
 
 describe('PlaceDetailPage owner review', () => {
-  it('warns about a place the owner marked as suspect and offers a search anyway', async () => {
+  it('a place the owner marked as suspect: no warning for users, who can still report it', async () => {
+    availability = null
+    current = place(11, 'Seyir Cafe', { city: 'Amasya', latitude: 40.647, longitude: 35.82, suspect: true })
+    renderPage()
+    expect(await screen.findByRole('button', { name: /Bu mekanı bildir/ })).toBeInTheDocument()
+    expect(screen.queryByText('Bu yer kapanmış olabilir.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Mekanı kaldır/ })).not.toBeInTheDocument()
+  })
+
+  it('the owner sees the warning and ends a wrong one with “Bu yer var”', async () => {
+    authUser = { id: 1, role: 'ADMIN' }
+    reviewPlace.mockResolvedValue(undefined)
     availability = null
     current = place(11, 'Seyir Cafe', { city: 'Amasya', latitude: 40.647, longitude: 35.82, suspect: true })
     renderPage()
     expect(await screen.findByText('Bu yer kapanmış olabilir.')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Haritada yine de ara/ })).toBeInTheDocument()
-    // Every user can report it; the owner's controls are not shown to others
-    expect(screen.getByRole('button', { name: /Bu mekanı bildir/ })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Mekanı kaldır/ })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Bu yer var' }))
+
+    await waitFor(() => expect(screen.queryByText('Bu yer kapanmış olabilir.')).not.toBeInTheDocument())
+    expect(reviewPlace).toHaveBeenCalledWith(5, 'CONFIRM')
+    expect(screen.getByRole('link', { name: /Google Haritalar’da aç/ })).toBeInTheDocument()
+    authUser = null
   })
 })

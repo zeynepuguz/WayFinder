@@ -137,6 +137,10 @@ public class Place {
     @Column(insertable = false, updatable = false)
     private String review;
 
+    // The owner checked it is there ("Bu yer var"): never warned as "may have closed" (admin/PlaceReviewService)
+    @Column(insertable = false, updatable = false)
+    private java.time.Instant presenceConfirmedAt;
+
     // Real-world interest from Wikipedia (popularity/PlacePopularityService); null = unknown
     @Column(insertable = false, updatable = false)
     private Double popularity;
@@ -287,6 +291,10 @@ public class Place {
 
     public String getReview() {
         return review;
+    }
+
+    public boolean isPresenceConfirmed() {
+        return presenceConfirmedAt != null;
     }
 
     public boolean isSuspect() {
