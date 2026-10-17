@@ -1,8 +1,9 @@
 import { Clock, ExternalLink, Globe, Bookmark, Info, MapPin, Navigation, Phone, Timer, Umbrella, Wallet } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import { api } from '../api'
 import { useGate } from '../components/gate'
+import { Lightbox } from '../components/Lightbox'
 import { PlaceRating } from '../components/PlaceRating'
 import { FavoriteBadge, OpenBadge, PhotoCredit, VerifiedBadge } from '../components/PlaceViews'
 import { PlaceReportAndReview } from '../components/PlaceReview'
@@ -12,7 +13,7 @@ import { UserPhotosSection } from '../components/UserPhotos'
 import { CATEGORY_ICON, Rating, usePlacePhoto } from '../components/visuals'
 import { useAuth } from '../context/AuthContext'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, shownRating, TAG_LABELS } from '../lib/format'
+import { dayNames, formatCost, formatTime, googleMapsPinUrl, googleMapsSearchUrl, httpUrl, shownRating, TAG_LABELS , placeKindLabel } from '../lib/format'
 import { useAsync } from '../lib/useAsync'
 import { locale, useT } from '../lib/i18n'
 
@@ -29,6 +30,19 @@ export function PlaceDetailPage() {
   // The owner's "Bu yer var": the warning goes at once (the backend stops warning about this place)
   const [confirmed, setConfirmed] = useState(false)
   const [confirming, setConfirming] = useState(false)
+  // The photo full screen
+  const [viewing, setViewing] = useState(false)
+  // The bottom bar grows with its warnings; the page leaves that much room so its end can be scrolled to
+  const [bar, setBar] = useState<HTMLDivElement | null>(null)
+  const [barHeight, setBarHeight] = useState(110)
+  useEffect(() => {
+    if (!bar) return
+    const measure = () => setBarHeight(bar.offsetHeight)
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(bar)
+    return () => observer?.disconnect()
+  }, [bar])
   async function confirm() {
     setConfirming(true)
     try {
@@ -75,11 +89,16 @@ export function PlaceDetailPage() {
   const address = place.address?.trim() || lookedUp || placeArea(place)
 
   return (
-    <main className="screen screen-no-tabbar" style={{ paddingBottom: 'calc(var(--safe-bottom) + 110px)' }}>
+    <main className="screen screen-no-tabbar" style={{ paddingBottom: barHeight + 16 }}>
       <div className={`place-hero ${photo.url ? 'place-hero-photo' : ''}`}>
         <div className={`tile tile-${place.category}`}>
           <span className="hero-icon"><Icon size={44} strokeWidth={1.6} /></span>
-          {photo.url && <img className="tile-photo" src={photo.url} alt={place.name} decoding="async" onError={photo.onError} />}
+          {/* The whole photo (the sides in the page colour); a tap opens it full screen */}
+          {photo.url && (
+            <button type="button" className="hero-photo" aria-label={t('Fotoğrafı büyüt', 'Open the photo')} onClick={() => setViewing(true)}>
+              <img className="tile-photo" src={photo.url} alt={place.name} decoding="async" onError={photo.onError} />
+            </button>
+          )}
         </div>
         <div className="place-hero-bar">
           <BackButton glass />
@@ -90,9 +109,14 @@ export function PlaceDetailPage() {
         </div>
       </div>
 
+      {viewing && photo.url && (
+        <Lightbox src={photo.url} alt={place.name} onClose={() => setViewing(false)}
+                  caption={place.image && <PhotoCredit image={place.image} />} />
+      )}
+
       <div className="place-sheet place-sheet-bleed">
         <div className="stack-sm">
-          <span className="t-overline">{CATEGORY_LABELS[place.category]}{place.neighborhood && ` · ${place.neighborhood}`}</span>
+          <span className="t-overline">{placeKindLabel(place)}{place.neighborhood && ` · ${place.neighborhood}`}</span>
           <h1 className="t-title" style={{ fontSize: 26, lineHeight: '32px' }}>{place.name}</h1>
           <div className="row wrap" style={{ gap: 8 }}>
             <Rating value={shownRating(place)} />
@@ -191,7 +215,7 @@ export function PlaceDetailPage() {
         <PlaceReportAndReview place={place} onChanged={reload} />
       </div>
 
-      <div className="sticky-cta" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+      <div ref={setBar} className="sticky-cta" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
         {closed && <Alert tone="danger">{t('Google Haritalar’a göre bu yer kalıcı olarak kapanmış. Artık Nomi’de önerilmeyecek.', 'According to Google Maps this place has closed for good. Nomi will not suggest it any more.')}</Alert>}
         {warn && (
           <Alert tone="warning" action={

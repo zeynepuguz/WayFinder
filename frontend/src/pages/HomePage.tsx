@@ -20,7 +20,7 @@ import { CATEGORY_LABELS, formatDistance, isOpenRoute, locativeTr, STOP_TYPE_LAB
 import { isNativeApp } from '../lib/billing'
 import { useAsync } from '../lib/useAsync'
 import { useDistricts } from '../lib/districts'
-import { setHomeArea, useHomeArea } from '../lib/homeArea'
+import { setHomeArea, useHomeArea, type HomeArea } from '../lib/homeArea'
 import { locale, useT, type Translate } from '../lib/i18n'
 import { LanguageSwitch } from '../components/LanguageSwitch'
 
@@ -98,6 +98,15 @@ export function HomePage() {
       : { tr: locativeTr(area.city.name), en: `in ${area.city.name}` }
     : null
 
+  // A place picked here is Keşfet's place too (its city now, its list next time it opens); "Konumumu kullan" takes
+  // both back to the device location. Keşfet's own choices never come back here
+  const { setCity, clearCity } = cityState
+  function pickArea(picked: HomeArea | null) {
+    setHomeArea(picked)
+    if (picked) setCity(picked.city.slug)
+    else clearCity()
+  }
+
   // Picking a place: the city first, then "Genel" (the whole city) or one of its districts
   const [cityOpen, setCityOpen] = useState(false)
   const [pickedCity, setPickedCity] = useState<City | null>(null)
@@ -158,7 +167,7 @@ export function HomePage() {
               </button>
             )}
             {area ? (
-              <button className="chip-link" onClick={() => setHomeArea(null)}>
+              <button className="chip-link" onClick={() => pickArea(null)}>
                 <Navigation size={14} /> {t('Konumumu kullan', 'Use my location')}
               </button>
             ) : (
@@ -296,12 +305,12 @@ export function HomePage() {
       )}
 
       <CitySheet open={cityOpen} onClose={() => setCityOpen(false)} selected={area?.city.slug ?? null} state={cityState}
-                 myLocation={{ selected: area === null, onChoose: () => { setHomeArea(null); setCityOpen(false) } }}
+                 myLocation={{ selected: area === null, onChoose: () => { pickArea(null); setCityOpen(false) } }}
                  onChoose={c => { setCityOpen(false); setPickedCity(c) }} />
       <DistrictSheet open={pickedCity !== null} onClose={() => setPickedCity(null)} districts={districts}
                      selected={area && pickedCity && area.city.slug === pickedCity.slug ? area.district?.slug ?? null : null}
                      allLabel={pickedCity ? t(`Genel – tüm ${pickedCity.name}`, `All of ${pickedCity.name}`) : undefined}
-                     onChoose={d => { if (pickedCity) setHomeArea({ city: pickedCity, district: d }); setPickedCity(null) }} />
+                     onChoose={d => { if (pickedCity) pickArea({ city: pickedCity, district: d }); setPickedCity(null) }} />
 
       {/* Website only: about and legal pages */}
       {!isNativeApp() && (

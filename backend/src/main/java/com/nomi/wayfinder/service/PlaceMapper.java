@@ -9,6 +9,7 @@ import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.planning.CommunityScore;
 import com.nomi.wayfinder.entity.PlaceOpeningHours;
 import com.nomi.wayfinder.i18n.Texts;
+import com.nomi.wayfinder.planning.PlaceKinds;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -98,6 +99,7 @@ public class PlaceMapper {
         response.setFavoriteCount(place.getFavoriteCount());
         response.setFavorite(CommunityScore.isFavorite(place.getUserRatingSum(), place.getUserRatingCount()));
         response.setSuspect(place.isSuspect());
+        response.setKind(PlaceKinds.of(place));
 
         return response;
     }

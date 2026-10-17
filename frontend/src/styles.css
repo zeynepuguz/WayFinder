@@ -628,7 +628,11 @@ svg { flex-shrink: 0; }
 .place-card .tile { height: 144px; border-radius: 0; }
 .place-card-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
 .place-card-wrap .save { position: absolute; top: 10px; right: 10px; z-index: 2; }
-.place-card-wrap { position: relative; }
+/* Cards side by side are one height: the card fills its slot, the reason line takes at most two lines */
+.place-card-wrap { position: relative; display: flex; }
+.place-card-wrap > .place-card { display: flex; flex-direction: column; }
+.place-card-reason { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--success); font-weight: 650; }
+.place-card-kind { margin-top: -2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .rating { display: inline-flex; align-items: center; gap: 3px; color: var(--ink); font-weight: 700; }
 .rating svg { color: var(--star); fill: var(--star); }
@@ -918,6 +922,12 @@ details > .reasons { margin-top: 8px; }
 .place-hero-photo::before { content: ''; position: absolute; inset: 0 0 auto; height: 45%; z-index: 1; pointer-events: none; background: linear-gradient(rgb(0 0 0 / 42%), transparent); }
 .photo-credit { gap: 6px; align-items: center; margin-top: -8px; }
 .photo-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }
+/* The photo is never cropped: it fits above the sheet's rounded edge, the sides in the page colour */
+.place-hero-photo { height: 300px; }
+.hero-photo { position: absolute; inset: 0 0 28px; z-index: 2; padding: 0; border: 0; background: var(--bg); cursor: zoom-in; }
+.hero-photo .tile-photo { object-fit: contain; background: transparent; }
+.lightbox-caption .photo-credit { justify-content: center; color: inherit; margin: 0; }
+.lightbox-caption .photo-credit a { color: inherit; }
 .place-hero-bar { position: absolute; left: 0; right: 0; top: calc(var(--safe-top) + 12px); padding: 0 var(--gutter); display: flex; justify-content: space-between; z-index: 2; }
 .place-sheet { margin-top: -28px; position: relative; z-index: 3; background: var(--bg); border-radius: var(--r-xl) var(--r-xl) 0 0; padding-top: 22px; display: flex; flex-direction: column; gap: 18px; }
 

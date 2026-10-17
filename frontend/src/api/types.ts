@@ -4,6 +4,14 @@ export type PlaceCategory =
   | 'BREAKFAST' | 'RESTAURANT' | 'CAFE' | 'DESSERT' | 'ATTRACTION' | 'MUSEUM' | 'PARK' | 'CULTURE'
   // Places to pray at and grocery shops: Explore only (never a route stop or a suggestion)
   | 'WORSHIP' | 'MARKET'
+
+// Finer than the category (backend planning/PlaceKinds): balık restoranı, pastane, internet kafe, ...
+export type PlaceKind =
+  | 'INTERNET_CAFE' | 'GAME_CAFE' | 'BILLIARDS' | 'KIRAATHANE' | 'HOOKAH' | 'CIGKOFTE' | 'FISH' | 'KEBAB' | 'DONER'
+  | 'PIDE' | 'TANTUNI' | 'KOFTE' | 'LOKANTA' | 'MANTI' | 'SOUP' | 'CHICKEN' | 'STEAK' | 'PIZZA' | 'BURGER' | 'ASIAN'
+  | 'ITALIAN' | 'BAKLAVA' | 'MUHALLEBI' | 'ICE_CREAM' | 'CHOCOLATE' | 'PASTRY' | 'BOREK' | 'GOZLEME' | 'SIMIT'
+  | 'BAKERY' | 'TEA_HOUSE' | 'BOOK_CAFE' | 'COFFEE'
+
 export type StopType = 'BREAKFAST' | 'SIGHTSEEING' | 'LUNCH' | 'COFFEE' | 'DESSERT' | 'DINNER'
 export type WalkingTolerance = 'LOW' | 'MEDIUM' | 'HIGH'
 // EXPIRED: the route's day is over and it was never finished (read-only, shown under "Geçmiş rotalar")
@@ -214,6 +222,8 @@ export interface Place {
   distanceMeters?: number
   // The owner marked it "may have closed": shown with a warning, never suggested
   suspect?: boolean
+  // Finer than the category ("FISH" = balık restoranı); null / missing = only the category is known
+  kind?: PlaceKind | null
   // Nomi users' stars: plain average (null without votes) and number of votes
   userRating?: number | null
   userRatingCount?: number

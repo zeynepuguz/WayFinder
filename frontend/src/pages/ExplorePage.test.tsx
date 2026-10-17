@@ -6,6 +6,7 @@ import type { City, District, Page, Place, PopularRoute } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { place } from '../test/fixtures'
 import { ExplorePage, resetExploreListCache } from './ExplorePage'
+import { exploreFollowUp, setHomeArea } from '../lib/homeArea'
 
 const district = (slug: string, name: string, placeCount: number): District => ({
   slug, name, placeCount, latitude: 41, longitude: 29, south: 40.9, west: 28.9, north: 41.1, east: 29.1,
@@ -487,5 +488,22 @@ describe('ExplorePage back navigation', () => {
     expect(search).toBe('?sehir=istanbul')
     await userEvent.click(screen.getByRole('button', { name: 'Telefonun geri tuşu' }))
     expect(await screen.findByText('Ana sayfa')).toBeInTheDocument()
+  })
+})
+
+describe('ExplorePage follows a place picked on Ana Sayfa', () => {
+  it('opens once with that city and district, then keeps its own choice', async () => {
+    setHomeArea({ city: CITIES[0], district: ANKARA_DISTRICTS[0] })
+    renderPage('/explore')
+
+    await waitFor(() => expect(search).toBe('?sehir=ankara&ilce=cankaya'))
+    expect(await screen.findByRole('tab', { name: 'Çankaya' })).toHaveAttribute('aria-selected', 'true')
+    expect(exploreFollowUp()).toBeUndefined()
+
+    // Later visits: whatever Keşfet shows (no new pick on Ana Sayfa)
+    cleanup()
+    renderPage('/explore?sehir=istanbul')
+    await waitFor(() => expect(searchPlaces).toHaveBeenLastCalledWith(expect.objectContaining({ city: 'istanbul' })))
+    expect(search).toBe('?sehir=istanbul')
   })
 })

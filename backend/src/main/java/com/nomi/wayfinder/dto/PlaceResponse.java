@@ -269,6 +269,17 @@ public class PlaceResponse {
         this.favorite = favorite;
     }
 
+    // Finer than the category (planning/PlaceKinds): "FISH", "KEBAB", "PASTRY", "INTERNET_CAFE", ...; null = unknown
+    private String kind;
+
+    public String getKind() {
+        return kind;
+    }
+
+    public void setKind(String kind) {
+        this.kind = kind;
+    }
+
     // The owner marked it "may have closed": shown with a warning, never suggested
     private boolean suspect;
 

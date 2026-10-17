@@ -22,6 +22,26 @@ class PlaceSuitabilityTest {
     }
 
     @Test
+    void placesToPlayAreNotStopsAndHaveTheirKind() {
+        assertThat(stop("Cadde Arena Cafe", PlaceCategory.CAFE)).isFalse();
+        assertThat(PlaceSuitability.cafeKind("Cadde Arena Cafe", PlaceCategory.CAFE)).isEqualTo("GAME_CAFE");
+        assertThat(PlaceSuitability.cafeKind("Prestij İnternet Cafe Ve Playstation Salonu", PlaceCategory.CAFE))
+                .isEqualTo("INTERNET_CAFE");
+        assertThat(PlaceSuitability.cafeKind("Arena Bilardo Salonu Cafe", PlaceCategory.CAFE)).isEqualTo("BILLIARDS");
+        assertThat(PlaceSuitability.cafeKind("Mahsen Ps4 Cafe", PlaceCategory.CAFE)).isEqualTo("GAME_CAFE");
+        assertThat(PlaceSuitability.cafeKind("Vip Ps cafe", PlaceCategory.CAFE)).isEqualTo("GAME_CAFE");
+        assertThat(PlaceSuitability.cafeKind("Turkuaz E-Spor", PlaceCategory.CAFE)).isEqualTo("GAME_CAFE");
+        assertThat(PlaceSuitability.cafeKind("Game Point Playstation Cafe", PlaceCategory.CAFE)).isEqualTo("GAME_CAFE");
+        // Ordinary cafés whose names only look alike
+        assertThat(PlaceSuitability.cafeKind("DROPS Cafe", PlaceCategory.CAFE)).isNull();
+        assertThat(PlaceSuitability.cafeKind("Yenicespor Halısaha Kafe", PlaceCategory.CAFE)).isNull();
+        assertThat(PlaceSuitability.cafeKind("ÖZsÜT Arenapark", PlaceCategory.CAFE)).isNull();
+        assertThat(PlaceSuitability.cafeKind("Karınca Çocuk Oyun Parkı Cafe", PlaceCategory.CAFE)).isNull();
+        // Only cafés
+        assertThat(PlaceSuitability.cafeKind("Arena Restaurant", PlaceCategory.RESTAURANT)).isNull();
+    }
+
+    @Test
     void placesWithTablesStay() {
         assertThat(stop("Tuana Börek", PlaceCategory.CAFE, "bakery")).isTrue();
         assertThat(stop("Simit Sarayı", PlaceCategory.CAFE, "bakery")).isTrue();

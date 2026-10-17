@@ -7,7 +7,7 @@ import { Link } from 'react-router'
 import { api } from '../api'
 import type { City, District, NearbyPlace, Place, PlaceCategory, Recommendation } from '../api/types'
 import { locationLabel, useLiveLocation, useUserLocation } from '../context/LocationContext'
-import { CATEGORY_LABELS, formatCost, formatDistance, haversineMeters } from '../lib/format'
+import { formatCost, formatDistance, haversineMeters , placeKindLabel } from '../lib/format'
 import { CATEGORY_PIN, inBox, isInTurkey, latestRequest, MAX_MAP_PINS, MIN_PLACES_ZOOM, placesQueryBox } from '../lib/geo'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
@@ -280,7 +280,7 @@ export function LiveMap({ category, tag = null, focusArea = null, focusCity = nu
               <div className="grow stack-sm">
                 <span className="place-name">{selected.name}</span>
                 <div className="meta">
-                  <span>{CATEGORY_LABELS[selected.category]}</span>
+                  <span>{placeKindLabel(selected)}</span>
                   {selectedDistance != null && <span><MapPin size={12} />{formatDistance(selectedDistance)}</span>}
                 </div>
               </div>
@@ -335,7 +335,7 @@ function RecItem({ rec, onSelect }: { rec: Recommendation; onSelect: (place: Pla
       <span className="grow stack-sm" style={{ gap: 2 }}>
         <span className="place-name" style={{ fontSize: 15 }}>{place.name}</span>
         <span className="meta">
-          <span>{CATEGORY_LABELS[place.category]}</span>
+          <span>{placeKindLabel(place)}</span>
           {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
           <span>{formatCost(place.estimatedCost)}</span>
         </span>

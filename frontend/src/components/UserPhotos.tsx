@@ -1,6 +1,5 @@
-import { Camera, ChevronLeft, ChevronRight, ExternalLink, ImagePlus, Images, Trash2, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { createPortal } from 'react-dom'
+import { Camera, ExternalLink, ImagePlus, Images, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
 import { api } from '../api'
 import { mediaUrl } from '../api/client'
@@ -11,13 +10,10 @@ import { locale, useT } from '../lib/i18n'
 import { checkPhotoFile, currentPosition, PHOTO_ACCEPT, uploadErrorMessage } from '../lib/photos'
 import { useAsync } from '../lib/useAsync'
 import { HScroll } from './HScroll'
+import { Lightbox, Portal } from './Lightbox'
 import { Alert, ConfirmSheet, Sheet, Skeleton, Spinner, useToast } from './ui'
 import { Avatar, UserProfileSheet } from './UserProfileSheet'
 
-// Rendered on <body>: the place page's sheet is its own stacking context and would cover overlays
-function Portal({ children }: { children: ReactNode }) {
-  return typeof document === 'undefined' ? <>{children}</> : createPortal(children, document.body)
-}
 
 const photoDate = (iso: string) =>
   new Date(iso).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })
@@ -133,9 +129,7 @@ function PhotoThumb({ photo, alt, onOpen, onError }: { photo: UserPhoto; alt: st
   )
 }
 
-const FOCUSABLE = 'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
-
-/** Full-screen viewer: arrows / swipe to move, Esc or the close button to leave; focus stays inside. */
+/** The full-screen viewer for users' photos, with who uploaded it and when. */
 function PhotoLightbox({ photos, index, onIndex, onClose, alt, onProfile }: {
   photos: UserPhoto[]
   index: number
@@ -145,98 +139,18 @@ function PhotoLightbox({ photos, index, onIndex, onClose, alt, onProfile }: {
   // Opens the uploader's public profile
   onProfile: (username: string) => void
 }) {
-  const t = useT()
-  const dialog = useRef<HTMLDivElement>(null)
-  const closeButton = useRef<HTMLButtonElement>(null)
-  const touchX = useRef<number | null>(null)
   const photo = photos[index]
-  const count = photos.length
-
-  const go = useCallback((step: -1 | 1) => {
-    if (count > 1) onIndex((index + step + count) % count)
-  }, [count, index, onIndex])
-
-  // Focus moves into the viewer and back to the photo that opened it
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null
-    closeButton.current?.focus()
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = overflow
-      previous?.focus?.()
-    }
-  }, [])
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        onClose()
-      } else if (e.key === 'ArrowLeft') go(-1)
-      else if (e.key === 'ArrowRight') go(1)
-      else if (e.key === 'Tab' && dialog.current) {
-        const items = Array.from(dialog.current.querySelectorAll<HTMLElement>(FOCUSABLE))
-        if (!items.length) return
-        const first = items[0]
-        const last = items[items.length - 1]
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault()
-          last.focus()
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault()
-          first.focus()
-        } else if (!dialog.current.contains(document.activeElement)) {
-          e.preventDefault()
-          first.focus()
-        }
-      }
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [go, onClose])
-
-  const src = mediaUrl(photo.url)
   return (
-    <Portal>
-      <div className="lightbox" role="dialog" aria-modal="true" aria-label={t('Fotoğraf', 'Photo')} ref={dialog}
-           onClick={e => e.target === e.currentTarget && onClose()}
-           onTouchStart={e => { touchX.current = e.touches[0]?.clientX ?? null }}
-           onTouchEnd={e => {
-             const start = touchX.current
-             const end = e.changedTouches[0]?.clientX
-             touchX.current = null
-             if (start == null || end == null || Math.abs(end - start) < 40) return
-             go(end < start ? 1 : -1)
-           }}>
-        <div className="lightbox-bar">
-          <span className="lightbox-count" aria-live="polite">{count > 1 ? `${index + 1} / ${count}` : ''}</span>
-          <button ref={closeButton} type="button" className="icon-btn icon-btn-glass" aria-label={t('Kapat', 'Close')} onClick={onClose}>
-            <X size={20} />
-          </button>
-        </div>
-        {src && <img className="lightbox-img" src={src} alt={alt(index)} decoding="async" />}
-        {count > 1 && (
-          <>
-            <button type="button" className="icon-btn icon-btn-glass lightbox-nav lightbox-prev" aria-label={t('Önceki fotoğraf', 'Previous photo')} onClick={() => go(-1)}>
-              <ChevronLeft size={22} />
-            </button>
-            <button type="button" className="icon-btn icon-btn-glass lightbox-nav lightbox-next" aria-label={t('Sonraki fotoğraf', 'Next photo')} onClick={() => go(1)}>
-              <ChevronRight size={22} />
-            </button>
-          </>
-        )}
-        <p className="lightbox-caption">
-          {/* "@zeynep7": a username opens the uploader's profile ("Nomi kullanıcısı" has none) */}
-          {photo.uploader.startsWith('@') ? (
-            <button type="button" className="lightbox-uploader" onClick={() => onProfile(photo.uploader.slice(1))}>
-              <Avatar url={photo.uploaderAvatar} name={photo.uploader} size={24} />{photo.uploader}
-            </button>
-          ) : photo.uploader}
-          {' · '}{photoDate(photo.createdAt)}
-        </p>
-      </div>
-    </Portal>
+    <Lightbox src={mediaUrl(photo.url)} alt={alt(index)} index={index} count={photos.length} onIndex={onIndex} onClose={onClose}
+              caption={<>
+                {/* "@zeynep7": a username opens the uploader's profile ("Nomi kullanıcısı" has none) */}
+                {photo.uploader.startsWith('@') ? (
+                  <button type="button" className="lightbox-uploader" onClick={() => onProfile(photo.uploader.slice(1))}>
+                    <Avatar url={photo.uploaderAvatar} name={photo.uploader} size={24} />{photo.uploader}
+                  </button>
+                ) : photo.uploader}
+                {' · '}{photoDate(photo.createdAt)}
+              </>} />
   )
 }
 

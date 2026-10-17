@@ -1,4 +1,4 @@
-import type { PlaceCategory, RouteStatus, StopType, WalkingTolerance } from '../api/types'
+import type { PlaceCategory, PlaceKind, RouteStatus, StopType, WalkingTolerance } from '../api/types'
 import { bilingual, locale, tr } from './i18n'
 
 export const CATEGORY_LABELS: Record<PlaceCategory, string> = bilingual({
@@ -13,6 +13,47 @@ export const CATEGORY_LABELS: Record<PlaceCategory, string> = bilingual({
   WORSHIP: ['İbadet', 'Worship'],
   MARKET: ['Market', 'Groceries'],
 })
+
+const KIND_LABELS: Record<PlaceKind, string> = bilingual({
+  INTERNET_CAFE: ['İnternet kafe', 'Internet café'],
+  GAME_CAFE: ['Oyun kafe', 'Gaming café'],
+  BILLIARDS: ['Bilardo salonu', 'Billiard hall'],
+  KIRAATHANE: ['Kıraathane', 'Coffee house'],
+  HOOKAH: ['Nargile kafe', 'Hookah café'],
+  CIGKOFTE: ['Çiğ köfteci', 'Çiğ köfte'],
+  FISH: ['Balık restoranı', 'Fish restaurant'],
+  KEBAB: ['Kebapçı', 'Kebab house'],
+  DONER: ['Dönerci', 'Döner'],
+  PIDE: ['Pide ve lahmacun', 'Pide & lahmacun'],
+  TANTUNI: ['Tantuni', 'Tantuni'],
+  KOFTE: ['Köfteci', 'Meatballs'],
+  LOKANTA: ['Esnaf lokantası', 'Home-style diner'],
+  MANTI: ['Mantıcı', 'Mantı'],
+  SOUP: ['Çorbacı', 'Soup house'],
+  CHICKEN: ['Tavukçu', 'Chicken'],
+  STEAK: ['Et restoranı', 'Steakhouse'],
+  PIZZA: ['Pizzacı', 'Pizza'],
+  BURGER: ['Burgerci', 'Burgers'],
+  ASIAN: ['Uzak Doğu mutfağı', 'Asian'],
+  ITALIAN: ['İtalyan mutfağı', 'Italian'],
+  BAKLAVA: ['Baklavacı', 'Baklava'],
+  MUHALLEBI: ['Muhallebici', 'Milk puddings'],
+  ICE_CREAM: ['Dondurmacı', 'Ice cream'],
+  CHOCOLATE: ['Çikolatacı', 'Chocolatier'],
+  PASTRY: ['Pastane', 'Patisserie'],
+  BOREK: ['Börekçi', 'Börek'],
+  GOZLEME: ['Gözlemeci', 'Gözleme'],
+  SIMIT: ['Simitçi', 'Simit'],
+  BAKERY: ['Fırın', 'Bakery'],
+  TEA_HOUSE: ['Çay bahçesi', 'Tea garden'],
+  BOOK_CAFE: ['Kitap kafe', 'Book café'],
+  COFFEE: ['Kahveci', 'Coffee shop'],
+})
+
+// "Restoran", or what kind of place it is ("Balık restoranı", "İnternet kafe")
+export function placeKindLabel(place: { category: PlaceCategory; kind?: PlaceKind | null }): string {
+  return (place.kind && KIND_LABELS[place.kind]) || CATEGORY_LABELS[place.category]
+}
 
 // Explore > İbadet sub-kinds (place tags); cami and mescit are one kind
 export const WORSHIP_KINDS: Record<string, string> = bilingual({

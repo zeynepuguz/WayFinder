@@ -1,0 +1,5 @@
+Ayağa Kaldırma
+1	PostgreSQL + Redis	docker start wayfinder-postgres wayfinder-redis	Backend açılırken veritabanına bağlanıyor.
+2	Backend (8080)	backend klasöründe: ./mvnw spring-boot:run (OSM ve Overture aktarımları kapalı)	Aktarımlar kapalı, çünkü her açılışta saatlerce veri çekmesini istemiyoruz
+3	AI servisi (8000)	ai-service klasöründe: .venv\Scripts\python -m uvicorn app.main:app --port 8000	Asistan mesajlarını OpenAI'ye bu servis iletiyor
+4	Frontend (5173)	Zaten açıktı (frontend klasöründe npm run dev)	Vite, /api isteklerini backend'e yönlendiriyorcd

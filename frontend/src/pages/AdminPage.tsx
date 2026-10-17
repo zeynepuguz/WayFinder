@@ -5,7 +5,7 @@ import { api } from '../api'
 import type { ReviewAction, ReviewedPlace } from '../api/types'
 import { Alert, BackButton, EmptyState, ErrorState, Segmented, Skeleton, useToast } from '../components/ui'
 import { useAuth } from '../context/AuthContext'
-import { CATEGORY_LABELS, errorMessage, formatDate, formatDateTime } from '../lib/format'
+import { errorMessage, formatDate, formatDateTime , placeKindLabel } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useAsync } from '../lib/useAsync'
 
@@ -141,7 +141,7 @@ function ReviewRow({ place, children }: { place: ReviewedPlace; children: ReactN
   return (
     <div className="card stack-sm">
       <Link to={`/places/${place.id}`} className="t-headline">{place.name}</Link>
-      <span className="t-caption">{CATEGORY_LABELS[place.category]}{where ? ` · ${where}` : ''}</span>
+      <span className="t-caption">{placeKindLabel(place)}{where ? ` · ${where}` : ''}</span>
       {place.reports > 0 && (
         <span className="t-caption">
           {t(`${place.reports} bildirim`, `${place.reports} reports`)} · {place.lastReason === 'WRONG_LOCATION'

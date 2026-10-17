@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronLeft, Map as MapIcon, MapPin, Search, SearchX, SlidersHorizontal, Umbrella } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { api } from '../api'
 import type { City, District, Place, PlaceCategory } from '../api/types'
 import { HScroll } from '../components/HScroll'
@@ -14,6 +14,7 @@ import { CATEGORY_ICON } from '../components/visuals'
 import { DEFAULT_CITY, useCity } from '../context/CityContext'
 import { useUserLocation } from '../context/LocationContext'
 import { useDistricts } from '../lib/districts'
+import { exploreFollowedUp, exploreFollowUp, type HomeArea } from '../lib/homeArea'
 import { ablativeTr, appendUnique, CATEGORY_BY_SLUG, CATEGORY_LABELS, errorMessage, fold, googleMapsSearchUrl, MARKET_KINDS, withinBudget, WORSHIP_KINDS } from '../lib/format'
 import { useT, type Translate } from '../lib/i18n'
 
@@ -50,6 +51,23 @@ export function resetExploreListCache() {
 }
 
 export function ExplorePage() {
+  const [followUp, setFollowUp] = useState(exploreFollowUp)
+  if (followUp !== undefined) return <FollowHome area={followUp} onDone={() => setFollowUp(undefined)} />
+  return <ExploreScreen />
+}
+
+// The place picked on Ana Sayfa, once: its city (and district) list; back to "Yakınımda" for the device location
+function FollowHome({ area, onDone }: { area: HomeArea | null; onDone: () => void }) {
+  useEffect(() => {
+    exploreFollowedUp()
+    resetExploreListCache()
+    onDone()
+  }, [onDone])
+  const to = area ? `/explore?sehir=${area.city.slug}${area.district ? `&ilce=${area.district.slug}` : ''}` : '/explore'
+  return <Navigate to={to} replace />
+}
+
+function ExploreScreen() {
   const location = useUserLocation()
   const [params, setParams] = useSearchParams()
   // /kadikoy/kafe (crawlable category page) or /explore?category=CAFE

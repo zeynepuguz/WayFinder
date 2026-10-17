@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router'
 import type { Place } from '../api/types'
 import { PHOTO, place } from '../test/fixtures'
@@ -70,6 +70,18 @@ describe('PlaceDetailPage photo', () => {
     fireEvent.error(img)
     expect(screen.queryByRole('img', { name: 'Haydarpaşa Garı' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Wikimedia Commons/)).not.toBeInTheDocument()
+  })
+
+  it('a tap on the photo opens it full screen with its credit', async () => {
+    current = place(5, 'Haydarpaşa Garı', { category: 'ATTRACTION', image: PHOTO })
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: 'Fotoğrafı büyüt' }))
+    const viewer = screen.getByRole('dialog', { name: 'Fotoğraf' })
+    expect(within(viewer).getByRole('img', { name: 'Haydarpaşa Garı' })).toHaveAttribute('src', PHOTO.url)
+    expect(within(viewer).getByText(/Jane Doe/)).toBeInTheDocument()
+
+    fireEvent.click(within(viewer).getByRole('button', { name: 'Kapat' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('keeps the category hero without a photo', async () => {

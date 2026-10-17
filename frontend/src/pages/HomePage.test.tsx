@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import type { City, District, HomeResponse, RouteSummary } from '../api/types'
 import { resetDistrictCache } from '../lib/districts'
 import { todayIso } from '../lib/format'
-import { setHomeArea } from '../lib/homeArea'
+import { exploreFollowUp, setHomeArea } from '../lib/homeArea'
 import { place } from '../test/fixtures'
 import { HomePage, ideaNow } from './HomePage'
 import { tr } from '../lib/i18n'
@@ -30,8 +30,10 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, displayName: 'Zeynep Uğuz' }, hasAccess: true }),
 }))
 // Keşfet's choice (Ankara here) must not change Ana Sayfa
+const setCity = vi.fn()
+const clearCity = vi.fn()
 vi.mock('../context/CityContext', () => ({
-  useCity: () => ({ city: null, citySlug: 'ankara', cities: [ISTANBUL, KOCAELI], loading: false, error: null, reload: () => {}, setCity: vi.fn() }),
+  useCity: () => ({ city: null, citySlug: 'ankara', cities: [ISTANBUL, KOCAELI], loading: false, error: null, reload: () => {}, setCity, clearCity }),
 }))
 vi.mock('../context/SavedPlacesContext', () => ({ useSavedPlaces: () => ({ isSaved: () => false, toggle: vi.fn() }) }))
 vi.mock('../context/LocationContext', () => ({
@@ -161,6 +163,9 @@ describe('HomePage place', () => {
     await userEvent.click(await within(districtSheet).findByRole('button', { name: /İzmit/ }))
 
     expect(await screen.findAllByText('İzmit, Kocaeli')).not.toHaveLength(0)
+    // Keşfet follows (its city now, its list next time); Keşfet's own choices never come back here
+    expect(setCity).toHaveBeenCalledWith('kocaeli')
+    expect(exploreFollowUp()).toEqual({ city: KOCAELI, district: IZMIT })
     expect(home).toHaveBeenLastCalledWith(40.76, 29.92)
     await userEvent.click(screen.getByRole('button', { name: /Tarih & Kültür/ }))
     const url = screen.getByTestId('url').textContent ?? ''
@@ -183,6 +188,9 @@ describe('HomePage place', () => {
     renderHome()
     await userEvent.click(screen.getByRole('button', { name: /Konumumu kullan/ }))
     expect(home).toHaveBeenLastCalledWith(40.991, 29.023)
+    // Keşfet goes back to the device location too
+    expect(clearCity).toHaveBeenCalled()
+    expect(exploreFollowUp()).toBeNull()
     expect(screen.getByRole('button', { name: /Yer seç/ })).toBeInTheDocument()
   })
 

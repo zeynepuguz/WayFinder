@@ -2,15 +2,18 @@ package com.nomi.wayfinder.planning;
 
 import com.nomi.wayfinder.entity.Place;
 import com.nomi.wayfinder.entity.PlaceCategory;
+import com.nomi.wayfinder.i18n.TurkishFold;
 import com.nomi.wayfinder.osm.OsmPlaceMapper;
 
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Is a place a stop worth suggesting (route plans, recommendations)? Real places that are not a place to sit down
  * stay in Explore / search but are never suggested:
  * - a kıraathane / kahvehane: a (mostly men's) tea and card-game house
+ * - an internet / PlayStation / e-sports café or a billiard hall filed as a café: a place to play, not to sit and eat
  * - a bread / simit bakery or "unlu mamülleri" shop without a sign of seating in its name: you buy and leave
  *   (a börek / pastry shop, "... Cafe", "Simit Sarayı" have tables and stay)
  * Decided from the name, category and tags only (OSM / Overture have no reliable seating data). Pure logic.
@@ -34,6 +37,13 @@ public final class PlaceSuitability {
     // Places for a drink, not a meal
     private static final List<String> DRINKS_ONLY = List.of("cayevi", "caybahce", "cayocag", "kahve", "coffee",
             "kiraathane", "kahvehane", "nargile", "espresso", "roastery");
+    // Cafés that are a place to play (Overture / OSM file many of them as plain cafés), on the lowercase ASCII name
+    private static final Pattern INTERNET_CAFE = Pattern.compile("\\binternet");
+    private static final Pattern BILLIARDS = Pattern.compile("\\b(bilardo|billiard)");
+    // "Playstation", "PS4", "Ps Cafe", "Game Zone", "Gamer", "E-Spor", "Esports", "Arena", "Oyun Salonu"
+    // ("DROPS Cafe", "Belediyespor", "Arenapark" are not)
+    private static final Pattern GAME_CAFE = Pattern.compile(
+            "playstation|\\bps ?([2-5]|cafe|kafe)\\b|\\bgam(e|er|ing)|\\be-?sports?\\b|\\be-?spor\\b|\\barena\\b|oyun (salon|merkez)");
     private static final Set<PlaceCategory> LIGHT_FOOD = Set.of(PlaceCategory.CAFE, PlaceCategory.DESSERT,
             PlaceCategory.BREAKFAST);
 
@@ -74,9 +84,27 @@ public final class PlaceSuitability {
         return place != null && isStop(place.getName(), place.getCategory(), place.getTags());
     }
 
+    /**
+     * What kind of café a place to play is: "INTERNET_CAFE", "GAME_CAFE" (PlayStation / e-sports / game hall) or
+     * "BILLIARDS"; null = an ordinary place. Shown as its kind in Explore and on the place page.
+     */
+    public static String cafeKind(String name, PlaceCategory category) {
+        if (category != PlaceCategory.CAFE || name == null) {
+            return null;
+        }
+        String lower = TurkishFold.ascii(name);
+        if (INTERNET_CAFE.matcher(lower).find()) {
+            return "INTERNET_CAFE";
+        }
+        if (BILLIARDS.matcher(lower).find()) {
+            return "BILLIARDS";
+        }
+        return GAME_CAFE.matcher(lower).find() ? "GAME_CAFE" : null;
+    }
+
     public static boolean isStop(String name, PlaceCategory category, List<String> tags) {
         String folded = OsmPlaceMapper.fold(name);
-        if (TEA_HOUSE.stream().anyMatch(folded::contains)) {
+        if (TEA_HOUSE.stream().anyMatch(folded::contains) || cafeKind(name, category) != null) {
             return false;
         }
         boolean seating = SEATING.stream().anyMatch(folded::contains);

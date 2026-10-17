@@ -2,7 +2,7 @@ import { Award, BadgeCheck, Bookmark, Camera, ExternalLink, MapPin } from 'lucid
 import { Link } from 'react-router'
 import type { Place, PlaceImage, Recommendation } from '../api/types'
 import { useSavedPlaces } from '../context/SavedPlacesContext'
-import { CATEGORY_LABELS, formatCost, formatDistance, httpUrl, shownRating } from '../lib/format'
+import { formatCost, formatDistance, httpUrl, shownRating , placeKindLabel } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { useGate } from './gate'
 import { CategoryTile, Rating } from './visuals'
@@ -58,7 +58,7 @@ export function PlaceRow({ place, showDistrict, showVotes }: { place: Place; sho
       <Link to={`/places/${place.id}`} className="place-row card-press">
         <CategoryTile category={place.category} image={place.image} alt={place.name} />
         <div className="place-row-body">
-          <span className="t-overline place-kind">{CATEGORY_LABELS[place.category]}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
+          <span className="t-overline place-kind">{placeKindLabel(place)}{showDistrict && place.district ? ` · ${place.district}` : ''}</span>
           <span className="place-name" style={{ paddingRight: 36 }}>{place.name}</span>
           <div className="meta">
             {showVotes && place.userRating != null
@@ -87,12 +87,13 @@ export function PlaceCard({ place, reason }: { place: Place; reason?: string }) 
         <CategoryTile category={place.category} size={40} image={place.image} alt={place.name} />
         <div className="place-card-body">
           <span className="place-name">{place.name}</span>
+          <span className="t-caption place-card-kind">{placeKindLabel(place)}</span>
           <div className="meta">
             <Rating value={shownRating(place)} />
             <span>{formatCost(place.estimatedCost)}</span>
             {place.distanceMeters != null && <span>{formatDistance(place.distanceMeters)}</span>}
           </div>
-          {reason && <span className="t-caption" style={{ color: 'var(--success)', fontWeight: 650 }}>{reason}</span>}
+          {reason && <span className="t-caption place-card-reason" title={reason}>{reason}</span>}
         </div>
       </Link>
       <SaveButton place={place} glass />

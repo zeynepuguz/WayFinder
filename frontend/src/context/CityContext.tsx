@@ -36,6 +36,8 @@ interface CityState {
   error: string | null
   reload: () => void
   setCity: (slug: string) => void
+  // Forgets the user's choice: the city at their position again
+  clearCity: () => void
 }
 
 const CityContext = createContext<CityState | null>(null)
@@ -80,11 +82,19 @@ export function CityProvider({ children }: { children: ReactNode }) {
     saveCity(slug)
     setChosen(slug)
   }, [])
+  const clearCity = useCallback(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // nothing saved
+    }
+    setChosen(null)
+  }, [])
   const reload = list.reload
 
   const value = useMemo<CityState>(() => ({
-    city, citySlug, cities, loading: list.loading, error: list.error, reload: () => void reload(), setCity,
-  }), [city, citySlug, list.data, list.loading, list.error, reload, setCity])
+    city, citySlug, cities, loading: list.loading, error: list.error, reload: () => void reload(), setCity, clearCity,
+  }), [city, citySlug, list.data, list.loading, list.error, reload, setCity, clearCity])
   return <CityContext.Provider value={value}>{children}</CityContext.Provider>
 }
 
